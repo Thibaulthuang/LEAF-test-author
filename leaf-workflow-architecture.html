@@ -1,0 +1,815 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LEAF Test Author Workflow Architecture</title>
+  <style>
+    :root {
+      --ink: #17212b;
+      --muted: #5d6d7e;
+      --paper: #f4f7fa;
+      --panel: #ffffff;
+      --line: #d7e0e8;
+      --green: #16866f;
+      --blue: #2f74c8;
+      --amber: #b7791f;
+      --red: #c4423f;
+      --green-soft: #e4f4ef;
+      --blue-soft: #e7f1fb;
+      --amber-soft: #fff2d5;
+      --red-soft: #fdebea;
+      --shadow: 0 14px 32px rgba(23, 33, 43, 0.10);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+      line-height: 1.64;
+    }
+
+    .hero {
+      min-height: 420px;
+      color: #fff;
+      display: grid;
+      align-items: end;
+      background:
+        linear-gradient(120deg, rgba(13, 31, 48, 0.94), rgba(22, 79, 87, 0.80)),
+        url("assets/agent-architecture-hero.svg") center/cover no-repeat;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: auto 0 0;
+      height: 120px;
+      background: linear-gradient(0deg, var(--paper), rgba(244, 247, 250, 0));
+    }
+
+    .hero-inner {
+      width: min(1160px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 72px 0 82px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .eyebrow {
+      font-weight: 700;
+      color: #b9efe4;
+      margin-bottom: 14px;
+    }
+
+    h1 {
+      max-width: 920px;
+      margin: 0;
+      font-size: clamp(34px, 5vw, 64px);
+      line-height: 1.08;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      max-width: 850px;
+      margin-top: 20px;
+      font-size: clamp(17px, 2vw, 21px);
+      color: #dfeef3;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 24px;
+    }
+
+    .chip {
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      border-radius: 999px;
+      padding: 6px 12px;
+      background: rgba(255, 255, 255, 0.12);
+      color: #f1fbfd;
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    main {
+      width: min(1160px, calc(100% - 40px));
+      margin: -38px auto 72px;
+      position: relative;
+      z-index: 2;
+    }
+
+    section { margin: 34px 0; }
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      gap: 24px;
+      margin-bottom: 16px;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: clamp(25px, 3vw, 36px);
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 0 0 10px;
+      font-size: 19px;
+      line-height: 1.28;
+      letter-spacing: 0;
+    }
+
+    p { margin: 0; }
+
+    .note {
+      max-width: 760px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .grid {
+      display: grid;
+      gap: 16px;
+    }
+
+    .cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      padding: 20px;
+    }
+
+    .band {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .band-row {
+      display: grid;
+      grid-template-columns: 210px 1fr 1fr;
+      gap: 18px;
+      padding: 18px 20px;
+      border-top: 1px solid var(--line);
+    }
+
+    .band-row:first-child { border-top: 0; }
+
+    .phase {
+      font-weight: 750;
+      color: #203446;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 27px;
+      padding: 4px 9px;
+      border-radius: 999px;
+      background: var(--blue-soft);
+      color: #225b96;
+      font-size: 13px;
+      font-weight: 650;
+      margin: 0 6px 6px 0;
+    }
+
+    .tag.green { background: var(--green-soft); color: #126d5b; }
+    .tag.amber { background: var(--amber-soft); color: #805713; }
+    .tag.red { background: var(--red-soft); color: #a13d39; }
+
+    code, pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+
+    code {
+      padding: 2px 6px;
+      border-radius: 5px;
+      background: #edf3f7;
+      color: #244257;
+      font-size: 0.92em;
+    }
+
+    pre {
+      margin: 12px 0 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: #101c28;
+      color: #e8f2f7;
+      border-radius: 8px;
+      padding: 15px;
+      font-size: 13px;
+      line-height: 1.55;
+      overflow-x: auto;
+    }
+
+    ul {
+      margin: 10px 0 0;
+      padding-left: 20px;
+    }
+
+    li { margin: 6px 0; }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .flow-step {
+      min-height: 126px;
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 8px;
+      padding: 14px;
+      position: relative;
+    }
+
+    .flow-step strong {
+      display: block;
+      margin-bottom: 6px;
+      color: #203446;
+    }
+
+    .flow-step span {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .diagram {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      padding: 22px;
+      overflow-x: auto;
+    }
+
+    .lane-title {
+      display: grid;
+      grid-template-columns: 150px repeat(5, minmax(135px, 1fr));
+      gap: 10px;
+      min-width: 860px;
+      margin-bottom: 10px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .lane-row {
+      display: grid;
+      grid-template-columns: 150px repeat(5, minmax(135px, 1fr));
+      gap: 10px;
+      min-width: 860px;
+      align-items: stretch;
+      margin-top: 10px;
+    }
+
+    .lane-label {
+      display: flex;
+      align-items: center;
+      font-weight: 750;
+      color: #203446;
+    }
+
+    .node {
+      min-height: 86px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: #f9fcfe;
+      position: relative;
+      font-size: 14px;
+    }
+
+    .node strong {
+      display: block;
+      margin-bottom: 5px;
+      color: #1f3446;
+    }
+
+    .node.user {
+      border-color: #b8dfd5;
+      background: var(--green-soft);
+    }
+
+    .node.agent {
+      border-color: #bed5ef;
+      background: var(--blue-soft);
+    }
+
+    .node.tool {
+      border-color: #e6d098;
+      background: var(--amber-soft);
+    }
+
+    .node.device {
+      border-color: #efc1be;
+      background: var(--red-soft);
+    }
+
+    .empty {
+      border: 1px dashed #cfd9e1;
+      background: #fbfdfe;
+    }
+
+    .callout {
+      border-left: 4px solid var(--green);
+      background: var(--green-soft);
+      padding: 14px 16px;
+      border-radius: 8px;
+      color: #174d43;
+    }
+
+    .risk {
+      border-left-color: var(--amber);
+      background: var(--amber-soft);
+      color: #5f4315;
+    }
+
+    @media (max-width: 920px) {
+      .cols-2,
+      .cols-3,
+      .flow,
+      .band-row {
+        grid-template-columns: 1fr;
+      }
+
+      .section-head {
+        display: block;
+      }
+
+      .note { margin-top: 8px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-inner">
+      <div class="eyebrow">LEAF Test Author</div>
+      <h1>OpenCode 本地用例生成工作流说明</h1>
+      <p class="lead">本文描述当前仓库的真实 workflow：用户从 <code>/leaf-new-case</code> 进入，OpenCode 技能负责语义规划，Python 工具层负责稳定产物、验证、设备探测与真实执行。</p>
+      <div class="chips">
+        <span class="chip">默认平台 OpenHarmony</span>
+        <span class="chip">两阶段确认</span>
+        <span class="chip">Camera 域已接入</span>
+        <span class="chip">GUI Agent 只读接入</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <div class="section-head">
+        <h2>当前 Workflow</h2>
+        <p class="note">每个请求创建一个 run 目录，所有状态和证据都落盘，断点恢复依赖 <code>workflow.json</code>，而不是依赖对话上下文。</p>
+      </div>
+      <div class="flow">
+        <div class="flow-step"><strong>1. 用户入口</strong><span><code>/leaf-new-case camera "打开相机拍照"</code></span></div>
+        <div class="flow-step"><strong>2. 语义计划</strong><span>加载 <code>leaf-camera</code>，生成 <code>plan_input.json</code>。</span></div>
+        <div class="flow-step"><strong>3. 工具落盘</strong><span>创建 <code>workflow.json</code> 和 <code>plan.json</code>。</span></div>
+        <div class="flow-step"><strong>4. 首次确认</strong><span>用户确认计划后才生成 pytest 与 Hypium draft。</span></div>
+        <div class="flow-step"><strong>5. 安全本地阶段</strong><span>验证 draft、跑静态/pytest gate、收集只读 GUI 上下文。</span></div>
+        <div class="flow-step"><strong>6. 真实执行</strong><span>第二次确认后执行 direct smoke、capture E2E 或 Hypium E2E。</span></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>用户在循环中的位置</h2>
+        <p class="note">用户不是每一步都参与。当前设计只有两个必须停下来的 checkpoint：计划确认和真实设备变更确认。</p>
+      </div>
+      <div class="diagram" aria-label="LEAF workflow lanes">
+        <div class="lane-title">
+          <div>Lane</div>
+          <div>输入</div>
+          <div>计划</div>
+          <div>首次确认后</div>
+          <div>安全验证</div>
+          <div>真实执行</div>
+        </div>
+        <div class="lane-row">
+          <div class="lane-label">用户</div>
+          <div class="node user"><strong>发起请求</strong><code>/leaf-new-case camera "打开相机拍照"</code></div>
+          <div class="node user"><strong>确认计划</strong>检查步骤、风险、将写入文件。回复 yes 才进入生成阶段。</div>
+          <div class="node empty"></div>
+          <div class="node empty"></div>
+          <div class="node user"><strong>二次确认</strong>确认真实拍照、安装 HAP 或运行 Hypium 等设备动作。</div>
+        </div>
+        <div class="lane-row">
+          <div class="lane-label">OpenCode Agent</div>
+          <div class="node agent"><strong>路由入口</strong><code>/leaf-new-case</code> 固定加载 <code>leaf-test-author</code>。</div>
+          <div class="node agent"><strong>语义展开</strong>加载 <code>leaf-camera</code>，写 <code>plan_input.json</code>。</div>
+          <div class="node agent"><strong>继续编排</strong>调用 <code>confirm-plan</code> 和 <code>advance</code>，不中途停在 next_action。</div>
+          <div class="node agent"><strong>解释质量门</strong>向用户说明 draft pass、direct smoke、capture e2e、Hypium pass 的差异。</div>
+          <div class="node agent"><strong>受控执行</strong>只有拿到二次确认才传入 <code>--run-real</code>。</div>
+        </div>
+        <div class="lane-row">
+          <div class="lane-label">Python 工具层</div>
+          <div class="node tool"><strong>创建 run</strong><code>workflow.json</code> 记录 owner、phase、artifacts。</div>
+          <div class="node tool"><strong>校验计划</strong><code>planner.py</code> 验证 steps 和 domain contract。</div>
+          <div class="node tool"><strong>生成产物</strong><code>case.json</code>、pytest、Hypium、OpenHarmony export。</div>
+          <div class="node tool"><strong>稳定推进</strong><code>validation.json</code>、<code>pytest_result.json</code>、<code>gui_context.json</code>、manifest。</div>
+          <div class="node tool"><strong>记录证据</strong><code>camera_capture_e2e.json</code>、<code>hypium_result.json</code>。</div>
+        </div>
+        <div class="lane-row">
+          <div class="lane-label">设备 / 项目</div>
+          <div class="node empty"></div>
+          <div class="node device"><strong>只读探测</strong>允许 list targets、读 model/API version。</div>
+          <div class="node empty"></div>
+          <div class="node device"><strong>只读上下文</strong>允许 dump layout 和 hilog。</div>
+          <div class="node device"><strong>状态变更</strong>启动 Camera、点击快门、安装 test HAP、运行 aa test。</div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>OpenCode 如何稳定触发阶段</h2>
+        <p class="note">关键不是让模型记住流程，而是让命令、技能、状态机和质量门共同限制它只能按可恢复的路径前进。</p>
+      </div>
+      <div class="grid cols-2">
+        <div class="card">
+          <h3>触发稳定性</h3>
+          <ul>
+            <li><code>.opencode/commands/leaf-new-case.md</code> 固定入口，要求先调用 <code>leaf-test-author</code>。</li>
+            <li><code>leaf-test-author</code> 只做 workflow 决策，不直接拼复杂文件格式。</li>
+            <li>领域理解必须加载 <code>leaf-&lt;domain&gt;</code>，Camera 场景由 <code>leaf-camera</code> 负责语义展开。</li>
+            <li>每个阶段通过 Python CLI 子命令触发：<code>new-case</code>、<code>confirm-plan</code>、<code>advance</code>、<code>resume</code>、<code>run-e2e</code>。</li>
+            <li>工具返回 <code>plan_summary</code>、<code>resume_summary</code>、<code>quality_gate</code> 和 <code>next_action</code>，OpenCode 不需要猜下一步。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>上下文稳定性</h3>
+          <ul>
+            <li>对话上下文可以丢失，但 <code>.leaf/runs/&lt;run_id&gt;/workflow.json</code> 保存当前 phase。</li>
+            <li>所有关键中间产物都有路径记录在 <code>artifacts</code> 中。</li>
+            <li><code>/leaf-resume &lt;run_id&gt;</code> 读取 workflow，再调用 <code>resume</code> 决定安全下一步。</li>
+            <li>LLM 生成的语义输入落盘到 <code>plan_input.json</code>，后续 plan/case/draft 都能追溯。</li>
+            <li>真实设备证据单独写 JSON，避免只靠终端输出判断是否通过。</li>
+          </ul>
+        </div>
+      </div>
+      <div class="grid cols-2" style="margin-top:16px;">
+        <div class="card">
+          <h3>任务稳定性</h3>
+          <ul>
+            <li>首次确认前只允许 workflow、plan、只读 probe 产物。</li>
+            <li>确认后 <code>advance</code> 自动跑安全本地阶段，不停在半成品。</li>
+            <li>真实设备变更必须显式传入 <code>--run-real</code>，Camera capture 还要 <code>--camera-capture</code>。</li>
+            <li>质量门区分草稿、框架 smoke、业务 capture、Hypium 真机通过，避免误报。</li>
+            <li>失败阶段写入对应 JSON，下一次 resume 可以从失败点分析，而不是重跑高风险动作。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>是否需要 Subagents</h3>
+          <p>需要，但要克制。当前 <code>leaf-test-author</code> 可以视为主 subagent：它拥有 workflow 决策权。领域技能承担领域 subagent 的角色，但不直接改工具层。</p>
+          <ul>
+            <li>建议保留一个主编排 subagent：<code>leaf-test-author</code>。</li>
+            <li>每个领域一个领域 subagent/skill：<code>leaf-camera</code>、未来 <code>leaf-display</code>。</li>
+            <li>GUI Agent 应作为证据采集/诊断 subagent 接入，默认只读。</li>
+            <li>不要让多个 subagent 同时写同一个 run 状态；状态迁移仍由 Python 工具层集中执行。</li>
+          </ul>
+        </div>
+      </div>
+      <div class="callout risk" style="margin-top:16px;">
+        Subagents 的价值是隔离职责和压缩上下文，不是增加自由度。真正保证稳定的是落盘状态、确定性工具、显式质量门和用户 checkpoint。
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>代码级触发链路</h2>
+        <p class="note">下面把“稳定触发”展开到实际代码。核心思想是：OpenCode 只负责按协议调用，真正的阶段边界由 Python 工具层和落盘状态控制。</p>
+      </div>
+      <div class="grid cols-2">
+        <div class="card">
+          <h3>1. 命令协议先限制 OpenCode</h3>
+          <p><code>.opencode/commands/leaf-new-case.md</code> 规定了固定顺序：加载主 skill、加载领域 skill、写 <code>plan_input.json</code>、调用 Python、等待用户确认。</p>
+          <pre>1. Invoke the `leaf-test-author` skill/subagent.
+3. Load the domain skill, such as `leaf-camera`.
+4. Call deterministic tools under `tools/leaf_author/`.
+5. Present the generated plan for confirmation.
+6. If the user replies `yes`, call `confirm-plan`.
+7. Immediately call `advance &lt;run_id&gt;`.
+8. Stop before real-device execution.</pre>
+          <p style="margin-top:12px;">这里不是建议，而是 OpenCode 命令的执行合同。它让模型从“自由发挥”变成“按阶段调用”。</p>
+        </div>
+
+        <div class="card">
+          <h3>2. CLI 只暴露固定阶段入口</h3>
+          <p><code>tools/leaf_author/__main__.py</code> 把动作收敛成有限子命令，OpenCode 不能传一段自然语言让工具自由解释。</p>
+          <pre>new_case = subparsers.add_parser("new-case")
+confirm = subparsers.add_parser("confirm-plan")
+resume = subparsers.add_parser("resume")
+advance = subparsers.add_parser("advance")
+
+advance.add_argument("--run-real", action="store_true")
+advance.add_argument("--camera-direct", action="store_true")
+advance.add_argument("--camera-capture", action="store_true")</pre>
+          <p style="margin-top:12px;">没有 <code>--run-real</code>，<code>advance</code> 只能跑安全本地阶段；没有 <code>--camera-capture</code>，不会触发真实拍照。</p>
+        </div>
+
+        <div class="card">
+          <h3>3. 每个 run 落盘成状态机</h3>
+          <p><code>workflow.py</code> 创建可恢复状态。对话上下文丢失时，<code>/leaf-resume</code> 读取这里，而不是让模型回忆。</p>
+          <pre>workflow = {
+  "owner": "leaf-test-author",
+  "domain": domain,
+  "platform": "openharmony",
+  "current_phase": "plan",
+  "confirmed_plan": False,
+  "artifacts": {
+    "workflow": ".leaf/runs/&lt;run_id&gt;/workflow.json",
+    "plan": ".leaf/runs/&lt;run_id&gt;/plan.json"
+  }
+}</pre>
+          <p style="margin-top:12px;">稳定性来自 <code>current_phase</code> 和 <code>confirmed_plan</code>。OpenCode 只需要读状态并按返回的 <code>next_action</code> 继续。</p>
+        </div>
+
+        <div class="card">
+          <h3>4. 语义计划必须通过确定性校验</h3>
+          <p><code>planner.py</code> 校验 OpenCode 写入的 <code>plan_input.json</code>。Camera capture 必须包含打开、拍照动作、新照片验证。</p>
+          <pre>steps = _validated_steps(plan_input)
+target_feature = str(plan_input.get("target_feature"))
+_validate_domain_plan(domain, target_feature, steps)
+
+required_groups = [
+  ("打开", "相机"),
+  ("拍照模式", "快门"),
+  ("新照片", "照片")
+]</pre>
+          <p style="margin-top:12px;">所以即使用户只说“打开相机拍照”，OpenCode 也必须扩成完整语义步骤；扩错会被 Python 拒绝。</p>
+        </div>
+
+        <div class="card">
+          <h3>5. resume/advance 串起阶段</h3>
+          <p><code>resume_run</code> 根据 phase 返回下一步，<code>advance_run</code> 自动跑安全本地阶段，减少模型逐步判断的机会。</p>
+          <pre>if current_phase == "plan" and not confirmed:
+    next_action = "present_plan_for_confirmation"
+elif current_phase in {"pytest_draft", "hypium_draft"}:
+    next_action = "validate_pytest_draft"
+elif current_phase == "validated":
+    next_action = "run_pytest_draft"
+
+if current_phase in {"pytest_draft", "hypium_draft"}:
+    validate_pytest_draft(root, run_id)
+if current_phase == "validated":
+    run_pytest_draft(root, run_id)</pre>
+          <p style="margin-top:12px;">这就是为什么确认后要求立刻 <code>advance</code>：安全阶段由状态机推进，不靠 OpenCode 一步步猜。</p>
+        </div>
+
+        <div class="card">
+          <h3>6. 质量门把结果类型固定住</h3>
+          <p><code>camera_smoke.py</code> 把不同失败归一化成稳定质量门，并返回说明和建议。</p>
+          <pre>if "TARGET_CANDIDATES_EMPTY" in missing:
+    return "CAMERA_SMOKE_TARGET_MISSING"
+if "TEST_RUNNER_HAP_MISSING" in missing:
+    return "CAMERA_SMOKE_TEST_RUNNER_MISSING"
+
+return {
+  "quality_gate": quality_gate,
+  "quality_gate_description": ...,
+  "recommended_actions": ...
+}</pre>
+          <p style="margin-top:12px;">OpenCode 不需要从 hdc 输出里猜原因。它只要展示 <code>quality_gate</code>、说明和下一步建议。</p>
+        </div>
+      </div>
+      <div class="callout" style="margin-top:16px;">
+        最终链路是：固定命令 -> skill 协议 -> <code>plan_input.json</code> -> Python 校验 -> <code>workflow.json</code> -> 用户确认 -> <code>confirm-plan</code> -> <code>advance</code> -> 显式 <code>--run-real</code> -> 质量门 -> <code>resume</code> 可恢复。
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>阶段稳定性保障</h2>
+        <p class="note">稳定性的核心是“LLM 只做决策和解释，确定性工具负责文件格式、状态迁移、质量门和设备命令”。</p>
+      </div>
+      <div class="band">
+        <div class="band-row">
+          <div class="phase">Plan</div>
+          <div>产物：<code>.leaf/runs/&lt;run_id&gt;/workflow.json</code>、<code>plan.json</code>。</div>
+          <div><span class="tag green">稳定点</span>计划由 Python 校验；未确认前不生成 draft，不执行高风险设备动作。</div>
+        </div>
+        <div class="band-row">
+          <div class="phase">Confirm</div>
+          <div>产物：<code>case.json</code>、<code>tests/generated/*.py</code>、<code>hypium/*.test.ets</code>、OpenHarmony export。</div>
+          <div><span class="tag green">稳定点</span>pytest 与 Hypium 都从 <code>case.json</code> 派生，避免两套生成逻辑漂移。</div>
+        </div>
+        <div class="band-row">
+          <div class="phase">Validate</div>
+          <div>产物：<code>validation.json</code>、<code>pytest_result.json</code>。</div>
+          <div><span class="tag amber">质量门</span><code>DRAFT_VALIDATED</code> 和 <code>DRAFT_STATIC_PASS</code> 只代表 draft 可执行，不代表真实设备通过。</div>
+        </div>
+        <div class="band-row">
+          <div class="phase">GUI Context</div>
+          <div>产物：<code>gui_context.json</code>，包含 layout 和 hilog 摘要。</div>
+          <div><span class="tag green">稳定点</span>当前 GUI Agent 只读，不点击、不修复、不改 AW 代码。</div>
+        </div>
+        <div class="band-row">
+          <div class="phase">Real Device</div>
+          <div>产物：<code>camera_direct_smoke.json</code>、<code>camera_capture_e2e.json</code>、<code>hypium_result.json</code>。</div>
+          <div><span class="tag red">安全边界</span>拍照会创建媒体文件，必须在计划确认后再二次确认。</div>
+        </div>
+        <div class="band-row">
+          <div class="phase">Experience</div>
+          <div>产物：<code>.leaf/knowledge/&lt;domain&gt;/&lt;platform&gt;/experience/*.json</code>、<code>team_export_manifest.json</code>。</div>
+          <div><span class="tag blue">稳定点</span>经验记录是 reviewable draft knowledge，不自动修改 AW 或业务代码。</div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>领域插件如何插入</h2>
+        <p class="note">领域插件不是 Python 包，而是 OpenCode skill + Python deterministic mapping 的组合。当前 Camera 是参考实现。</p>
+      </div>
+      <div class="grid cols-3">
+        <div class="card">
+          <h3>1. OpenCode Skill</h3>
+          <p>新增 <code>.opencode/skills/leaf-&lt;domain&gt;/SKILL.md</code>，定义自然语言如何展开成领域动作、默认平台、风险和真实设备边界。</p>
+          <pre>domain = "camera"
+target_feature = "camera.capture"
+steps = [
+  "打开系统相机",
+  "确认处于拍照模式",
+  "点击快门拍照",
+  "检查产生新照片"
+]</pre>
+        </div>
+        <div class="card">
+          <h3>2. Plan 与 Case Spec</h3>
+          <p>在 <code>planner.py</code> 和 <code>case_spec.py</code> 中加入领域验证和动作映射。这里的规则必须是确定性的，可测试的。</p>
+          <pre>CameraAW.launch
+CameraAW.switchToPhotoMode
+CameraAW.capture
+GalleryAW.assertLatestPhotoCreatedAfter</pre>
+        </div>
+        <div class="card">
+          <h3>3. 生成与执行器</h3>
+          <p>在 <code>hypium.py</code>、领域 smoke/e2e 模块中加入 draft 渲染、AW stub、preflight 和质量门。新增领域必须配套测试。</p>
+          <pre>quality_gate:
+  CAMERA_DIRECT_SMOKE_PASS
+  CAMERA_CAPTURE_E2E_PASS
+  HYPIUM_REAL_PASS</pre>
+        </div>
+      </div>
+      <div class="callout" style="margin-top:16px;">
+        插件接入原则：OpenCode 负责语义理解，Python 工具层负责格式、状态、设备命令和可重复测试。不要把确定性 JSON 格式只写在 prompt 里。
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>GUI Agent 怎么接入</h2>
+        <p class="note">当前 <code>leaf-gui-agent</code> 是预留的只读调试代理，已通过 <code>collect_gui_context</code> 接入 workflow。</p>
+      </div>
+      <div class="grid cols-2">
+        <div class="card">
+          <h3>当前允许</h3>
+          <ul>
+            <li>读取 HDC target metadata。</li>
+            <li>执行 <code>uitest dumpLayout</code> 获取布局。</li>
+            <li>执行 <code>hilog -x</code> 获取日志。</li>
+            <li>写入 <code>gui_context.json</code>，供后续人工或 agent 分析。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>下一步扩展</h3>
+          <ul>
+            <li>增加 screenshot pull 和布局节点索引。</li>
+            <li>生成 locator fallback proposal，但先只写 reviewable 建议。</li>
+            <li>处理权限弹窗前必须有 workflow 状态和用户确认。</li>
+            <li>自动点击、等待、修复 AW 都必须单独引入质量门。</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>真实用户输入与输出</h2>
+        <p class="note">下面展示当前 Camera 域的真实交互形态。用户看到的是计划摘要和下一步动作，工具层落盘完整 JSON。</p>
+      </div>
+      <div class="grid cols-2">
+        <div class="card">
+          <h3>用户输入</h3>
+          <pre>/leaf-new-case camera "打开相机拍照"</pre>
+          <p style="margin-top:12px;">OpenCode 加载 <code>leaf-test-author</code> 和 <code>leaf-camera</code>，把自然语言扩展成语义计划。</p>
+          <pre>{
+  "target_feature": "camera.capture",
+  "steps": [
+    "打开系统相机",
+    "确认处于拍照模式",
+    "点击快门拍照",
+    "检查产生新照片"
+  ],
+  "risk": "真实执行时会在设备中新增一张照片",
+  "confirmation_required": true
+}</pre>
+        </div>
+        <div class="card">
+          <h3>用户得到</h3>
+          <pre>{
+  "run_id": "run_20260624_152922",
+  "plan_path": ".leaf/runs/.../plan.json",
+  "plan_summary": {
+    "target_feature": "camera.capture",
+    "writes_after_confirmation": [
+      "tests/generated/test_run_..._camera.py"
+    ],
+    "first_confirmation_scope": "plan_only_safe_local_authoring",
+    "real_device_capture_requires_second_confirmation": true
+  }
+}</pre>
+          <p style="margin-top:12px;">首次确认后生成 <code>case.json</code>、pytest draft、Hypium draft 和 OpenHarmony 测试工程导出。</p>
+        </div>
+      </div>
+      <div class="grid cols-2" style="margin-top:16px;">
+        <div class="card">
+          <h3>Camera Preflight 输出</h3>
+          <pre>{
+  "quality_gate": "CAMERA_SMOKE_TEST_RUNNER_MISSING",
+  "readiness_summary": {
+    "target_app": "ready",
+    "test_runner": "missing",
+    "app_hap_required": false
+  },
+  "recommended_actions": [
+    "Provide --test-hap ...",
+    "If no test HAP is available yet, run camera direct smoke ..."
+  ]
+}</pre>
+        </div>
+        <div class="card">
+          <h3>Capture E2E 输出</h3>
+          <pre>{
+  "quality_gate": "CAMERA_CAPTURE_E2E_PASS",
+  "evidence_schema_version": "1.0",
+  "evidence_summary": {
+    "controls": {
+      "photo_mode_found": true,
+      "shutter_found": true
+    },
+    "media": {
+      "new_count": 1
+    }
+  }
+}</pre>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>下一步计划</h2>
+        <p class="note">优先继续把阶段 2 和阶段 4 做深，让 Camera MVP 成为可稳定复用的产品闭环。</p>
+      </div>
+      <div class="grid cols-3">
+        <div class="card">
+          <h3>短期</h3>
+          <ul>
+            <li>补 README，明确入口、环境准备、常用命令和质量门含义。</li>
+            <li>让 <code>/leaf-resume</code> 在安全阶段自动继续，而不是只返回 next action。</li>
+            <li>将 preflight 的错误摘要覆盖更多真实失败形态。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>中期</h3>
+          <ul>
+            <li>增强 GUI Agent：截图、节点索引、locator proposal。</li>
+            <li>OpenHarmony export 加冲突检测，避免覆盖目标工程手写文件。</li>
+            <li>抽象 domain 插件模板，降低新增领域成本。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>后续</h3>
+          <ul>
+            <li>在 Camera 闭环稳定后扩第二个低风险 domain。</li>
+            <li>引入真实设备执行报告汇总页。</li>
+            <li>把经验记录变成 review 后可应用的知识更新流程。</li>
+          </ul>
+        </div>
+      </div>
+      <div class="callout risk" style="margin-top:16px;">
+        当前不要急于自动修复 AW 或自动点击处理弹窗。先保证每个阶段都有明确质量门、证据文件和恢复点，再扩大自动化权限。
+      </div>
+    </section>
+  </main>
+</body>
+</html>
