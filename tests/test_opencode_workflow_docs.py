@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 import unittest
 
 
@@ -25,6 +26,35 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
         self.assertIn("case.json", combined)
         self.assertIn("final case spec", combined)
         self.assertIn("Hypium", combined)
+
+    def test_leaf_resume_documents_auto_safe_resume(self):
+        root = Path(__file__).resolve().parents[1]
+        command = (root / ".opencode" / "commands" / "leaf-resume.md").read_text(encoding="utf-8")
+
+        self.assertIn("--auto-safe", command)
+        self.assertIn("safe_to_auto_continue", command)
+        self.assertIn("must still stop", command)
+
+    def test_workflow_contract_documents_phase_quality_gate_and_user_boundaries(self):
+        root = Path(__file__).resolve().parents[1]
+        contract = json.loads((root / "docs" / "workflow-contract.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(contract["schema_version"], "1.0")
+        self.assertIn("plan", contract["phases"])
+        self.assertEqual(contract["phases"]["plan"]["user_checkpoint"], "first_plan_confirmation")
+        self.assertEqual(contract["phases"]["e2e_ready"]["user_checkpoint"], "real_device_confirmation")
+        self.assertIn("DRAFT_STATIC_PASS", contract["quality_gates"])
+        self.assertIn("CAMERA_CAPTURE_E2E_PASS", contract["quality_gates"])
+        self.assertEqual(contract["resume_policy"]["auto_safe_flag"], "--auto-safe")
+
+    def test_domain_template_documents_required_extension_points(self):
+        root = Path(__file__).resolve().parents[1]
+        template = (root / ".opencode" / "skills" / "leaf-domain-template" / "SKILL.md").read_text(encoding="utf-8")
+
+        self.assertIn("Semantic Step Expansion", template)
+        self.assertIn("Plan Input Contract", template)
+        self.assertIn("Quality Gates", template)
+        self.assertIn("Required Python Touchpoints", template)
 
 
 if __name__ == "__main__":

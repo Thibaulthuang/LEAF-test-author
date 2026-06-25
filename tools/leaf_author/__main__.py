@@ -41,6 +41,7 @@ def main(argv: list[str] | None = None) -> int:
     resume = subparsers.add_parser("resume")
     resume.add_argument("run_id")
     resume.add_argument("--root", type=Path, default=Path("."))
+    resume.add_argument("--auto-safe", action="store_true")
 
     advance = subparsers.add_parser("advance")
     advance.add_argument("run_id")
@@ -182,7 +183,7 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(confirm_plan(args.root, args.run_id), ensure_ascii=False, indent=2))
         return 0
     if args.command == "resume":
-        print(json.dumps(resume_run(args.root, args.run_id), ensure_ascii=False, indent=2))
+        print(json.dumps(resume_run(args.root, args.run_id, auto_safe=args.auto_safe), ensure_ascii=False, indent=2))
         return 0
     if args.command == "advance":
         print(

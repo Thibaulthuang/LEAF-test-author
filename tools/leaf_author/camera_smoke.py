@@ -231,6 +231,15 @@ def run_camera_capture_e2e(
         and after_verified
         and bool(new_media_files)
     )
+    failure_reason = _capture_failure_reason(
+        launch=launch,
+        before_verified=before_verified,
+        photo_mode_node=photo_mode_node,
+        shutter_node=shutter_node,
+        capture=capture,
+        after_verified=after_verified,
+        new_media_files=new_media_files,
+    )
     return _write_capture_e2e(
         root,
         run_id,
@@ -244,6 +253,7 @@ def run_camera_capture_e2e(
             "target_app": _target_app(bundle_name, resolved_module),
             "launch": launch,
             "capture": capture,
+            "failure_reason": None if passed else failure_reason,
             "evidence": {
                 "before_layout_path": before["path"],
                 "after_layout_path": after["path"],
@@ -293,6 +303,7 @@ def _camera_payload(payload: dict[str, object], next_command: str | None = None)
         },
         "missing": missing,
         "readiness_summary": _camera_readiness_summary(payload, selected_target, missing),
+        "blocking_reason": _camera_blocking_reason(quality_gate, missing),
         "quality_gate": quality_gate,
         "quality_gate_description": _camera_quality_gate_description(quality_gate),
         "recommended_actions": _camera_recommended_actions(quality_gate),
@@ -325,10 +336,14 @@ def _camera_missing(missing: object) -> list[str]:
 def _camera_quality_gate(quality_gate: str, missing: list[str]) -> str:
     if quality_gate in {"E2E_REAL_PASS", "HYPIUM_REAL_PASS"}:
         return quality_gate
+    if any(item in missing for item in ("HDC_DEVICE_UNAVAILABLE", "DEVICE_UNAVAILABLE", "HDC_TARGET_UNAVAILABLE")):
+        return "CAMERA_SMOKE_DEVICE_UNAVAILABLE"
     if "TARGET_CANDIDATES_EMPTY" in missing:
         return "CAMERA_SMOKE_TARGET_MISSING"
     if "TEST_RUNNER_HAP_MISSING" in missing:
         return "CAMERA_SMOKE_TEST_RUNNER_MISSING"
+    if "OPENHARMONY_PROJECT_MISSING" in missing:
+        return "CAMERA_SMOKE_PROJECT_MISSING"
     return "CAMERA_SMOKE_READY" if quality_gate == "E2E_PREFLIGHT_READY" else quality_gate
 
 
@@ -339,6 +354,8 @@ def _camera_readiness_summary(payload: dict[str, object], selected_target: objec
         target = readiness.get("target", {})
         if isinstance(target, dict) and target.get("device"):
             device = "ready"
+    if any(item in missing for item in ("HDC_DEVICE_UNAVAILABLE", "DEVICE_UNAVAILABLE", "HDC_TARGET_UNAVAILABLE")):
+        device = "missing"
     target_app = "missing" if "TARGET_CANDIDATES_EMPTY" in missing else "ready" if isinstance(selected_target, dict) and selected_target else "unknown"
     if payload.get("test_hap") or payload.get("package_dir"):
         test_runner = "ready"
@@ -354,11 +371,30 @@ def _camera_readiness_summary(payload: dict[str, object], selected_target: objec
     }
 
 
+def _camera_blocking_reason(quality_gate: str, missing: list[str]) -> str | None:
+    if quality_gate in {"CAMERA_SMOKE_READY", "E2E_REAL_PASS", "HYPIUM_REAL_PASS"}:
+        return None
+    preferred = [
+        "HDC_DEVICE_UNAVAILABLE",
+        "TARGET_CANDIDATES_EMPTY",
+        "TEST_RUNNER_HAP_MISSING",
+        "OPENHARMONY_PROJECT_MISSING",
+        "HAP_PACKAGE_INVALID",
+        "HAP_PACKAGE_MISSING",
+    ]
+    for item in preferred:
+        if item in missing:
+            return item
+    return missing[0] if missing else quality_gate
+
+
 def _camera_quality_gate_description(quality_gate: str) -> str:
     descriptions = {
         "CAMERA_SMOKE_READY": "Camera target and Hypium runner inputs are ready for run-camera-smoke.",
+        "CAMERA_SMOKE_DEVICE_UNAVAILABLE": "No usable OpenHarmony device is available through HDC.",
         "CAMERA_SMOKE_TEST_RUNNER_MISSING": "Camera target is available, but no Hypium test-runner HAP or buildable OpenHarmony project was found.",
         "CAMERA_SMOKE_TARGET_MISSING": "No Camera bundle candidate was found on the connected device.",
+        "CAMERA_SMOKE_PROJECT_MISSING": "No test HAP or buildable OpenHarmony project was found for the Camera Hypium runner.",
         "E2E_REAL_PASS": "Camera Hypium E2E passed on a real device.",
         "HYPIUM_REAL_PASS": "Hypium execution passed on a real device.",
     }
@@ -366,10 +402,20 @@ def _camera_quality_gate_description(quality_gate: str) -> str:
 
 
 def _camera_recommended_actions(quality_gate: str) -> list[str]:
+    if quality_gate == "CAMERA_SMOKE_DEVICE_UNAVAILABLE":
+        return [
+            "Connect an OpenHarmony device, verify HDC can list the serial, then rerun camera-smoke-preflight.",
+            "If multiple devices are connected, pass the intended --serial explicitly.",
+        ]
     if quality_gate == "CAMERA_SMOKE_TEST_RUNNER_MISSING":
         return [
             "Provide --test-hap <path>, --package-dir <hap_output_dir>, or a buildable OpenHarmony project.",
             "If no test HAP is available yet, run camera direct smoke as the safe real-device framework check.",
+        ]
+    if quality_gate == "CAMERA_SMOKE_PROJECT_MISSING":
+        return [
+            "Provide --project-dir <openharmony_project_dir> and --target-module-dir <module_dir>, or provide --test-hap <path>.",
+            "If the project exists elsewhere, pass --discover-root <path> so preflight can discover HAP artifacts.",
         ]
     if quality_gate == "CAMERA_SMOKE_TARGET_MISSING":
         return [
@@ -555,7 +601,7 @@ def _enrich_capture_payload(payload: dict[str, object]) -> dict[str, object]:
     }
     evidence = payload.get("evidence", {})
     if isinstance(evidence, dict):
-        enriched["evidence_summary"] = _capture_evidence_summary(evidence)
+        enriched["evidence_summary"] = _capture_evidence_summary(evidence, failure_reason=payload.get("failure_reason"))
     return enriched
 
 
@@ -569,11 +615,12 @@ def _capture_quality_gate_description(quality_gate: str) -> str:
     return "Camera capture failed; inspect layout, shutter, click, and media evidence."
 
 
-def _capture_evidence_summary(evidence: dict[str, object]) -> dict[str, object]:
+def _capture_evidence_summary(evidence: dict[str, object], failure_reason: object = None) -> dict[str, object]:
     before_media = evidence.get("media_before", [])
     after_media = evidence.get("media_after", [])
     new_media = evidence.get("new_media_files", [])
     return {
+        "failure_reason": failure_reason,
         "before_layout": {
             "path": evidence.get("before_layout_path"),
             "verified": bool(evidence.get("before_layout_verified")),
@@ -594,3 +641,30 @@ def _capture_evidence_summary(evidence: dict[str, object]) -> dict[str, object]:
             "new_files": new_media if isinstance(new_media, list) else [],
         },
     }
+
+
+def _capture_failure_reason(
+    *,
+    launch: dict[str, object],
+    before_verified: bool,
+    photo_mode_node: dict[str, object] | None,
+    shutter_node: dict[str, object] | None,
+    capture: dict[str, object],
+    after_verified: bool,
+    new_media_files: list[str],
+) -> str:
+    if not _command_succeeded(launch):
+        return "CAMERA_LAUNCH_FAILED"
+    if not before_verified:
+        return "BEFORE_LAYOUT_NOT_CAMERA"
+    if photo_mode_node is None:
+        return "PHOTO_MODE_NODE_MISSING"
+    if shutter_node is None:
+        return "SHUTTER_NODE_MISSING"
+    if not _command_succeeded(capture):
+        return "SHUTTER_CLICK_FAILED"
+    if not after_verified:
+        return "AFTER_LAYOUT_NOT_CAMERA"
+    if not new_media_files:
+        return "NEW_MEDIA_FILE_MISSING"
+    return "UNKNOWN"

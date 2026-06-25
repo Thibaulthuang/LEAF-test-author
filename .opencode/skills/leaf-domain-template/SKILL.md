@@ -1,0 +1,72 @@
+---
+name: leaf-domain-template
+description: Template for adding a LEAF domain skill. Copy this structure for new domains.
+---
+
+# leaf-domain-template
+
+Use this template when adding a new `leaf-<domain>` skill.
+
+## Domain Defaults
+
+- Platform default: `openharmony` unless the domain explicitly needs another platform.
+- Define the target app or target feature ownership.
+- State whether the target app is built in, installed by HAP, or provided by the user.
+- State which actions are read-only and which actions mutate device state.
+
+## Semantic Step Expansion
+
+Define how natural user phrases become explicit ordered domain operations.
+Do not rely on punctuation splitting. A short phrase must expand into a complete
+end-to-end plan when the domain requires evidence.
+
+Example shape:
+
+```json
+{
+  "target_feature": "<domain>.<feature>",
+  "steps": [
+    "打开目标功能",
+    "执行核心动作",
+    "验证真实证据"
+  ],
+  "risk": "真实执行时可能改变设备状态",
+  "confirmation_required": true
+}
+```
+
+## Plan Input Contract
+
+The OpenCode agent writes `.leaf/runs/<run_id>/plan_input.json` before calling
+the deterministic Python layer. The Python layer must validate:
+
+- `target_feature`
+- non-empty ordered `steps`
+- required evidence steps
+- risk wording when real execution mutates device state
+
+## Quality Gates
+
+Define domain-specific gates and what each gate proves. Keep draft gates separate
+from real-device gates.
+
+- `<DOMAIN>_DIRECT_SMOKE_PASS`: framework/device control evidence.
+- `<DOMAIN>_E2E_PASS`: business behavior evidence.
+- `HYPIUM_REAL_PASS`: installed Hypium test package pass on a real device.
+
+## Required Python Touchpoints
+
+Adding a domain normally requires reviewing these files:
+
+- `tools/leaf_author/planner.py`: semantic plan validation.
+- `tools/leaf_author/case_spec.py`: domain action mapping.
+- `tools/leaf_author/hypium.py`: Hypium rendering and AW export if needed.
+- `tools/leaf_author/<domain>_smoke.py`: domain preflight/direct/e2e execution if needed.
+- `tests/`: unit tests for plan validation, generated drafts, quality gates, and CLI output.
+
+## Safety Rules
+
+- Do not run device-mutating commands before plan confirmation.
+- Require a second confirmation before destructive or state-changing real-device execution.
+- GUI context collection must remain read-only unless a separate workflow state and user approval authorize mutation.
+- Experience records are reviewable draft knowledge and must not auto-modify AW code.

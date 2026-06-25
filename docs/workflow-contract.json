@@ -1,0 +1,107 @@
+{
+  "schema_version": "1.0",
+  "owner": "leaf-test-author",
+  "default_platform": "openharmony",
+  "entrypoints": {
+    "new_case": "/leaf-new-case <domain> \"<teststep>\"",
+    "resume": "/leaf-resume <run_id>",
+    "python_module": "python3 -m tools.leaf_author"
+  },
+  "resume_policy": {
+    "auto_safe_flag": "--auto-safe",
+    "safe_local_actions": [
+      "validate_pytest_draft",
+      "run_pytest_draft",
+      "collect_gui_context",
+      "record_experience",
+      "export_team_knowledge"
+    ],
+    "never_auto_cross": [
+      "first_plan_confirmation",
+      "real_device_confirmation"
+    ]
+  },
+  "phases": {
+    "plan": {
+      "user_checkpoint": "first_plan_confirmation",
+      "allowed_artifacts": [
+        "workflow",
+        "plan",
+        "device_probe"
+      ],
+      "next_action": "present_plan_for_confirmation"
+    },
+    "hypium_draft": {
+      "user_checkpoint": null,
+      "allowed_artifacts": [
+        "case",
+        "pytest",
+        "hypium",
+        "openharmony_test_project"
+      ],
+      "next_action": "validate_pytest_draft"
+    },
+    "validated": {
+      "user_checkpoint": null,
+      "allowed_artifacts": [
+        "validation"
+      ],
+      "next_action": "run_pytest_draft"
+    },
+    "pytest_ran": {
+      "user_checkpoint": null,
+      "allowed_artifacts": [
+        "pytest_result"
+      ],
+      "next_action": "collect_gui_context"
+    },
+    "gui_context_collected": {
+      "user_checkpoint": null,
+      "allowed_artifacts": [
+        "gui_context"
+      ],
+      "next_action": "record_experience"
+    },
+    "experience_recorded": {
+      "user_checkpoint": null,
+      "allowed_artifacts": [
+        "experience"
+      ],
+      "next_action": "export_team_knowledge"
+    },
+    "e2e_not_ready": {
+      "user_checkpoint": null,
+      "allowed_artifacts": [
+        "e2e_preflight_report",
+        "e2e_readiness"
+      ],
+      "next_action": "prepare_haps_or_target_bundle"
+    },
+    "e2e_ready": {
+      "user_checkpoint": "real_device_confirmation",
+      "allowed_artifacts": [
+        "e2e_preflight_report",
+        "e2e_readiness"
+      ],
+      "next_action": "run_real_hypium"
+    },
+    "complete": {
+      "user_checkpoint": null,
+      "allowed_artifacts": [
+        "team_export_manifest"
+      ],
+      "next_action": "complete"
+    }
+  },
+  "quality_gates": {
+    "DRAFT_VALIDATED": "Generated pytest draft contains required traceability metadata.",
+    "DRAFT_STATIC_PASS": "Host-side draft gate passed; this is not a real-device pass.",
+    "CAMERA_DIRECT_SMOKE_PASS": "Built-in Camera foregrounded and UiTest layout evidence matched the Camera bundle and ability.",
+    "CAMERA_CAPTURE_E2E_PASS": "Camera capture passed through UiTest shutter control and new media-file evidence.",
+    "HYPIUM_REAL_PASS": "Hypium test package executed successfully on a real OpenHarmony device.",
+    "CAMERA_SMOKE_DEVICE_UNAVAILABLE": "HDC did not expose a usable OpenHarmony device.",
+    "CAMERA_SMOKE_TARGET_MISSING": "No built-in Camera target candidate was found.",
+    "CAMERA_SMOKE_TEST_RUNNER_MISSING": "Camera target is available but no Hypium test-runner HAP or buildable project was found.",
+    "CAMERA_SMOKE_PROJECT_MISSING": "No test HAP or buildable OpenHarmony project was found."
+  }
+}

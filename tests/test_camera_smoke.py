@@ -43,6 +43,7 @@ class CameraSmokeTests(unittest.TestCase):
             self.assertEqual(result["readiness_summary"]["device"], "unknown")
             self.assertEqual(result["readiness_summary"]["target_app"], "ready")
             self.assertEqual(result["readiness_summary"]["test_runner"], "missing")
+            self.assertEqual(result["blocking_reason"], "TEST_RUNNER_HAP_MISSING")
             self.assertEqual(result["quality_gate_description"], "Camera target is available, but no Hypium test-runner HAP or buildable OpenHarmony project was found.")
             self.assertIn("Provide --test-hap", result["recommended_actions"][0])
             self.assertIn("direct smoke", result["recommended_actions"][1])
@@ -75,8 +76,61 @@ class CameraSmokeTests(unittest.TestCase):
 
             self.assertEqual(result["quality_gate"], "CAMERA_SMOKE_TARGET_MISSING")
             self.assertEqual(result["readiness_summary"]["target_app"], "missing")
+            self.assertEqual(result["blocking_reason"], "TARGET_CANDIDATES_EMPTY")
             self.assertEqual(result["quality_gate_description"], "No Camera bundle candidate was found on the connected device.")
             self.assertIn("Verify the device has the built-in Camera app", result["recommended_actions"][0])
+
+    def test_camera_smoke_preflight_explains_device_unavailable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            from tools.leaf_author.camera_smoke import write_camera_smoke_preflight
+
+            with patch(
+                "tools.leaf_author.camera_smoke.write_e2e_preflight_report",
+                return_value={
+                    "run_id": "camera-smoke",
+                    "status": "not_ready",
+                    "quality_gate": "E2E_PREFLIGHT_NOT_READY",
+                    "serial": "SERIAL123",
+                    "selected_target": None,
+                    "target_discovery": {"quality_gate": "HDC_DEVICE_UNAVAILABLE", "candidates": []},
+                    "missing": ["HDC_DEVICE_UNAVAILABLE"],
+                    "next_command": "",
+                },
+            ):
+                result = write_camera_smoke_preflight(root, "camera-smoke", serial="SERIAL123")
+
+            self.assertEqual(result["quality_gate"], "CAMERA_SMOKE_DEVICE_UNAVAILABLE")
+            self.assertEqual(result["readiness_summary"]["device"], "missing")
+            self.assertEqual(result["blocking_reason"], "HDC_DEVICE_UNAVAILABLE")
+            self.assertIn("Connect an OpenHarmony device", result["recommended_actions"][0])
+
+    def test_camera_smoke_preflight_explains_project_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            from tools.leaf_author.camera_smoke import write_camera_smoke_preflight
+
+            with patch(
+                "tools.leaf_author.camera_smoke.write_e2e_preflight_report",
+                return_value={
+                    "run_id": "camera-smoke",
+                    "status": "not_ready",
+                    "quality_gate": "E2E_PREFLIGHT_NOT_READY",
+                    "serial": "SERIAL123",
+                    "selected_target": {"bundle_name": "com.huawei.hmos.camera", "module_name": "phone"},
+                    "missing": ["OPENHARMONY_PROJECT_MISSING"],
+                    "test_hap": None,
+                    "package_dir": None,
+                    "next_command": "",
+                },
+            ):
+                result = write_camera_smoke_preflight(root, "camera-smoke", serial="SERIAL123")
+
+            self.assertEqual(result["quality_gate"], "CAMERA_SMOKE_PROJECT_MISSING")
+            self.assertEqual(result["blocking_reason"], "OPENHARMONY_PROJECT_MISSING")
+            self.assertIn("Provide --project-dir", result["recommended_actions"][0])
 
     def test_run_camera_smoke_wraps_e2e_without_app_hap(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -619,6 +673,8 @@ class CameraSmokeTests(unittest.TestCase):
 
             self.assertEqual(result["status"], "failed")
             self.assertEqual(result["quality_gate"], "CAMERA_CAPTURE_E2E_FAILED")
+            self.assertEqual(result["failure_reason"], "SHUTTER_NODE_MISSING")
+            self.assertEqual(result["evidence_summary"]["failure_reason"], "SHUTTER_NODE_MISSING")
             self.assertIsNone(result["evidence"]["shutter_node"])
             self.assertFalse(any(args[:7] == ["hdc", "-t", "SERIAL123", "shell", "uitest", "uiInput", "click"] for args in calls))
 
@@ -678,6 +734,8 @@ class CameraSmokeTests(unittest.TestCase):
 
             self.assertEqual(result["status"], "failed")
             self.assertEqual(result["quality_gate"], "CAMERA_CAPTURE_E2E_FAILED")
+            self.assertEqual(result["failure_reason"], "NEW_MEDIA_FILE_MISSING")
+            self.assertEqual(result["evidence_summary"]["failure_reason"], "NEW_MEDIA_FILE_MISSING")
             self.assertEqual(result["evidence"]["new_media_files"], [])
 
     def test_cli_run_camera_capture_e2e_outputs_json(self):

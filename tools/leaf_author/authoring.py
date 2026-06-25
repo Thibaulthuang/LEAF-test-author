@@ -83,7 +83,7 @@ def confirm_plan(root: Path, run_id: str) -> dict[str, object]:
     }
 
 
-def resume_run(root: Path, run_id: str) -> dict[str, object]:
+def resume_run(root: Path, run_id: str, auto_safe: bool = False) -> dict[str, object]:
     workflow = load_workflow(root, run_id)
     current_phase = str(workflow.get("current_phase", ""))
     confirmed = bool(workflow.get("confirmed_plan", False))
@@ -113,13 +113,28 @@ def resume_run(root: Path, run_id: str) -> dict[str, object]:
         next_action = "complete"
     else:
         next_action = "inspect_workflow_state"
-    return {
+    payload = {
         "run_id": run_id,
         "current_phase": current_phase,
         "confirmed_plan": confirmed,
         "next_action": next_action,
         "resume_summary": _resume_summary(current_phase, confirmed, next_action),
         "workflow_path": str(root / ".leaf" / "runs" / run_id / "workflow.json"),
+    }
+    if not auto_safe:
+        return payload
+    if not payload["resume_summary"]["safe_to_auto_continue"]:
+        return {**payload, "auto_advanced": False, "status": "waiting_for_confirmation" if payload["resume_summary"]["requires_user_confirmation"] else "in_progress"}
+    advance_result = advance_run(root, run_id)
+    final = load_workflow(root, run_id)
+    return {
+        **payload,
+        "auto_advanced": True,
+        "status": advance_result.get("status", "in_progress"),
+        "current_phase": final.get("current_phase"),
+        "next_action": advance_result.get("next_action"),
+        "advance_result": advance_result,
+        "resume_summary": resume_run(root, run_id)["resume_summary"],
     }
 
 

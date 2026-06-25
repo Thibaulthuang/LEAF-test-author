@@ -405,6 +405,58 @@ class LeafAuthorWorkflowTests(unittest.TestCase):
             self.assertEqual(after["resume_summary"]["requires_user_confirmation"], False)
             self.assertEqual(after["resume_summary"]["safe_to_auto_continue"], True)
 
+    def test_resume_run_auto_safe_advances_confirmed_local_workflow(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            from tools.leaf_author.authoring import confirm_plan, resume_run, start_new_case
+
+            start_new_case(root, "camera", "打开相机；点击拍照", run_id="run-auto-resume")
+            confirm_plan(root, "run-auto-resume")
+
+            result = resume_run(root, "run-auto-resume", auto_safe=True)
+
+            self.assertEqual(result["status"], "complete")
+            self.assertEqual(result["auto_advanced"], True)
+            self.assertEqual(result["current_phase"], "complete")
+            self.assertEqual(result["advance_result"]["stages"], ["validation", "pytest_result", "gui_context", "experience", "team_export_manifest"])
+            self.assertTrue((root / ".leaf" / "runs" / "run-auto-resume" / "team_export_manifest.json").exists())
+
+    def test_resume_run_auto_safe_does_not_cross_confirmation_boundary(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            from tools.leaf_author.authoring import resume_run, start_new_case
+
+            start_new_case(root, "camera", "打开相机；点击拍照", run_id="run-auto-waits")
+
+            result = resume_run(root, "run-auto-waits", auto_safe=True)
+
+            self.assertEqual(result["auto_advanced"], False)
+            self.assertEqual(result["next_action"], "present_plan_for_confirmation")
+            self.assertEqual(result["resume_summary"]["requires_user_confirmation"], True)
+
+    def test_cli_resume_auto_safe_outputs_advanced_result(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            from contextlib import redirect_stdout
+            from io import StringIO
+            from tools.leaf_author.authoring import confirm_plan, start_new_case
+            from tools.leaf_author.__main__ import main
+
+            start_new_case(root, "camera", "打开相机；点击拍照", run_id="run-auto-cli")
+            confirm_plan(root, "run-auto-cli")
+            output = StringIO()
+
+            with redirect_stdout(output):
+                exit_code = main(["resume", "run-auto-cli", "--root", str(root), "--auto-safe"])
+
+            payload = json.loads(output.getvalue())
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(payload["auto_advanced"], True)
+            self.assertEqual(payload["current_phase"], "complete")
+
 
 if __name__ == "__main__":
     unittest.main()
