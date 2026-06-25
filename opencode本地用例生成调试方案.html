@@ -1,0 +1,822 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LEAF_PRO 基于 OpenCode 的本地用例生成与调试方案</title>
+  <style>
+    :root {
+      --ink: #18232f;
+      --muted: #627181;
+      --line: #d7e1ea;
+      --paper: #f5f8fb;
+      --panel: #ffffff;
+      --green: #16866f;
+      --blue: #2f74c8;
+      --amber: #b7791f;
+      --red: #c4423f;
+      --slate: #2c3d50;
+      --green-soft: #e6f4ef;
+      --blue-soft: #e8f1fb;
+      --amber-soft: #fff3d8;
+      --red-soft: #fdebea;
+      --shadow: 0 14px 34px rgba(24, 42, 58, 0.10);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+      line-height: 1.62;
+    }
+
+    .hero {
+      position: relative;
+      min-height: 500px;
+      display: grid;
+      align-items: end;
+      overflow: hidden;
+      color: #fff;
+      background:
+        linear-gradient(120deg, rgba(9, 29, 45, 0.92), rgba(23, 74, 96, 0.78)),
+        url("assets/agent-architecture-hero.svg") center/cover no-repeat;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: auto 0 0;
+      height: 180px;
+      background: linear-gradient(0deg, rgba(245, 248, 251, 1), rgba(245, 248, 251, 0));
+    }
+
+    .hero-content {
+      position: relative;
+      z-index: 1;
+      width: min(1180px, calc(100% - 48px));
+      margin: 0 auto;
+      padding: 86px 0 88px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin: 0 0 18px;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0;
+      text-transform: uppercase;
+      color: #b8efe5;
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 34px;
+      height: 3px;
+      border-radius: 2px;
+      background: #34c0a3;
+    }
+
+    h1 {
+      max-width: 980px;
+      margin: 0;
+      font-size: clamp(36px, 5vw, 70px);
+      line-height: 1.06;
+      letter-spacing: 0;
+    }
+
+    .hero-lead {
+      max-width: 820px;
+      margin: 24px 0 0;
+      font-size: clamp(17px, 2vw, 22px);
+      color: #dcebf0;
+    }
+
+    .hero-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 28px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 34px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      background: rgba(255, 255, 255, 0.12);
+      color: #eff8fb;
+      font-size: 13px;
+      font-weight: 650;
+      backdrop-filter: blur(8px);
+    }
+
+    main {
+      width: min(1180px, calc(100% - 48px));
+      margin: -44px auto 72px;
+      position: relative;
+      z-index: 2;
+    }
+
+    section { margin: 36px 0; }
+
+    .section-head {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 18px;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: clamp(25px, 3vw, 38px);
+      line-height: 1.18;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 0 0 10px;
+      font-size: 20px;
+      line-height: 1.28;
+      letter-spacing: 0;
+    }
+
+    p { margin: 0; }
+
+    code {
+      padding: 2px 6px;
+      border-radius: 5px;
+      background: #edf3f7;
+      color: #244257;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 0.92em;
+    }
+
+    .note {
+      max-width: 760px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .grid {
+      display: grid;
+      gap: 16px;
+    }
+
+    .cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      padding: 20px;
+    }
+
+    .metric strong {
+      display: block;
+      font-size: 38px;
+      line-height: 1;
+      margin-bottom: 8px;
+      color: var(--green);
+    }
+
+    .metric span {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 4px 9px;
+      border-radius: 999px;
+      background: var(--blue-soft);
+      color: #225b96;
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    .tag.green { background: var(--green-soft); color: #126d5b; }
+    .tag.amber { background: var(--amber-soft); color: #815716; }
+    .tag.red { background: var(--red-soft); color: #a13c38; }
+
+    .decision {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      align-items: stretch;
+    }
+
+    .decision .chosen {
+      border-color: rgba(22, 134, 111, 0.35);
+      background: linear-gradient(180deg, #ffffff, #f2fbf8);
+    }
+
+    .list {
+      margin: 12px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .list li {
+      position: relative;
+      padding-left: 18px;
+      margin: 8px 0;
+      color: var(--muted);
+    }
+
+    .list li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0.75em;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--green);
+    }
+
+    .flow-panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      padding: 18px;
+      overflow-x: auto;
+    }
+
+    svg { display: block; min-width: 980px; }
+
+    .node rect {
+      fill: #fff;
+      stroke: #c9d7e2;
+      stroke-width: 1.4;
+      rx: 8;
+    }
+
+    .node text {
+      fill: #18232f;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    .node .sub {
+      fill: #627181;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .node.skill rect { fill: #e8f1fb; stroke: #8db7e0; }
+    .node.cli rect { fill: #e6f4ef; stroke: #86c7b5; }
+    .node.user rect { fill: #fff3d8; stroke: #e1b561; }
+    .node.store rect { fill: #f0edf8; stroke: #b9abd9; }
+    .node.gui rect { fill: #fdebea; stroke: #e4a09c; }
+
+    .arrow {
+      stroke: #668195;
+      stroke-width: 2;
+      fill: none;
+      marker-end: url(#arrow);
+    }
+
+    .lane-label {
+      fill: #627181;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .sequence {
+      counter-reset: seq;
+      display: grid;
+      gap: 12px;
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 42px 1fr;
+      gap: 12px;
+      align-items: start;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .step::before {
+      counter-increment: seq;
+      content: counter(seq);
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: var(--slate);
+      color: #fff;
+      font-weight: 800;
+    }
+
+    .step p {
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .terminal {
+      background: #101820;
+      color: #d6edf0;
+      border-radius: 8px;
+      padding: 18px;
+      overflow-x: auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 14px;
+      line-height: 1.7;
+      box-shadow: var(--shadow);
+    }
+
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+
+    .table th,
+    .table td {
+      border-bottom: 1px solid var(--line);
+      padding: 13px 14px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .table th {
+      background: #edf3f7;
+      color: #34495d;
+      font-size: 14px;
+    }
+
+    .table tr:last-child td { border-bottom: 0; }
+
+    .table td { color: var(--muted); }
+
+    .callout {
+      border-left: 5px solid var(--green);
+      background: #ffffff;
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      padding: 18px 20px;
+    }
+
+    .callout strong {
+      color: var(--green);
+    }
+
+    @media (max-width: 860px) {
+      .hero-content, main { width: min(100% - 28px, 1180px); }
+      .cols-2, .cols-3, .cols-4, .decision { grid-template-columns: 1fr; }
+      .section-head { display: block; }
+      .note { margin-top: 8px; }
+      h1 { font-size: 38px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-content">
+      <p class="eyebrow">LEAF_PRO / OpenCode Local Authoring Plan</p>
+      <h1>基于 OpenCode 的本地用例生成与调试方案</h1>
+      <p class="hero-lead">目标不是先做大型平台，而是让用户在本地打开工程后，只调用一次 <code>/leaf-new-case</code>；该 Command 内部启动 <code>leaf-test-author</code> 主流程 Skill，确认计划后自动完成编写、校验、运行、GUI 辅助调试、重跑和经验入库。</p>
+      <div class="hero-meta">
+        <span class="chip">推荐主线：OpenCode Skill / Subagent</span>
+        <span class="chip">执行后端：pytest</span>
+        <span class="chip">GUI 定位：调试辅助接入</span>
+        <span class="chip">经验库：内部默认入库、分层更新</span>
+        <span class="chip">日期：2026-06-23</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <div class="grid cols-4">
+        <article class="card metric">
+          <strong>1</strong>
+          <span>主入口：leaf-test-author subagent 负责本地用户交互和生成调试闭环</span>
+        </article>
+        <article class="card metric">
+          <strong>4</strong>
+          <span>核心分层：Command、Skill、pytest、AW/fixture</span>
+        </article>
+        <article class="card metric">
+          <strong>1</strong>
+          <span>默认用户确认点：只确认计划；高风险和核心 AW 修改才例外确认</span>
+        </article>
+        <article class="card metric">
+          <strong>6</strong>
+          <span>阶段路线：基础接入、工具层、调试、GUI、经验、团队化</span>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>一、方案判断</h2>
+        <p class="note">当前目标是本地生成和调试 pytest 用例，因此 OpenCode Skill / subagent 比先做完整自建 Agent 平台更直接。LangGraph 和 Orchestrator 暂不进入这条本地用例编写主链路。</p>
+      </div>
+      <div class="decision">
+        <article class="card chosen">
+          <h3>推荐：OpenCode Skill / Subagent 主线</h3>
+          <p>让用户直接在本地工程里输入需求，<code>leaf-test-author</code> subagent 读取领域插件、工具 schema 和已有测试，生成用例、运行校验、根据失败修正。它优先解决“用户如何真正用起来”。</p>
+          <div class="tag-row">
+            <span class="tag green">本地优先</span>
+            <span class="tag green">生成质量迭代快</span>
+            <span class="tag green">用户交互自然</span>
+          </div>
+        </article>
+        <article class="card">
+          <h3>后置：平台化执行能力</h3>
+          <p>用于后续平台化真实设备长任务、审批中断和 checkpoint/resume。当前本地用例编写阶段不需要复杂执行架构。</p>
+          <div class="tag-row">
+            <span class="tag amber">适合执行编排</span>
+            <span class="tag amber">适合 checkpoint</span>
+            <span class="tag amber">实现成本更高</span>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>二、用户实际使用流</h2>
+        <p class="note">用户不需要反复提醒继续流程。一次调用 <code>/leaf-new-case</code> 后，Command 内部交给 <code>leaf-test-author</code> subagent 生成 plan；用户确认后，后续编写、调试、GUI 调整、重跑和经验更新自动执行到底。确定性 Python 工具只作为 subagent 可调用的底层执行器，不作为用户主入口。</p>
+      </div>
+      <div class="flow-panel">
+        <svg viewBox="0 0 1120 520" role="img" aria-label="OpenCode 本地用例生成调试流程图">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#668195"></path>
+            </marker>
+          </defs>
+
+          <text x="32" y="34" class="lane-label">用户交互</text>
+          <text x="32" y="192" class="lane-label">OpenCode Command / Subagent</text>
+          <text x="32" y="350" class="lane-label">LEAF 工程后端</text>
+
+          <g class="node user" transform="translate(120 58)">
+            <rect width="150" height="74"></rect>
+            <text x="18" y="30">输入测试需求</text>
+            <text class="sub" x="18" y="53">domain + teststep</text>
+          </g>
+          <g class="node user" transform="translate(330 58)">
+            <rect width="150" height="74"></rect>
+            <text x="18" y="30">确认 Plan</text>
+            <text class="sub" x="18" y="53">唯一默认确认点</text>
+          </g>
+          <g class="node user" transform="translate(540 58)">
+            <rect width="150" height="74"></rect>
+            <text x="18" y="30">自动调试</text>
+            <text class="sub" x="18" y="53">改用例 / 重跑</text>
+          </g>
+          <g class="node user" transform="translate(750 58)">
+            <rect width="150" height="74"></rect>
+            <text x="18" y="30">自动入库</text>
+            <text class="sub" x="18" y="53">经验 / AW 更新</text>
+          </g>
+
+          <g class="node skill" transform="translate(120 216)">
+            <rect width="150" height="74"></rect>
+            <text x="18" y="30">leaf-new-case</text>
+            <text class="sub" x="18" y="53">用户唯一入口</text>
+          </g>
+          <g class="node skill" transform="translate(330 216)">
+            <rect width="150" height="74"></rect>
+            <text x="18" y="30">leaf-test-author</text>
+            <text class="sub" x="18" y="53">主流程状态机</text>
+          </g>
+          <g class="node gui" transform="translate(540 216)">
+            <rect width="150" height="74"></rect>
+            <text x="18" y="30">GUI Context</text>
+            <text class="sub" x="18" y="53">截图 / 控件树 / 日志</text>
+          </g>
+          <g class="node skill" transform="translate(750 216)">
+            <rect width="150" height="74"></rect>
+            <text x="18" y="30">test-debugger</text>
+            <text class="sub" x="18" y="53">失败分析 / 自动修复</text>
+          </g>
+
+          <g class="node cli" transform="translate(120 374)">
+            <rect width="150" height="74"></rect>
+            <text x="18" y="30">pytest</text>
+            <text class="sub" x="18" y="53">本地执行用例</text>
+          </g>
+          <g class="node cli" transform="translate(330 374)">
+            <rect width="150" height="74"></rect>
+            <text x="18" y="30">AW / fixture</text>
+            <text class="sub" x="18" y="53">领域操作封装</text>
+          </g>
+          <g class="node store" transform="translate(540 374)">
+            <rect width="150" height="74"></rect>
+            <text x="18" y="30">case / report</text>
+            <text class="sub" x="18" y="53">TestCase / Trace</text>
+          </g>
+          <g class="node store" transform="translate(750 374)">
+            <rect width="150" height="74"></rect>
+            <text x="18" y="30">Knowledge</text>
+            <text class="sub" x="18" y="53">经验库 / AW fallback</text>
+          </g>
+
+          <path class="arrow" d="M270 95H330"></path>
+          <path class="arrow" d="M480 95H540"></path>
+          <path class="arrow" d="M690 95H750"></path>
+
+          <path class="arrow" d="M195 132V216"></path>
+          <path class="arrow" d="M270 253H330"></path>
+          <path class="arrow" d="M405 216V132"></path>
+          <path class="arrow" d="M480 253H540"></path>
+          <path class="arrow" d="M690 253H750"></path>
+          <path class="arrow" d="M825 290V374"></path>
+
+          <path class="arrow" d="M195 290V374"></path>
+          <path class="arrow" d="M270 411H330"></path>
+          <path class="arrow" d="M480 411H540"></path>
+          <path class="arrow" d="M690 411H750"></path>
+          <path class="arrow" d="M615 374V290"></path>
+          <path class="arrow" d="M825 216V132"></path>
+        </svg>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>三、工程分层</h2>
+        <p class="note">OpenCode 负责本地协作体验，<code>leaf-test-author</code> subagent 负责推理和流程推进，LEAF Python 工具层负责确定性执行。这样可以避免把状态文件、设备探测、安全规则和报告校验写成纯 prompt。</p>
+      </div>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>层级</th>
+            <th>建议目录</th>
+            <th>职责</th>
+            <th>不负责</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>项目规则</td>
+            <td><code>AGENTS.md</code></td>
+            <td>定义 <code>/leaf-new-case</code> 一次调用入口、计划确认后自动推进、平台知识隔离、风险动作和编码边界。</td>
+            <td>不写具体用例逻辑。</td>
+          </tr>
+          <tr>
+            <td>主流程 Skill / Subagent</td>
+            <td><code>.opencode/skills/leaf-test-author/</code></td>
+            <td>负责 workflow 状态机和决策：plan、确认、编写、校验、运行、调试、GUI 调整、经验入库。</td>
+            <td>不把领域知识写死在主流程。</td>
+          </tr>
+          <tr>
+            <td>领域 Skill</td>
+            <td><code>.opencode/skills/leaf-camera/</code></td>
+            <td>按 domain/platform 自动加载，提供工具组合、平台差异、AW 使用规则、常见失败和修复模板。</td>
+            <td>不直接控制全流程。</td>
+          </tr>
+          <tr>
+            <td>Command</td>
+            <td><code>.opencode/commands/</code></td>
+            <td>提供 <code>/leaf-new-case</code> 作为一次调用入口，必要时提供 <code>/leaf-resume</code> 恢复中断任务。</td>
+            <td>不承载复杂推理。</td>
+          </tr>
+          <tr>
+            <td>确定性工具层</td>
+            <td><code>.opencode/tools/</code>、<code>tools/leaf_author/</code></td>
+            <td>封装 workflow 文件读写、plan 落盘、pytest 草稿生成、HDC 设备探测、GUI context、pytest 结果摘要、experience updater、AW updater 等可测试能力。</td>
+            <td>不做领域业务判断。</td>
+          </tr>
+          <tr>
+            <td>pytest / AW</td>
+            <td><code>tests/generated/</code>、<code>aw/fixture</code></td>
+            <td>pytest 负责执行生成的用例；AW 和 fixture 负责封装平台操作、设备连接和页面动作。</td>
+            <td>不承担智能生成和经验判断。</td>
+          </tr>
+          <tr>
+            <td>开发调试入口</td>
+            <td><code>python -m tools.leaf_author</code>（可选）</td>
+            <td>仅供本地调试和自动化测试调用同一批确定性工具。</td>
+            <td>不作为用户主入口，不替代 subagent。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>四、用户 In Loop 设计</h2>
+        <p class="note">默认只有一个确认点：确认 plan。确认后 <code>leaf-test-author</code> 自动继续，不再要求用户提醒“继续编写/继续调试/保存经验”。高风险动作和核心 AW 语义修改是例外。</p>
+      </div>
+      <div class="sequence">
+        <article class="step">
+          <div>
+            <h3>一次调用</h3>
+            <p>用户只调用 <code>/leaf-new-case &lt;domain&gt; "&lt;teststep&gt;"</code>。该 Command 启动 <code>leaf-test-author</code> subagent；subagent 调用确定性工具创建 <code>.leaf/runs/&lt;run_id&gt;/workflow.json</code> 和 <code>plan.json</code>，记录当前阶段、领域、平台、确认状态和调试次数。未确认 plan 前不生成 pytest 草稿。</p>
+          </div>
+        </article>
+        <article class="step">
+          <div>
+            <h3>计划确认</h3>
+            <p>Skill 展示识别出的领域、平台、目标、工具、计划步骤和将写入的文件。用户确认后调用确定性工具写入 <code>confirmed_plan=true</code>，进入 <code>pytest_draft</code> 阶段并生成 pytest 草稿，后续流程自动执行。</p>
+          </div>
+        </article>
+        <article class="step">
+          <div>
+            <h3>自动编写与校验</h3>
+            <p><code>leaf-test-author</code> 自动生成 pytest 文件，优先复用领域 AW/fixture，并调用轻量校验检查导入、fixture、AW 方法和平台经验引用；不通过则自动修正。</p>
+          </div>
+        </article>
+        <article class="step">
+          <div>
+            <h3>自动调试循环</h3>
+            <p>pytest 失败后自动读取 traceback、pytest log、截图、控件树和 hilog，加载领域 Skill 与 GUI context，修正 pytest、fallback locator 或等待条件，并重跑直到通过或达到最大次数。</p>
+          </div>
+        </article>
+        <article class="step">
+          <div>
+            <h3>自动经验入库</h3>
+            <p>内部用户默认入库。调试成功或失败都会更新本地/团队经验记录；普通 locator fallback 和等待条件可自动更新，核心 AW 语义修改只生成 review proposal。</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>五、GUI 介入方式</h2>
+        <p class="note">GUI 的意义是让系统根据真实页面状态实时调整用例，并把稳定修复沉淀回领域经验和 AW 映射。它不替代主流程，而是<code>leaf-test-author</code> 调试循环里的观察和修正能力。</p>
+      </div>
+      <div class="grid cols-3">
+        <article class="card">
+          <h3>页面状态识别</h3>
+          <p>读取截图、控件树和 hilog，判断当前页面是目标页、权限弹窗、加载中、异常页还是控件定位失败。</p>
+        </article>
+        <article class="card">
+          <h3>自动用例调整</h3>
+          <p>对低风险修复自动应用，例如插入权限处理、增加等待条件、加入 fallback locator，然后立即重跑验证。</p>
+        </article>
+        <article class="card">
+          <h3>AW / 经验更新</h3>
+          <p>将成功修复写入平台化经验库；新增 fallback locator 可自动落库，修改核心 AW 方法或设备命令只生成 proposal。</p>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>六、建议命令与技能</h2>
+        <p class="note">用户只需要记住一个 slash command。复杂行为藏在 <code>leaf-test-author</code> subagent 里，实际执行由 pytest 完成；确定性工具层只做状态文件、用例草稿、设备探测、GUI 上下文和经验更新。</p>
+      </div>
+      <div class="grid cols-2">
+        <article class="card">
+          <h3>OpenCode Commands</h3>
+          <div class="terminal">/leaf-new-case camera "打开相机；切拍照模式；点击拍照；检查相册出现新照片"
+
+# 正常用户只需要这个入口：
+# 生成 workflow/plan -> 用户确认 -> 写 pytest -> pytest 执行 -> 自动调试 -> 自动入库
+
+/leaf-resume
+# 读取 workflow.json 并返回下一步动作，例如 present_plan_for_confirmation 或 validate_pytest_draft</div>
+        </article>
+        <article class="card">
+          <h3>Skills</h3>
+          <ul class="list">
+            <li><code>leaf-test-author</code>：主流程 Skill，由 <code>/leaf-new-case</code> 调用，控制完整 workflow。</li>
+            <li><code>leaf-camera</code> / <code>leaf-audio</code> / <code>leaf-display</code> / <code>leaf-video</code>：按领域和平台自动加载。</li>
+            <li><code>leaf-gui-context</code>：页面状态识别、locator fallback、等待条件修正。</li>
+            <li><code>leaf-experience</code>：自动写入经验、更新统计、生成 AW proposal。</li>
+            <li><code>tools/leaf_author</code>：确定性工具层，被 subagent 调用，负责 workflow、plan、pytest 草稿、校验、草稿运行、只读 GUI context、经验记录、团队导出和 HDC 设备探测。</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>七、稳定执行机制</h2>
+        <p class="note">流程稳定性不能依赖 prompt 约束。<code>leaf-test-author</code> 必须把每一步写入本地状态，并通过 pytest 结果和轻量校验 gate 判断能否进入下一阶段。</p>
+      </div>
+      <div class="grid cols-3">
+        <article class="card">
+          <h3>workflow.json</h3>
+          <p>每次任务创建 <code>.leaf/runs/&lt;run_id&gt;/workflow.json</code>，记录 <code>current_phase</code>、<code>confirmed_plan</code>、调试次数、领域、平台和产物路径。</p>
+        </article>
+        <article class="card">
+          <h3>pytest Gate</h3>
+          <p>每个阶段通过确定性结果推进：domain inspect、pytest 静态检查、pytest 执行、pytest 结果摘要、GUI context 采集。失败则自动修复或停在明确阻塞点。</p>
+        </article>
+        <article class="card">
+          <h3>调试上限</h3>
+          <p>自动调试循环设置最大次数。低风险修复可自动应用；高风险动作、核心 AW 语义修改和真实设备命令修改只生成 proposal。</p>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>八、经验收集</h2>
+        <p class="note">用户都是内部用户，经验默认入库或更新领域经验库。仍需做平台隔离、脱敏和质量分层，避免 OpenHarmony、Android、iOS 或不同 AW 版本的经验互相污染。</p>
+      </div>
+      <div class="grid cols-2">
+        <article class="card">
+          <h3>平台化目录</h3>
+          <div class="terminal">.leaf/knowledge/
+  camera/
+    openharmony/
+      aw/
+      experience/
+      templates/
+    android/
+      aw/
+      experience/
+      templates/
+
+{
+  "domain": "camera",
+  "platform": "openharmony",
+  "target_feature": "camera.capture",
+  "failure": {"step": "camera.take_photo"},
+  "fix": {"type": "insert_step"},
+  "usage": {"success_count": 7},
+  "confidence": 0.87
+}</div>
+        </article>
+        <article class="card">
+          <h3>自动更新策略</h3>
+          <ul class="list">
+            <li>普通失败修复、等待条件、fallback locator 默认自动入库。</li>
+            <li>按 <code>domain/platform/target_feature/AW version</code> 区分经验。</li>
+            <li><code>confidence >= 0.85</code> 的经验可自动用于生成用例。</li>
+            <li>核心 AW 方法、真实设备命令和高风险步骤只生成 review proposal。</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>九、落地路线</h2>
+        <p class="note">先让用户本地可用：输入 domain + teststep，生成 pytest，跑 pytest，失败后 GUI 辅助修正，经验自动入库。复杂执行编排不进入当前阶段。</p>
+      </div>
+      <div class="grid cols-3">
+        <article class="card">
+          <h3>Stage A：基础接入</h3>
+          <p>新增 <code>AGENTS.md</code>、<code>leaf-test-author</code>、<code>/leaf-new-case</code>、<code>/leaf-resume</code> 和 <code>tools/leaf_author</code>，并定义 <code>workflow.json</code> 状态机。Stage A 明确 plan 未确认前只生成 workflow、plan 和只读设备探测产物。</p>
+        </article>
+        <article class="card">
+          <h3>Stage B：pytest 生成</h3>
+          <p>确认 plan 后生成 <code>tests/generated/test_*.py</code> 草稿和 Hypium 草稿，并用 <code>validation.json</code> 校验 run id、domain、target feature、步骤注释和元数据断言。</p>
+        </article>
+        <article class="card">
+          <h3>Stage C：调试闭环</h3>
+          <p>当前本地闭环先执行草稿质量门禁，写入 <code>pytest_result.json</code> 并明确 <code>DRAFT_STATIC_PASS</code>；真实设备结论只由 Hypium 执行结果写入。</p>
+        </article>
+        <article class="card">
+          <h3>Stage D：GUI 上下文</h3>
+          <p>接入 HDC 只读 <code>uitest dumpLayout</code> 和 <code>hilog</code> 采集，写入 <code>gui_context.json</code>；当前阶段不自动点击、不安装、不修改设备状态。</p>
+        </article>
+        <article class="card">
+          <h3>Stage E：经验沉淀</h3>
+          <p>按 <code>domain/platform</code> 写入 <code>.leaf/knowledge</code> 下的 reviewable experience，标记草稿运行状态、质量门禁和不可自动应用。</p>
+        </article>
+        <article class="card">
+          <h3>Stage F：团队化</h3>
+          <p>生成 <code>team_export_manifest.json</code>，汇总 workflow、plan、pytest、validation、pytest result 和 experience，供团队 review 后再同步。</p>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <div class="callout">
+        <strong>最终结论：</strong>
+        当前目标下，用户只调用 <code>/leaf-new-case &lt;domain&gt; "&lt;teststep&gt;"</code> 一次；确认 plan 后，<code>leaf-test-author</code> subagent 通过 <code>workflow.json</code> 自动推进 pytest 草稿生成、草稿校验、草稿运行、只读 GUI context、reviewable 经验记录和团队导出。确定性 Python 工具层只负责可测试的文件读写、pytest 草稿生成、HDC 设备探测、结果摘要和本地产物，不作为用户主入口。领域 Skill 按 domain/platform 自动加载，GUI 负责根据真实页面状态提供修复上下文，经验按平台分层并先进入 reviewable 状态。自建 Agent / LangGraph 后置，不参与当前本地 pytest 用例生成主链路。
+      </div>
+    </section>
+  </main>
+</body>
+</html>
