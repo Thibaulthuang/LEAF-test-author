@@ -164,6 +164,19 @@ def advance_run(
     domain = str(workflow.get("domain", ""))
     effective_serial = serial or ""
     if run_real and selected_runtime_mode:
+        if not bool(workflow.get("confirmed_plan", False)):
+            decision = decide_next_step(workflow)
+            context_manifest = write_context_manifest(root, run_id, decision=decision)
+            return {
+                "run_id": run_id,
+                "status": "blocked",
+                "block_reason": "plan_confirmation_required",
+                "current_phase": workflow.get("current_phase"),
+                "stages": stages,
+                "next_action": decision.get("next_action"),
+                "resume_summary": _resume_summary(decision),
+                "context_manifest": context_manifest,
+            }
         approval = _real_device_approval_decision(domain, selected_runtime_mode, approval_token)
         if not approval["approved"]:
             approval_artifact = _write_real_device_approval_artifact(root, run_id, workflow, selected_runtime_mode, approval)

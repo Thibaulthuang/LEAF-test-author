@@ -247,6 +247,37 @@ class LeafAuthorStageTests(unittest.TestCase):
             self.assertEqual(manifest["artifacts"]["real_device_preflight"], ".leaf/runs/stage-camera-direct/real_device_preflight.json")
             self.assertEqual(load_workflow(root, "stage-camera-direct")["current_phase"], "complete")
 
+    def test_advance_real_runtime_requires_confirmed_plan_before_any_real_gate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "打开相机；点击拍照", run_id="stage-real-before-confirm")
+
+            from tools.leaf_author.authoring import advance_run
+
+            with patch("tools.leaf_author.authoring.run_domain_runtime") as runtime:
+                result = advance_run(
+                    root,
+                    "stage-real-before-confirm",
+                    run_real=True,
+                    runtime_mode="direct_smoke",
+                    serial="SERIAL123",
+                    hdc_path="/sdk/hdc",
+                )
+
+            self.assertEqual(result["status"], "blocked")
+            self.assertEqual(result["block_reason"], "plan_confirmation_required")
+            self.assertEqual(result["next_action"], "present_plan_for_confirmation")
+            self.assertEqual(result["stages"], [])
+            self.assertEqual(result["resume_summary"]["user_checkpoint"], "first_plan_confirmation")
+            runtime.assert_not_called()
+            run_dir = root / ".leaf" / "runs" / "stage-real-before-confirm"
+            self.assertFalse((run_dir / "case.json").exists())
+            self.assertFalse((run_dir / "real_device_input.json").exists())
+            self.assertFalse((run_dir / "real_device_preflight.json").exists())
+            workflow = load_workflow(root, "stage-real-before-confirm")
+            self.assertEqual(workflow["current_phase"], "plan")
+            self.assertEqual(workflow["confirmed_plan"], False)
+
     def test_advance_camera_capture_real_e2e_requires_approval_token_before_runtime(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
