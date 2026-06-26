@@ -82,6 +82,7 @@ def report_batch(root: Path, batch_id: str) -> dict[str, object]:
             "blocked_or_inspect": status_counts.get("blocked_or_inspect", 0),
         },
         "real_device_summary": _batch_real_device_summary(runs),
+        "runtime_evidence_summary": _batch_runtime_evidence_summary(runs),
         "next_run_focus": _next_report_focus(runs),
         "runs": [_batch_report_summary(run) for run in runs],
         "context_policy": {
@@ -492,6 +493,7 @@ def _next_report_focus(runs: list[dict[str, object]]) -> dict[str, object] | Non
 
 def _batch_report_summary(run: dict[str, object]) -> dict[str, object]:
     real_device_preflight = run.get("real_device_preflight")
+    runtime_evidence = run.get("runtime_evidence_summary")
     summary = {
         "run_id": run.get("run_id"),
         "domain": run.get("domain"),
@@ -504,6 +506,7 @@ def _batch_report_summary(run: dict[str, object]) -> dict[str, object]:
         "user_checkpoint": run.get("user_checkpoint"),
         "next_command": run.get("next_command"),
         "real_device_preflight": _batch_preflight_summary(real_device_preflight if isinstance(real_device_preflight, dict) else None),
+        "runtime_evidence": _batch_runtime_evidence_detail(runtime_evidence if isinstance(runtime_evidence, dict) else None),
     }
     if isinstance(run.get("error"), dict):
         summary["error"] = run["error"]
@@ -535,3 +538,34 @@ def _batch_real_device_summary(runs: list[dict[str, object]]) -> dict[str, objec
         "runtime_modes": runtime_modes,
         "statuses": statuses,
     }
+
+
+def _batch_runtime_evidence_summary(runs: list[dict[str, object]]) -> dict[str, object]:
+    summaries = [run.get("runtime_evidence_summary") for run in runs if isinstance(run.get("runtime_evidence_summary"), dict)]
+    schema_statuses = Counter(str(summary.get("schema_status")) for summary in summaries if summary.get("schema_status"))
+    quality_gates = sorted({str(summary.get("quality_gate")) for summary in summaries if summary.get("quality_gate")})
+    missing_fields = sorted({field for summary in summaries for field in _string_list(summary.get("missing_required_fields"))})
+    return {
+        "total": len(summaries),
+        "schema_statuses": dict(schema_statuses),
+        "quality_gates": quality_gates,
+        "missing_required_fields": missing_fields,
+    }
+
+
+def _batch_runtime_evidence_detail(summary: dict[str, object] | None) -> dict[str, object] | None:
+    if not summary:
+        return None
+    return {
+        "schema_status": summary.get("schema_status"),
+        "runtime_mode": summary.get("runtime_mode"),
+        "artifact": summary.get("artifact"),
+        "quality_gate": summary.get("quality_gate"),
+        "missing_required_fields": _string_list(summary.get("missing_required_fields")),
+    }
+
+
+def _string_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value]

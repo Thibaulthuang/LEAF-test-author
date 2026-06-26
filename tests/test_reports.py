@@ -375,12 +375,16 @@ class ReportTests(unittest.TestCase):
             self.assertEqual(result["real_device_summary"]["serials"], ["SERIAL123"])
             self.assertEqual(result["real_device_summary"]["runtime_modes"], ["direct_smoke"])
             self.assertEqual(result["real_device_summary"]["statuses"], ["ready"])
+            self.assertEqual(result["runtime_evidence_summary"]["total"], 1)
+            self.assertEqual(result["runtime_evidence_summary"]["schema_statuses"], {"complete": 1})
+            self.assertEqual(result["runtime_evidence_summary"]["quality_gates"], ["CAMERA_DIRECT_SMOKE_PASS"])
             preflight = result["runs"][0]["real_device_preflight"]
             self.assertEqual(preflight["runtime_mode"], "direct_smoke")
             self.assertEqual(preflight["status"], "ready")
             self.assertEqual(preflight["risk_level"], "read_only_probe")
             self.assertEqual(preflight["approval_status"], "not_required")
             self.assertEqual(preflight["input_status"], "ready")
+            self.assertEqual(result["runs"][0]["runtime_evidence"]["schema_status"], "complete")
 
     def test_cli_report_commands_output_json(self):
         with tempfile.TemporaryDirectory() as tmp:
