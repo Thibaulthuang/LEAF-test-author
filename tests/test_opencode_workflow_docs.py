@@ -97,6 +97,8 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
         self.assertIn("Plan Input Contract", template)
         self.assertIn("Quality Gates", template)
         self.assertIn("Required Python Touchpoints", template)
+        self.assertIn("tools/leaf_author/domain_registry.py", template)
+        self.assertIn("Avoid adding new domain branches", template)
 
     def test_readme_documents_multi_run_context_management(self):
         root = Path(__file__).resolve().parents[1]
@@ -113,6 +115,7 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
         self.assertIn("/leaf-batch", readme)
         self.assertIn("/leaf-report", readme)
         self.assertIn("one run at a time", readme)
+        self.assertIn("tools/leaf_author/domain_registry.py", readme)
         self.assertNotIn("test HAP", readme)
         self.assertNotIn("test package", readme)
 

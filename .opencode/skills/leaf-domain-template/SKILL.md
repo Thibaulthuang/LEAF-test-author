@@ -58,10 +58,16 @@ from real-device gates.
 
 Adding a domain normally requires reviewing these files:
 
-- `tools/leaf_author/planner.py`: semantic plan validation.
-- `tools/leaf_author/case_spec.py`: domain action mapping.
+- `tools/leaf_author/domain_registry.py`: register the domain contract for
+  target feature inference, semantic plan validation, and action mapping.
 - `tools/leaf_author/<domain>_smoke.py`: domain preflight/direct/e2e execution if needed.
 - `tests/`: unit tests for plan validation, generated drafts, quality gates, and CLI output.
+
+Avoid adding new domain branches to core workflow orchestration. The workflow
+state machine, phase contract, report surfaces, and context manifests should
+remain domain-neutral. Domain-specific behavior enters through the registry,
+domain skill, optional runtime smoke module, and reviewable quality-gate
+artifacts.
 
 ## Safety Rules
 

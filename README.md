@@ -22,6 +22,8 @@ Current default platform is OpenHarmony. The most complete domain is `camera`.
 - `.opencode/commands/`: user-facing OpenCode commands.
 - `.opencode/skills/`: workflow, domain, and GUI-agent skills.
 - `tools/leaf_author/`: deterministic Python tool layer for files, state, draft generation, validation, and device orchestration.
+- `tools/leaf_author/domain_registry.py`: domain plugin contract for target
+  feature inference, semantic plan validation, and action mapping.
 - `tests/`: unit and orchestration tests.
 - `docs/workflow-contract.json`: machine-readable phase, quality-gate, and resume contract.
 - `leaf-workflow-architecture.html`: human-readable workflow architecture document.

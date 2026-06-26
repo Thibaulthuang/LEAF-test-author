@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from tools.leaf_author.domain_registry import action_for_step
+
 
 def generate_case_spec(root: Path, plan: dict[str, object]) -> Path:
     run_id = str(plan["run_id"])
@@ -31,7 +33,7 @@ def build_case_spec(plan: dict[str, object]) -> dict[str, object]:
 
 
 def _build_step(domain: str, title: str, index: int) -> dict[str, object]:
-    action = _camera_action(title) if domain == "camera" else "GenericAW.performStep"
+    action = action_for_step(domain, title)
     step = {
         "id": _step_id(action, index),
         "title": title,
@@ -40,20 +42,6 @@ def _build_step(domain: str, title: str, index: int) -> dict[str, object]:
     if action.endswith("performStep"):
         step["args"] = [title]
     return step
-
-
-def _camera_action(title: str) -> str:
-    if "打开" in title and "相机" in title:
-        return "CameraAW.launch"
-    if "拍照模式" in title:
-        return "CameraAW.switchToPhotoMode"
-    if "快门" in title or ("拍照" in title and "模式" not in title):
-        return "CameraAW.capture"
-    if "照片" in title or "相册" in title:
-        return "GalleryAW.assertLatestPhotoCreatedAfter"
-    return "CameraAW.performStep"
-
-
 def _step_id(action: str, index: int) -> str:
     names = {
         "CameraAW.launch": "open_camera",
