@@ -22,8 +22,25 @@ class WorkflowDiagnosticsTests(unittest.TestCase):
             self.assertEqual(result["current_phase"], "plan")
             self.assertTrue(result["checks"]["exists"])
             self.assertTrue(result["checks"]["json_parseable"])
+            self.assertTrue(result["checks"]["phase_state_present"])
+            self.assertTrue(result["checks"]["phase_state_matches_current_phase"])
             self.assertEqual(result["diagnostics_path"], ".leaf/runs/diag-good/workflow_diagnostics.json")
             self.assertTrue((root / result["diagnostics_path"]).is_file())
+
+    def test_inspect_workflow_state_fails_when_phase_state_drifts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "打开相机", run_id="diag-phase-drift")
+            workflow_path = root / ".leaf" / "runs" / "diag-phase-drift" / "workflow.json"
+            workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+            workflow["phase_state"]["current_phase"] = "stale_phase"
+            workflow_path.write_text(json.dumps(workflow, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            result = inspect_workflow_state(root, "diag-phase-drift")
+
+            self.assertEqual(result["status"], "failed")
+            self.assertTrue(result["checks"]["phase_state_present"])
+            self.assertFalse(result["checks"]["phase_state_matches_current_phase"])
 
     def test_inspect_workflow_state_reports_unreadable_empty_workflow(self):
         with tempfile.TemporaryDirectory() as tmp:

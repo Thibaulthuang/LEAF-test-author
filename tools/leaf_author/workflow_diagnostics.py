@@ -14,6 +14,8 @@ def inspect_workflow_state(root: Path, run_id: str) -> dict[str, object]:
         "schema_version_present": False,
         "run_id_matches": False,
         "current_phase_present": False,
+        "phase_state_present": False,
+        "phase_state_matches_current_phase": False,
     }
     payload: dict[str, object] | None = None
     error: dict[str, str] | None = None
@@ -28,6 +30,9 @@ def inspect_workflow_state(root: Path, run_id: str) -> dict[str, object]:
                 checks["schema_version_present"] = bool(loaded.get("schema_version"))
                 checks["run_id_matches"] = loaded.get("run_id") == run_id
                 checks["current_phase_present"] = bool(loaded.get("current_phase"))
+                phase_state = loaded.get("phase_state")
+                checks["phase_state_present"] = isinstance(phase_state, dict)
+                checks["phase_state_matches_current_phase"] = isinstance(phase_state, dict) and phase_state.get("current_phase") == loaded.get("current_phase")
             else:
                 error = {"type": "TypeError", "message": "workflow.json must contain a JSON object"}
         except Exception as exc:
