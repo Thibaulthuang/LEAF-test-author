@@ -103,10 +103,17 @@ def audit_run(
     return _write_run_audit(root, run_id, payload)
 
 
-def audit_batch(root: Path, batch_id: str) -> dict[str, object]:
+def audit_batch(
+    root: Path,
+    batch_id: str,
+    *,
+    live_device: bool = False,
+    hdc_runner: ProbeRunner | None = None,
+    hdc_path: str = "hdc",
+) -> dict[str, object]:
     batch = _load_batch_manifest(root, batch_id)
     run_ids = [str(run_id) for run_id in batch.get("run_ids", [])] if isinstance(batch.get("run_ids"), list) else []
-    runs = [_audit_batch_run(root, run_id) for run_id in run_ids]
+    runs = [_audit_batch_run(root, run_id, live_device=live_device, hdc_runner=hdc_runner, hdc_path=hdc_path) for run_id in run_ids]
     passed_count = sum(1 for run in runs if run.get("status") == "passed")
     failed_count = len(runs) - passed_count
     resume_view = _load_batch_resume_view(root, batch_id)
@@ -922,11 +929,14 @@ def _batch_real_device_summary(runs: list[dict[str, object]]) -> dict[str, objec
     serials = sorted({str(trace.get("serial")) for trace in traces if trace.get("serial")})
     runtime_modes = sorted({str(trace.get("runtime_mode")) for trace in traces if trace.get("runtime_mode")})
     quality_gates = sorted({str(trace.get("latest_quality_gate")) for trace in traces if trace.get("latest_quality_gate")})
+    live_devices = [trace.get("live_device") for trace in traces if isinstance(trace.get("live_device"), dict)]
     return {
         "total_traces": len(traces),
         "serials": serials,
         "runtime_modes": runtime_modes,
         "quality_gates": quality_gates,
+        "live_connected": sum(1 for item in live_devices if isinstance(item, dict) and item.get("status") == "connected"),
+        "live_unavailable": sum(1 for item in live_devices if isinstance(item, dict) and item.get("status") != "connected"),
     }
 
 
@@ -951,9 +961,16 @@ def _string_list(value: object) -> list[str]:
     return [str(item) for item in value]
 
 
-def _audit_batch_run(root: Path, run_id: str) -> dict[str, object]:
+def _audit_batch_run(
+    root: Path,
+    run_id: str,
+    *,
+    live_device: bool,
+    hdc_runner: ProbeRunner | None,
+    hdc_path: str,
+) -> dict[str, object]:
     try:
-        return audit_run(root, run_id)
+        return audit_run(root, run_id, live_device=live_device, hdc_runner=hdc_runner, hdc_path=hdc_path)
     except Exception as exc:
         return {
             "schema_version": "1.0",

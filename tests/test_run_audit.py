@@ -463,6 +463,28 @@ class RunAuditTests(unittest.TestCase):
             failed = [run for run in result["runs"] if run["status"] == "failed"][0]
             self.assertIn("workflow_complete", failed["failed_checks"])
 
+    def test_audit_batch_can_verify_live_device_for_completed_runs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _complete_direct_smoke(root, "audit-batch-live")
+            create_batch(root, "audit-batch-live", ["audit-batch-live"])
+
+            def runner(args, timeout_s):
+                if args == ["/sdk/hdc", "list", "targets"]:
+                    return ProbeCommandResult(0, "SERIAL123\n", "")
+                if args == ["/sdk/hdc", "-t", "SERIAL123", "shell", "param", "get", "const.product.model"]:
+                    return ProbeCommandResult(0, "ohos\n", "")
+                if args == ["/sdk/hdc", "-t", "SERIAL123", "shell", "param", "get", "const.ohos.apiversion"]:
+                    return ProbeCommandResult(0, "26\n", "")
+                return ProbeCommandResult(1, "", f"unexpected {args}")
+
+            result = audit_batch(root, "audit-batch-live", live_device=True, hdc_runner=runner, hdc_path="/sdk/hdc")
+
+            self.assertEqual(result["status"], "passed")
+            self.assertEqual(result["real_device_summary"]["live_connected"], 1)
+            self.assertEqual(result["real_device_summary"]["live_unavailable"], 0)
+            self.assertEqual(result["runs"][0]["real_device_trace"]["live_device"]["status"], "connected")
+
     def test_audit_batch_checks_resume_focus_plan_for_incomplete_batch(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -575,17 +597,29 @@ class RunAuditTests(unittest.TestCase):
             root = Path(tmp)
             _complete_direct_smoke(root, "audit-batch-cli")
             create_batch(root, "audit-batch-cli", ["audit-batch-cli"])
+            fake_hdc = root / "fake_hdc"
+            fake_hdc.write_text(
+                "#!/bin/sh\n"
+                "if [ \"$1\" = \"list\" ]; then echo SERIAL123; exit 0; fi\n"
+                "if [ \"$4\" = \"param\" ] && [ \"$6\" = \"const.product.model\" ]; then echo ohos; exit 0; fi\n"
+                "if [ \"$4\" = \"param\" ] && [ \"$6\" = \"const.ohos.apiversion\" ]; then echo 26; exit 0; fi\n"
+                "echo unexpected \"$@\" >&2\n"
+                "exit 1\n",
+                encoding="utf-8",
+            )
+            fake_hdc.chmod(0o755)
 
             from tools.leaf_author.__main__ import main
 
             output = StringIO()
             with redirect_stdout(output):
-                exit_code = main(["audit-batch", "audit-batch-cli", "--root", str(root)])
+                exit_code = main(["audit-batch", "audit-batch-cli", "--root", str(root), "--live-device", "--hdc-path", str(fake_hdc)])
 
             payload = json.loads(output.getvalue())
             self.assertEqual(exit_code, 0)
             self.assertEqual(payload["status"], "passed")
             self.assertEqual(payload["summary"]["passed"], 1)
+            self.assertEqual(payload["real_device_summary"]["live_connected"], 1)
 
 
 def _complete_direct_smoke(root: Path, run_id: str) -> None:

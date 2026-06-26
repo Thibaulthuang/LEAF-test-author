@@ -128,6 +128,8 @@ def main(argv: list[str] | None = None) -> int:
     audit_batch_parser = subparsers.add_parser("audit-batch")
     audit_batch_parser.add_argument("batch_id")
     audit_batch_parser.add_argument("--root", type=Path, default=Path("."))
+    audit_batch_parser.add_argument("--live-device", action="store_true")
+    audit_batch_parser.add_argument("--hdc-path", default="hdc")
 
     extension_contract_parser = subparsers.add_parser("extension-contract")
     extension_contract_parser.add_argument("domain")
@@ -357,7 +359,7 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0 if result["status"] == "passed" else 1
     if args.command == "audit-batch":
-        result = audit_batch(args.root, args.batch_id)
+        result = audit_batch(args.root, args.batch_id, live_device=args.live_device, hdc_path=args.hdc_path)
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0 if result["status"] == "passed" else 1
     if args.command == "extension-contract":
