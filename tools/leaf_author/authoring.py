@@ -91,20 +91,17 @@ def resume_run(root: Path, run_id: str, auto_safe: bool = False) -> dict[str, ob
     if guard.get("status") != "stable":
         return _blocked_by_phase_guard(root, run_id, guard)
     workflow = load_workflow(root, run_id)
+    approval_blocker = _load_real_device_approval_blocker(root, workflow)
+    if approval_blocker:
+        decision = _approval_blocker_decision(workflow, approval_blocker)
+        context_manifest = write_context_manifest(root, run_id, decision=decision)
+        payload = _resume_payload(root, run_id, decision, context_manifest)
+        if not auto_safe:
+            return payload
+        return {**payload, "auto_advanced": False, "status": "waiting_for_confirmation"}
     decision = decide_next_step(workflow)
     context_manifest = write_context_manifest(root, run_id, decision=decision)
-    current_phase = str(decision.get("current_phase", ""))
-    confirmed = bool(decision.get("confirmed_plan", False))
-    next_action = str(decision.get("next_action", "inspect_workflow_state"))
-    payload = {
-        "run_id": run_id,
-        "current_phase": current_phase,
-        "confirmed_plan": confirmed,
-        "next_action": next_action,
-        "resume_summary": _resume_summary(decision),
-        "context_manifest": context_manifest,
-        "workflow_path": str(root / ".leaf" / "runs" / run_id / "workflow.json"),
-    }
+    payload = _resume_payload(root, run_id, decision, context_manifest)
     if not auto_safe:
         return payload
     if not payload["resume_summary"]["safe_to_auto_continue"]:
@@ -304,6 +301,18 @@ def _resume_summary(decision: dict[str, object]) -> dict[str, object]:
     }
 
 
+def _resume_payload(root: Path, run_id: str, decision: dict[str, object], context_manifest: dict[str, object]) -> dict[str, object]:
+    return {
+        "run_id": run_id,
+        "current_phase": str(decision.get("current_phase", "")),
+        "confirmed_plan": bool(decision.get("confirmed_plan", False)),
+        "next_action": str(decision.get("next_action", "inspect_workflow_state")),
+        "resume_summary": _resume_summary(decision),
+        "context_manifest": context_manifest,
+        "workflow_path": str(root / ".leaf" / "runs" / run_id / "workflow.json"),
+    }
+
+
 def _blocked_by_phase_guard(root: Path, run_id: str, guard: dict[str, object]) -> dict[str, object]:
     workflow = load_workflow(root, run_id)
     return {
@@ -340,6 +349,46 @@ def _real_device_approval_decision(domain: str, runtime_mode: str, approval_toke
         "approved": approved,
         "required_approval_token": required,
         "runtime_safety": safety,
+    }
+
+
+def _load_real_device_approval_blocker(root: Path, workflow: dict[str, object]) -> dict[str, object] | None:
+    artifacts = workflow.get("artifacts", {})
+    if not isinstance(artifacts, dict):
+        return None
+    value = artifacts.get("real_device_approval")
+    if not isinstance(value, str) or not value:
+        return None
+    path = root / value
+    if not path.is_file():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    return payload if payload.get("status") == "blocked" else None
+
+
+def _approval_blocker_decision(workflow: dict[str, object], blocker: dict[str, object]) -> dict[str, object]:
+    required_token = blocker.get("required_approval_token")
+    operator_message = blocker.get("operator_message")
+    return {
+        "current_phase": workflow.get("current_phase"),
+        "confirmed_plan": bool(workflow.get("confirmed_plan", False)),
+        "next_action": "request_real_device_approval",
+        "user_checkpoint": "real_device_confirmation",
+        "requires_user_confirmation": True,
+        "safe_to_auto_continue": False,
+        "operator_message": str(operator_message or "Explicit real-device approval is required."),
+        "agent_owner": "leaf-test-author",
+        "context_slice": ["workflow", "real_device_approval"],
+        "trigger_source": "workflow.json",
+        "allowed_artifacts": ["workflow", "real_device_approval"],
+        "batch_focus_priority": 80,
+        "user_loop": {
+            "position": "approve_real_device",
+            "required_input": str(required_token) if isinstance(required_token, str) else "",
+        },
     }
 
 

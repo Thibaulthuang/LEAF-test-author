@@ -436,6 +436,34 @@ class LeafAuthorWorkflowTests(unittest.TestCase):
             self.assertEqual(result["next_action"], "present_plan_for_confirmation")
             self.assertEqual(result["resume_summary"]["requires_user_confirmation"], True)
 
+    def test_resume_run_auto_safe_stops_at_real_device_approval_blocker(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            from tools.leaf_author.authoring import advance_run, confirm_plan, resume_run, start_new_case
+
+            start_new_case(root, "camera", "打开相机；点击拍照", run_id="run-approval-waits")
+            confirm_plan(root, "run-approval-waits")
+            blocked = advance_run(root, "run-approval-waits", run_real=True, runtime_mode="capture_e2e", serial="SERIAL123")
+
+            result = resume_run(root, "run-approval-waits", auto_safe=True)
+
+            self.assertEqual(blocked["status"], "blocked")
+            self.assertEqual(result["auto_advanced"], False)
+            self.assertEqual(result["status"], "waiting_for_confirmation")
+            self.assertEqual(result["next_action"], "request_real_device_approval")
+            self.assertEqual(result["resume_summary"]["user_checkpoint"], "real_device_confirmation")
+            self.assertEqual(result["resume_summary"]["user_loop"]["position"], "approve_real_device")
+            self.assertEqual(result["resume_summary"]["user_loop"]["required_input"], "approve_camera_capture_e2e")
+            self.assertEqual(result["resume_summary"]["agent_owner"], "leaf-test-author")
+            self.assertEqual(result["resume_summary"]["context_slice"], ["workflow", "real_device_approval"])
+            manifest_path = root / result["context_manifest"]["context_manifest_path"]
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual(manifest["context_slice"], ["workflow", "real_device_approval"])
+            self.assertIn("real_device_approval", manifest["referenced_artifacts"])
+            self.assertNotIn("pytest", manifest["referenced_artifacts"])
+            self.assertEqual(load_workflow(root, "run-approval-waits")["current_phase"], "hypium_draft")
+
     def test_resume_run_blocks_when_phase_guard_is_unstable(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
