@@ -5,7 +5,15 @@
   "entrypoints": {
     "new_case": "/leaf-new-case <domain> \"<teststep>\"",
     "resume": "/leaf-resume <run_id>",
-    "python_module": "python3 -m tools.leaf_author"
+    "python_module": "python3 -m tools.leaf_author",
+    "list_runs": "python3 -m tools.leaf_author list-runs",
+    "inspect_run": "python3 -m tools.leaf_author inspect-run <run_id>"
+  },
+  "context_policy": {
+    "run_listing": "lightweight_summaries",
+    "run_inspection": "single_run_context_slice",
+    "artifact_loading": "on_demand",
+    "attention_boundary": "one_active_run"
   },
   "resume_policy": {
     "auto_safe_flag": "--auto-safe",

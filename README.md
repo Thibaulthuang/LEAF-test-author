@@ -49,6 +49,18 @@ Resume and automatically advance safe local stages:
 python3 -m tools.leaf_author resume run-demo --auto-safe
 ```
 
+List active and historical runs with lightweight summaries:
+
+```bash
+python3 -m tools.leaf_author list-runs
+```
+
+Inspect one run when OpenCode needs details:
+
+```bash
+python3 -m tools.leaf_author inspect-run run-demo
+```
+
 Run safe local stages directly:
 
 ```bash
@@ -82,6 +94,17 @@ python3 -m tools.leaf_author advance run-demo --run-real --camera-capture --seri
 - Camera capture creates a media file and requires a second confirmation.
 - GUI context collection is read-only by default.
 - Experience records are reviewable draft knowledge and must not auto-modify AW code.
+
+## Multi-Run Context Management
+
+OpenCode should not load every `.leaf/runs/<run_id>/` artifact into one prompt.
+Use `list-runs` to get lightweight summaries, then `inspect-run <run_id>` to load
+one run at a time. Large artifacts such as Hypium sources, layout dumps, build
+logs, and result evidence should be opened only when the inspected run requires
+them.
+
+This keeps attention scoped to the active run and makes multi-case authoring
+and execution resumable without relying on conversational memory.
 
 ## Development
 

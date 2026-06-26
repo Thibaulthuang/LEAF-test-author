@@ -15,6 +15,7 @@ from tools.leaf_author.e2e_report import write_e2e_preflight_report
 from tools.leaf_author.hypium import sync_openharmony_export
 from tools.leaf_author.openharmony_discovery import discover_hap_artifacts
 from tools.leaf_author.openharmony_project import scaffold_openharmony_test_project
+from tools.leaf_author.run_registry import inspect_run, list_runs
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -42,6 +43,15 @@ def main(argv: list[str] | None = None) -> int:
     resume.add_argument("run_id")
     resume.add_argument("--root", type=Path, default=Path("."))
     resume.add_argument("--auto-safe", action="store_true")
+
+    list_runs_parser = subparsers.add_parser("list-runs")
+    list_runs_parser.add_argument("--root", type=Path, default=Path("."))
+    list_runs_parser.add_argument("--limit", type=int, default=None)
+    list_runs_parser.add_argument("--domain", default=None)
+
+    inspect_run_parser = subparsers.add_parser("inspect-run")
+    inspect_run_parser.add_argument("run_id")
+    inspect_run_parser.add_argument("--root", type=Path, default=Path("."))
 
     advance = subparsers.add_parser("advance")
     advance.add_argument("run_id")
@@ -184,6 +194,12 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "resume":
         print(json.dumps(resume_run(args.root, args.run_id, auto_safe=args.auto_safe), ensure_ascii=False, indent=2))
+        return 0
+    if args.command == "list-runs":
+        print(json.dumps(list_runs(args.root, limit=args.limit, domain=args.domain), ensure_ascii=False, indent=2))
+        return 0
+    if args.command == "inspect-run":
+        print(json.dumps(inspect_run(args.root, args.run_id), ensure_ascii=False, indent=2))
         return 0
     if args.command == "advance":
         print(
