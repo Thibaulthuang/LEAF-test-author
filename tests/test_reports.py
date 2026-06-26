@@ -282,7 +282,7 @@ class ReportTests(unittest.TestCase):
             result = report_run(root, "report-runtime-evidence-missing")
 
             self.assertEqual(result["runtime_evidence_summary"]["schema_status"], "missing_fields")
-            self.assertEqual(result["runtime_evidence_summary"]["missing_required_fields"], ["bundle_verified", "ability_verified"])
+            self.assertEqual(result["runtime_evidence_summary"]["missing_required_fields"], ["bundle_verified", "ability_verified", "ui_snapshot_refs"])
 
     def test_report_run_includes_device_selection_evidence_when_present(self):
         with tempfile.TemporaryDirectory() as tmp:

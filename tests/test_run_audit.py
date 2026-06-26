@@ -47,6 +47,7 @@ class RunAuditTests(unittest.TestCase):
             self.assertIn("runtime_evidence_artifact_ready", passed_checks)
             self.assertIn("runtime_evidence_quality_gate", passed_checks)
             self.assertIn("runtime_evidence_required_fields", passed_checks)
+            self.assertIn("runtime_evidence_ui_snapshots_ready", passed_checks)
             self.assertTrue(all(check["passed"] for check in result["checks"]))
 
     def test_audit_run_includes_workflow_diagnostics_when_present(self):
@@ -247,6 +248,37 @@ class RunAuditTests(unittest.TestCase):
             self.assertEqual(result["status"], "failed")
             failed_checks = [check["name"] for check in result["checks"] if not check["passed"]]
             self.assertIn("runtime_evidence_required_fields", failed_checks)
+
+    def test_audit_run_fails_when_runtime_ui_snapshot_refs_are_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _complete_direct_smoke(root, "audit-runtime-ui-snapshot")
+            smoke_path = root / ".leaf" / "runs" / "audit-runtime-ui-snapshot" / "camera_direct_smoke.json"
+            smoke = json.loads(smoke_path.read_text(encoding="utf-8"))
+            del smoke["evidence"]["ui_snapshot_refs"]
+            smoke_path.write_text(json.dumps(smoke, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            result = audit_run(root, "audit-runtime-ui-snapshot")
+
+            self.assertEqual(result["status"], "failed")
+            failed_checks = [check["name"] for check in result["checks"] if not check["passed"]]
+            self.assertIn("runtime_evidence_required_fields", failed_checks)
+            self.assertIn("runtime_evidence_ui_snapshots_ready", failed_checks)
+
+    def test_audit_run_fails_when_runtime_ui_snapshot_index_is_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _complete_direct_smoke(root, "audit-runtime-ui-index")
+            smoke_path = root / ".leaf" / "runs" / "audit-runtime-ui-index" / "camera_direct_smoke.json"
+            smoke = json.loads(smoke_path.read_text(encoding="utf-8"))
+            index_path = root / smoke["evidence"]["ui_snapshot_refs"][0]["index_path"]
+            index_path.unlink()
+
+            result = audit_run(root, "audit-runtime-ui-index")
+
+            self.assertEqual(result["status"], "failed")
+            failed_checks = [check["name"] for check in result["checks"] if not check["passed"]]
+            self.assertIn("runtime_evidence_ui_snapshots_ready", failed_checks)
 
     def test_cli_audit_run_outputs_json_and_exit_code(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -45,7 +45,7 @@ def audit_run(root: Path, run_id: str) -> dict[str, object]:
         )
     )
     runtime_evidence = _load_runtime_evidence(root, evidence if isinstance(evidence, dict) else {}, domain, preflight if isinstance(preflight, dict) else None)
-    checks.extend(_runtime_evidence_checks(runtime_evidence, latest_quality_gate))
+    checks.extend(_runtime_evidence_checks(root, runtime_evidence, latest_quality_gate))
     context_manifest = initial_context_manifest or _load_context_manifest(root, evidence if isinstance(evidence, dict) else {})
     checks.extend(_context_manifest_checks(context_manifest, report))
     workflow_phase_state = initial_workflow_phase_state if _has_phase_state_snapshot(initial_workflow_phase_state) else _load_workflow_phase_state(root, run_id)
@@ -258,7 +258,7 @@ def _load_runtime_evidence(
     return payload
 
 
-def _runtime_evidence_checks(runtime_evidence: dict[str, object] | None, latest_quality_gate: str) -> list[dict[str, object]]:
+def _runtime_evidence_checks(root: Path, runtime_evidence: dict[str, object] | None, latest_quality_gate: str) -> list[dict[str, object]]:
     if not runtime_evidence:
         return []
     schema = runtime_evidence.get("schema")
@@ -268,6 +268,7 @@ def _runtime_evidence_checks(runtime_evidence: dict[str, object] | None, latest_
     evidence = evidence if isinstance(evidence, dict) else {}
     required_fields = [str(field) for field in schema.get("required_evidence_fields", [])] if isinstance(schema.get("required_evidence_fields"), list) else []
     missing_fields = [field for field in required_fields if field not in evidence]
+    ui_snapshot_refs = evidence.get("ui_snapshot_refs")
     return [
         _check("runtime_evidence_artifact_ready", runtime_evidence.get("artifact") is not None and runtime_evidence.get("status") == "complete", "Runtime evidence artifact is present and complete."),
         _check(
@@ -279,6 +280,11 @@ def _runtime_evidence_checks(runtime_evidence: dict[str, object] | None, latest_
             "runtime_evidence_required_fields",
             not missing_fields,
             "Runtime evidence includes required schema fields." if not missing_fields else f"Runtime evidence missing fields: {', '.join(missing_fields)}.",
+        ),
+        _check(
+            "runtime_evidence_ui_snapshots_ready",
+            _ui_snapshot_refs_ready(root, ui_snapshot_refs),
+            "Runtime evidence links parseable UI snapshot raw and index artifacts.",
         ),
     ]
 
@@ -296,6 +302,7 @@ def _runtime_evidence_trace(runtime_evidence: dict[str, object] | None, checks: 
         "runtime_evidence_artifact_ready",
         "runtime_evidence_quality_gate",
         "runtime_evidence_required_fields",
+        "runtime_evidence_ui_snapshots_ready",
     }
     failed_checks = [
         str(check.get("name"))
@@ -308,8 +315,30 @@ def _runtime_evidence_trace(runtime_evidence: dict[str, object] | None, checks: 
         "expected_quality_gate": schema.get("quality_gate"),
         "required_evidence_fields": required_fields,
         "missing_required_fields": [field for field in required_fields if field not in evidence],
+        "ui_snapshot_ref_count": len(evidence.get("ui_snapshot_refs", [])) if isinstance(evidence.get("ui_snapshot_refs"), list) else 0,
         "failed_checks": failed_checks,
     }
+
+
+def _ui_snapshot_refs_ready(root: Path, ui_snapshot_refs: object) -> bool:
+    if not isinstance(ui_snapshot_refs, list) or not ui_snapshot_refs:
+        return False
+    for item in ui_snapshot_refs:
+        if not isinstance(item, dict):
+            return False
+        raw_path = item.get("raw_path")
+        index_path = item.get("index_path")
+        if not isinstance(raw_path, str) or not isinstance(index_path, str):
+            return False
+        if not (root / raw_path).is_file() or not (root / index_path).is_file():
+            return False
+        try:
+            index_payload = json.loads((root / index_path).read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return False
+        if not isinstance(index_payload, dict) or index_payload.get("kind") != "ui_snapshot":
+            return False
+    return True
 
 
 def _real_device_trace(

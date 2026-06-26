@@ -9,13 +9,13 @@ _RUNTIME_EVIDENCE = {
         "direct_smoke": {
             "artifact": "camera_direct_smoke",
             "quality_gate": "CAMERA_DIRECT_SMOKE_PASS",
-            "required_evidence_fields": ["layout_verified", "bundle_verified", "ability_verified"],
+            "required_evidence_fields": ["layout_verified", "bundle_verified", "ability_verified", "ui_snapshot_refs"],
             "requires_real_device_preflight": True,
         },
         "capture_e2e": {
             "artifact": "camera_capture_e2e",
             "quality_gate": "CAMERA_CAPTURE_E2E_PASS",
-            "required_evidence_fields": ["capture_triggered", "media_delta_detected", "layout_verified"],
+            "required_evidence_fields": ["capture_triggered", "media_delta_detected", "layout_verified", "ui_snapshot_refs"],
             "requires_real_device_preflight": True,
         },
     },

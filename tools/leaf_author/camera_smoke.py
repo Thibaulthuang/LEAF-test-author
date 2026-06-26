@@ -157,6 +157,7 @@ def run_camera_direct_smoke(
                 "ui_snapshots": {
                     "after_launch": ui_snapshot,
                 },
+                "ui_snapshot_refs": _ui_snapshot_refs(ui_snapshot),
                 "ui_tree_excerpt": ui_tree_text[:4000],
                 "hilog_excerpt": command_text(hilog)[:4000],
             },
@@ -315,6 +316,7 @@ def run_camera_capture_e2e(
                     "before_capture": before_snapshot,
                     "after_capture": after_snapshot,
                 },
+                "ui_snapshot_refs": _ui_snapshot_refs(before_snapshot, after_snapshot),
                 "ui_diff": capture_action.get("ui_diff") or diff_indexes(before_index, after_index),
                 "photo_mode_candidates": photo_mode_candidates[:5],
                 "shutter_candidates": shutter_candidates[:5],
@@ -474,6 +476,25 @@ def _camera_next_command(report: dict[str, object], project_dir: Path | None, ta
         str(report.get("serial", "")),
     ]
     return " ".join(parts)
+
+
+def _ui_snapshot_refs(*snapshots: object) -> list[dict[str, object]]:
+    refs = []
+    for snapshot in snapshots:
+        if not isinstance(snapshot, dict):
+            continue
+        refs.append(
+            {
+                "phase": snapshot.get("phase"),
+                "action_id": snapshot.get("action_id"),
+                "raw_path": snapshot.get("raw_path"),
+                "index_path": snapshot.get("index_path"),
+                "foreground": snapshot.get("foreground"),
+                "node_count": snapshot.get("node_count"),
+                "clickable_count": snapshot.get("clickable_count"),
+            }
+        )
+    return refs
 
 
 def _target_app(bundle_name: str, module_name: str | None) -> dict[str, object]:

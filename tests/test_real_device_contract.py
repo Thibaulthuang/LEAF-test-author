@@ -50,6 +50,7 @@ class RealDeviceContractTests(unittest.TestCase):
         self.assertEqual(camera_direct["artifact"], "camera_direct_smoke")
         self.assertEqual(camera_direct["quality_gate"], "CAMERA_DIRECT_SMOKE_PASS")
         self.assertIn("layout_verified", camera_direct["required_evidence_fields"])
+        self.assertIn("ui_snapshot_refs", camera_direct["required_evidence_fields"])
         self.assertTrue(camera_direct["requires_real_device_preflight"])
 
     def test_runtime_evidence_contract_can_be_exported_by_domain(self):
@@ -59,6 +60,7 @@ class RealDeviceContractTests(unittest.TestCase):
         self.assertEqual(manifest["domain"], "camera")
         self.assertEqual(manifest["runtime_evidence"]["direct_smoke"]["artifact"], "camera_direct_smoke")
         self.assertIn("ability_verified", manifest["runtime_evidence"]["direct_smoke"]["required_evidence_fields"])
+        self.assertIn("ui_snapshot_refs", manifest["runtime_evidence"]["capture_e2e"]["required_evidence_fields"])
 
     def test_real_device_contract_guard_rejects_incomplete_runtime_evidence_schema(self):
         manifest = build_real_device_contract()
