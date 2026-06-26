@@ -53,25 +53,42 @@ class RunAuditTests(unittest.TestCase):
     def test_audit_run_checks_device_selection_matches_preflight_serial(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            _complete_direct_smoke(root, "audit-selection")
+            start_new_case(root, "camera", "打开相机；点击拍照", run_id="audit-selection")
+            confirm_plan(root, "audit-selection")
+            layout_path = "/data/local/tmp/layout_123.json"
 
             def runner(args, timeout_s):
-                if args == ["hdc", "list", "targets"]:
+                if args == ["/sdk/hdc", "list", "targets"]:
                     return ProbeCommandResult(0, "SERIAL123\n", "")
-                if args == ["hdc", "-t", "SERIAL123", "shell", "param", "get", "const.product.model"]:
-                    return ProbeCommandResult(0, "MateTest\n", "")
-                if args == ["hdc", "-t", "SERIAL123", "shell", "param", "get", "const.ohos.apiversion"]:
-                    return ProbeCommandResult(0, "14\n", "")
+                if args == ["/sdk/hdc", "-t", "SERIAL123", "shell", "param", "get", "const.product.model"]:
+                    return ProbeCommandResult(0, "ohos\n", "")
+                if args == ["/sdk/hdc", "-t", "SERIAL123", "shell", "param", "get", "const.ohos.apiversion"]:
+                    return ProbeCommandResult(0, "26\n", "")
+                if args == ["/sdk/hdc", "-t", "SERIAL123", "shell", "bm", "dump", "-n", "com.huawei.hmos.camera"]:
+                    return ProbeCommandResult(0, '"bundleName": "com.huawei.hmos.camera",\n"moduleName": "phone",\n', "")
+                if args == ["/sdk/hdc", "-t", "SERIAL123", "shell", "aa", "start", "-a", "com.huawei.hmos.camera.MainAbility", "-b", "com.huawei.hmos.camera", "-m", "phone"]:
+                    return ProbeCommandResult(0, "start ability successfully\n", "")
+                if args == ["/sdk/hdc", "-t", "SERIAL123", "shell", "uitest", "dumpLayout"]:
+                    return ProbeCommandResult(0, f"DumpLayout saved to:{layout_path}\n", "")
+                if args == ["/sdk/hdc", "-t", "SERIAL123", "shell", "cat", layout_path]:
+                    return ProbeCommandResult(0, '{"attributes":{"bundleName":"com.huawei.hmos.camera","abilityName":"com.huawei.hmos.camera.MainAbility","text":"相机"},"children":[]}\n', "")
+                if args == ["/sdk/hdc", "-t", "SERIAL123", "shell", "hilog", "-x"]:
+                    return ProbeCommandResult(0, "camera foreground log\n", "")
                 return ProbeCommandResult(1, "", f"unexpected {args}")
 
-            select_real_device(root, "audit-selection", hdc_runner=runner)
+            select_real_device(root, "audit-selection", hdc_runner=runner, hdc_path="/sdk/hdc")
+            advance_run(root, "audit-selection", hdc_runner=runner, run_real=True, runtime_mode="direct_smoke", hdc_path="/sdk/hdc")
 
             result = audit_run(root, "audit-selection")
 
             self.assertEqual(result["evidence"]["device_selection"], ".leaf/runs/audit-selection/device_selection.json")
+            self.assertEqual(result["evidence"]["real_device_input"], ".leaf/runs/audit-selection/real_device_input.json")
             passed_checks = [check["name"] for check in result["checks"] if check["passed"]]
             self.assertIn("device_selection_ready", passed_checks)
             self.assertIn("device_selection_matches_preflight", passed_checks)
+            self.assertIn("real_device_input_artifact_ready", passed_checks)
+            self.assertIn("real_device_input_matches_preflight", passed_checks)
+            self.assertIn("real_device_input_source_matches_selection", passed_checks)
 
     def test_audit_run_fails_incomplete_run(self):
         with tempfile.TemporaryDirectory() as tmp:

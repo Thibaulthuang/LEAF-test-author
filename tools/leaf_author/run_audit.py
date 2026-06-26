@@ -34,6 +34,14 @@ def audit_run(root: Path, run_id: str) -> dict[str, object]:
     device_selection = report.get("device_selection")
     checks.extend(_device_selection_checks(device_selection if isinstance(device_selection, dict) else None, preflight if isinstance(preflight, dict) else None))
     evidence = report.get("evidence", {})
+    real_device_input = _load_real_device_input(root, evidence if isinstance(evidence, dict) else {})
+    checks.extend(
+        _real_device_input_checks(
+            real_device_input,
+            preflight if isinstance(preflight, dict) else None,
+            device_selection if isinstance(device_selection, dict) else None,
+        )
+    )
     context_manifest = _load_context_manifest(root, evidence if isinstance(evidence, dict) else {})
     checks.extend(_context_manifest_checks(context_manifest, report))
     workflow_diagnostics = _load_workflow_diagnostics(root, evidence if isinstance(evidence, dict) else {})
@@ -54,6 +62,7 @@ def audit_run(root: Path, run_id: str) -> dict[str, object]:
         "evidence": {
             "report": "report-run",
             "device_selection": device_selection.get("artifact") if isinstance(device_selection, dict) else None,
+            "real_device_input": real_device_input.get("artifact") if isinstance(real_device_input, dict) else None,
             "real_device_preflight": preflight.get("artifact") if isinstance(preflight, dict) else None,
             "context_manifest": context_manifest.get("artifact") if isinstance(context_manifest, dict) else None,
             "workflow_diagnostics": workflow_diagnostics.get("artifact") if isinstance(workflow_diagnostics, dict) else None,
@@ -127,6 +136,53 @@ def _device_selection_checks(device_selection: dict[str, object] | None, preflig
                 "device_selection_matches_preflight",
                 device_selection.get("serial") == preflight.get("serial"),
                 "Device selection serial matches real-device preflight serial.",
+            )
+        )
+    return checks
+
+
+def _load_real_device_input(root: Path, evidence: dict[str, object]) -> dict[str, object] | None:
+    value = evidence.get("real_device_input")
+    if not isinstance(value, str) or not value:
+        return None
+    path = root / value
+    if not path.is_file():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {"artifact": value, "status": "invalid", "error": {"type": "JSONDecodeError", "message": "real_device_input is not valid JSON"}}
+    if not isinstance(payload, dict):
+        return {"artifact": value, "status": "invalid", "error": {"type": "TypeError", "message": "real_device_input must be a JSON object"}}
+    payload["artifact"] = value
+    return payload
+
+
+def _real_device_input_checks(
+    real_device_input: dict[str, object] | None,
+    preflight: dict[str, object] | None,
+    device_selection: dict[str, object] | None,
+) -> list[dict[str, object]]:
+    if not real_device_input:
+        return []
+    checks = [
+        _check("real_device_input_artifact_ready", real_device_input.get("status") == "ready", "Real-device input artifact records ready serial input."),
+    ]
+    if preflight:
+        checks.append(
+            _check(
+                "real_device_input_matches_preflight",
+                real_device_input.get("serial") == preflight.get("serial"),
+                "Real-device input serial matches preflight serial.",
+            )
+        )
+    if device_selection and real_device_input.get("serial_source") == "device_selection":
+        checks.append(
+            _check(
+                "real_device_input_source_matches_selection",
+                real_device_input.get("device_selection_artifact") == device_selection.get("artifact")
+                and real_device_input.get("serial") == device_selection.get("serial"),
+                "Real-device input source points to the selected device artifact.",
             )
         )
     return checks
