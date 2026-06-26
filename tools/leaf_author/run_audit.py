@@ -9,6 +9,7 @@ from tools.leaf_author.phase_guard import validate_phase_contract
 from tools.leaf_author.real_device_contract import real_device_decision_contract, real_device_runtime_evidence_schema, validate_real_device_contract
 from tools.leaf_author.reports import report_run
 from tools.leaf_author.runtime_registry import runtime_quality_gates, runtime_safety_profile, validate_runtime_registry
+from tools.leaf_author.target_policy import default_target_policy
 from tools.leaf_author.workflow import load_workflow, save_workflow
 from tools.leaf_author.batch_registry import resume_batch
 
@@ -728,6 +729,11 @@ def _ui_tree_diagnostics_checks(
     return [
         _check("ui_tree_diagnostics_ready", ready, "UI tree diagnostics artifact is typed and internally consistent."),
         _check(
+            "ui_tree_diagnostics_handoff_ready",
+            _ui_tree_diagnostics_handoff_ready(ui_tree_diagnostics),
+            "UI tree diagnostics keeps the leaf-gui-agent handoff, context, and user-loop contract.",
+        ),
+        _check(
             "ui_tree_diagnostics_indexes_ready",
             _ui_tree_diagnostics_indexes_ready(root, snapshots),
             "UI tree diagnostics references parseable raw and indexed UI snapshots.",
@@ -738,6 +744,32 @@ def _ui_tree_diagnostics_checks(
             "UI tree diagnostics snapshots are a subset of runtime evidence UI snapshot refs.",
         ),
     ]
+
+
+def _ui_tree_diagnostics_handoff_ready(ui_tree_diagnostics: dict[str, object]) -> bool:
+    handoff = ui_tree_diagnostics.get("handoff")
+    user_loop = ui_tree_diagnostics.get("user_loop")
+    if not isinstance(handoff, dict) or not isinstance(user_loop, dict):
+        return False
+    rule = HANDOFF_RULES["leaf-gui-agent"]
+    expected_context = ["workflow", "runtime_evidence", "ui_tree"]
+    return (
+        ui_tree_diagnostics.get("agent_owner") == "leaf-gui-agent"
+        and ui_tree_diagnostics.get("agent_mode") == AGENT_MODES["leaf-gui-agent"]
+        and handoff.get("to_agent") == "leaf-gui-agent"
+        and handoff.get("agent_mode") == AGENT_MODES["leaf-gui-agent"]
+        and handoff.get("handoff_required") == rule.get("handoff_required")
+        and handoff.get("required_inputs") == rule.get("required_inputs")
+        and handoff.get("subagent_boundary") == rule.get("subagent_boundary")
+        and handoff.get("attention_boundary") == "one_active_run"
+        and handoff.get("artifact_loading") == "on_demand"
+        and handoff.get("context_slice") == expected_context
+        and "ui_tree" in _string_list(handoff.get("context_slice"))
+        and user_loop.get("position") == "observe_gui_context"
+        and user_loop.get("required_input") == ""
+        and ui_tree_diagnostics.get("target_policy") == default_target_policy()
+        and handoff.get("target_policy") == default_target_policy()
+    )
 
 
 def _ui_tree_diagnostics_indexes_ready(root: Path, snapshots: list[object]) -> bool:

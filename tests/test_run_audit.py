@@ -204,6 +204,23 @@ class RunAuditTests(unittest.TestCase):
             self.assertIn("ui_tree_diagnostics_ready", passed_checks)
             self.assertIn("ui_tree_diagnostics_indexes_ready", passed_checks)
             self.assertIn("ui_tree_diagnostics_matches_runtime_evidence", passed_checks)
+            self.assertIn("ui_tree_diagnostics_handoff_ready", passed_checks)
+
+    def test_audit_run_fails_when_ui_tree_diagnostics_handoff_drifts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _complete_direct_smoke(root, "audit-ui-diag-handoff-drift")
+            diagnostics = inspect_ui_tree(root, "audit-ui-diag-handoff-drift", phase="after_launch", action_id="camera_direct")
+            diagnostics["agent_mode"] = "orchestrator"
+            diagnostics["handoff"]["handoff_required"] = False
+            diagnostics["handoff"]["context_slice"] = ["workflow"]
+            (root / diagnostics["artifact"]).write_text(json.dumps(diagnostics, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            result = audit_run(root, "audit-ui-diag-handoff-drift")
+
+            self.assertEqual(result["status"], "failed")
+            failed_checks = [check["name"] for check in result["checks"] if not check["passed"]]
+            self.assertIn("ui_tree_diagnostics_handoff_ready", failed_checks)
 
     def test_audit_run_fails_when_ui_tree_diagnostics_reference_unknown_index(self):
         with tempfile.TemporaryDirectory() as tmp:

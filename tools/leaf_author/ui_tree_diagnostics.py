@@ -3,8 +3,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from tools.leaf_author.agent_handoff import AGENT_MODES, HANDOFF_RULES
 from tools.leaf_author.reports import report_run
 from tools.leaf_author.runtime.ui_tree import diff_indexes, find_candidates
+from tools.leaf_author.target_policy import default_target_policy
 from tools.leaf_author.workflow import load_workflow, save_workflow
 
 
@@ -41,6 +43,14 @@ def inspect_ui_tree(
         "schema_version": "1.0",
         "manifest_kind": "leaf_ui_tree_diagnostics",
         "run_id": run_id,
+        "agent_owner": "leaf-gui-agent",
+        "agent_mode": AGENT_MODES["leaf-gui-agent"],
+        "handoff": _gui_handoff(_allowed_runtime_artifacts(report), _specific_question(node_id, text, node_type, clickable)),
+        "user_loop": {
+            "position": "observe_gui_context",
+            "required_input": "",
+        },
+        "target_policy": default_target_policy(),
         "phase_filter": phase,
         "action_id_filter": action_id,
         "selector": {
@@ -64,6 +74,39 @@ def inspect_ui_tree(
     if write_artifact:
         payload = _write_diagnostics_artifact(root, run_id, payload)
     return payload
+
+
+def _gui_handoff(allowed_artifacts: list[str], specific_question: str) -> dict[str, object]:
+    rule = HANDOFF_RULES["leaf-gui-agent"]
+    return {
+        "from_agent": "tools.leaf_author",
+        "to_agent": "leaf-gui-agent",
+        "agent_mode": AGENT_MODES["leaf-gui-agent"],
+        "handoff_required": bool(rule.get("handoff_required")),
+        "required_inputs": list(rule.get("required_inputs", [])) if isinstance(rule.get("required_inputs"), list) else [],
+        "subagent_boundary": str(rule.get("subagent_boundary", "")),
+        "trigger_source": "workflow.json",
+        "next_action": "inspect_ui_tree",
+        "attention_boundary": "one_active_run",
+        "artifact_loading": "on_demand",
+        "context_slice": ["workflow", "runtime_evidence", "ui_tree"],
+        "allowed_artifacts": allowed_artifacts,
+        "specific_question": specific_question,
+        "target_policy": default_target_policy(),
+    }
+
+
+def _allowed_runtime_artifacts(report: dict[str, object]) -> list[str]:
+    evidence = report.get("evidence")
+    if not isinstance(evidence, dict):
+        return []
+    return [str(key) for key in evidence if isinstance(key, str) and (key.endswith("_smoke") or key.endswith("_e2e"))]
+
+
+def _specific_question(node_id: str | None, text: str | None, node_type: str | None, clickable: bool | None) -> str:
+    if any(value is not None and value != "" for value in [node_id, text, node_type, clickable]):
+        return "find ui tree candidates"
+    return "summarize ui tree snapshots"
 
 
 def _inspect_snapshot(root: Path, snapshot: dict[str, object], selectors: list[dict[str, object]], limit: int) -> dict[str, object]:

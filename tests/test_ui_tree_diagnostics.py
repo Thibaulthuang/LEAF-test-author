@@ -34,6 +34,26 @@ class UiTreeDiagnosticsTests(unittest.TestCase):
             workflow = load_workflow(root, "ui-diag")
             self.assertEqual(workflow["artifacts"]["ui_tree_diagnostics"], ".leaf/runs/ui-diag/ui_tree_diagnostics.json")
 
+    def test_inspect_ui_tree_records_gui_subagent_handoff_contract(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_run_with_ui_snapshots(root)
+
+            result = inspect_ui_tree(root, "ui-diag", text="拍照", clickable=True)
+
+            self.assertEqual(result["agent_owner"], "leaf-gui-agent")
+            self.assertEqual(result["agent_mode"], "focused_subagent")
+            self.assertEqual(result["handoff"]["handoff_required"], True)
+            self.assertEqual(result["handoff"]["subagent_boundary"], "read_only_gui_context")
+            self.assertEqual(result["handoff"]["attention_boundary"], "one_active_run")
+            self.assertEqual(result["handoff"]["artifact_loading"], "on_demand")
+            self.assertEqual(result["handoff"]["context_slice"], ["workflow", "runtime_evidence", "ui_tree"])
+            self.assertEqual(result["handoff"]["allowed_artifacts"], ["camera_direct_smoke"])
+            self.assertEqual(result["handoff"]["specific_question"], "find ui tree candidates")
+            self.assertEqual(result["user_loop"]["position"], "observe_gui_context")
+            self.assertEqual(result["user_loop"]["required_input"], "")
+            self.assertEqual(result["target_policy"]["scope"], "system_app_only")
+
     def test_inspect_ui_tree_can_skip_artifact_write(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
