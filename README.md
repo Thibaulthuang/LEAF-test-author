@@ -156,6 +156,10 @@ command, and existing evidence paths. Use `resume-batch --auto-safe` to advance
 only confirmed safe local stages across multiple runs; it still stops at plan
 confirmation and real-device confirmation.
 
+Report `next_command` is generated from the phase/runtime contracts. For Camera
+real-device checkpoints it recommends the registered runtime mode, for example
+`advance <run_id> --run-real --runtime-mode direct_smoke --serial <serial>`.
+
 Phase decisions are contract-driven. `docs/workflow-contract.json` defines each
 phase's `next_action`, `auto_safe` flag, `agent_owner`, `context_slice`, and
 `user_loop` position. `tools.leaf_author.phase_contract` reads that contract for

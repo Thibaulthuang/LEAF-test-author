@@ -28,6 +28,9 @@ Report the current LEAF workflow decision state for one run or one batch.
    decide whether the main author agent should continue or hand off to a domain
    or GUI subagent. Use `.leaf/runs/<run_id>/context_manifest.json` as the
    artifact handoff packet.
+8. Treat `next_command` as contract output. For real-device checkpoints it must
+   come from the runtime registry and should use `--runtime-mode <mode>` when
+   the domain has a registered runtime mode.
 
 This command is the lightweight status surface for interrupted work, multi-case
 execution, and handoff between OpenCode sessions.

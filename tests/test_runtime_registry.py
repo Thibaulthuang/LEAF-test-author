@@ -9,6 +9,7 @@ from tools.leaf_author.runtime_registry import (
     classify_experience_result,
     experience_candidate_keys,
     quality_artifact_priority,
+    real_device_next_command,
     resolve_runtime_mode,
     runtime_artifact_keys,
     run_domain_runtime,
@@ -70,6 +71,16 @@ class RuntimeRegistryTests(unittest.TestCase):
         )
         self.assertNotIn("camera_direct_smoke", quality_artifact_priority("display"))
         self.assertIn("pytest_result", quality_artifact_priority("display"))
+
+    def test_runtime_registry_builds_real_device_next_command(self):
+        self.assertEqual(
+            real_device_next_command("run-123", "camera"),
+            "python3 -m tools.leaf_author advance run-123 --run-real --runtime-mode direct_smoke --serial <serial>",
+        )
+        self.assertEqual(
+            real_device_next_command("run-123", "display"),
+            "python3 -m tools.leaf_author advance run-123 --run-real --serial <serial>",
+        )
 
     def test_advance_run_can_use_generic_runtime_mode_for_camera_direct(self):
         with tempfile.TemporaryDirectory() as tmp:

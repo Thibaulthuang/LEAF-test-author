@@ -58,6 +58,24 @@ class ReportTests(unittest.TestCase):
 
             self.assertEqual(result["latest_quality_gate"], "CAMERA_DIRECT_SMOKE_PASS")
 
+    def test_report_run_real_device_checkpoint_recommends_runtime_mode_command(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "打开相机；点击拍照", run_id="report-real")
+            confirm_plan(root, "report-real")
+            run_dir = root / ".leaf" / "runs" / "report-real"
+            workflow = json.loads((run_dir / "workflow.json").read_text(encoding="utf-8"))
+            workflow["current_phase"] = "e2e_ready"
+            (run_dir / "workflow.json").write_text(json.dumps(workflow, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            result = report_run(root, "report-real")
+
+            self.assertEqual(result["user_checkpoint"], "real_device_confirmation")
+            self.assertEqual(
+                result["next_command"],
+                "python3 -m tools.leaf_author advance report-real --run-real --runtime-mode direct_smoke --serial <serial>",
+            )
+
     def test_report_batch_summarizes_runs_and_next_focus(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -24,6 +24,9 @@ _DOMAIN_QUALITY_ARTIFACTS = {
 _DOMAIN_DIAGNOSTIC_ARTIFACTS = {
     "camera": ["camera_smoke_preflight"],
 }
+_DEFAULT_REAL_DEVICE_RUNTIME_MODE = {
+    "camera": "direct_smoke",
+}
 _RUNTIME_EXPERIENCE_RULES = {
     "HYPIUM_REAL_PASS": {
         "status": "PASSED_REAL",
@@ -77,6 +80,17 @@ def quality_artifact_priority(domain: str) -> list[str]:
         if key not in priority:
             priority.append(key)
     return priority
+
+
+def default_real_device_runtime_mode(domain: str) -> str | None:
+    return _DEFAULT_REAL_DEVICE_RUNTIME_MODE.get(domain)
+
+
+def real_device_next_command(run_id: str, domain: str) -> str:
+    runtime_mode = default_real_device_runtime_mode(domain)
+    if runtime_mode:
+        return f"python3 -m tools.leaf_author advance {run_id} --run-real --runtime-mode {runtime_mode} --serial <serial>"
+    return f"python3 -m tools.leaf_author advance {run_id} --run-real --serial <serial>"
 
 
 def classify_experience_result(domain: str, run_result: dict[str, object]) -> dict[str, object]:

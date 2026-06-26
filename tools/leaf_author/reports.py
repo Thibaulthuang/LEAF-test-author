@@ -6,7 +6,7 @@ from pathlib import Path
 
 from tools.leaf_author.batch_registry import inspect_batch
 from tools.leaf_author.run_registry import inspect_run
-from tools.leaf_author.runtime_registry import quality_artifact_priority
+from tools.leaf_author.runtime_registry import quality_artifact_priority, real_device_next_command
 
 
 def report_run(root: Path, run_id: str) -> dict[str, object]:
@@ -125,7 +125,7 @@ def _next_command(run_id: str, run: dict[str, object], safe_to_auto_continue: bo
     if user_checkpoint == "first_plan_confirmation":
         return f"python3 -m tools.leaf_author confirm-plan {run_id}"
     if user_checkpoint == "real_device_confirmation":
-        return f"python3 -m tools.leaf_author advance {run_id} --run-real --serial <serial>"
+        return real_device_next_command(run_id, str(run.get("domain", "")))
     if run.get("next_action") == "complete":
         return ""
     return ""

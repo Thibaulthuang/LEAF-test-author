@@ -56,6 +56,7 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
         self.assertIn("user_checkpoint", command)
         self.assertIn("user_loop", command)
         self.assertIn("decision_contract", command)
+        self.assertIn("--runtime-mode <mode>", command)
         self.assertIn("latest_quality_gate", command)
         self.assertIn("evidence", command)
 
@@ -119,6 +120,7 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
         self.assertIn("tools/leaf_author/domain_registry.py", readme)
         self.assertIn("tools/leaf_author/runtime_registry.py", readme)
         self.assertIn("--runtime-mode direct_smoke", readme)
+        self.assertIn("Report `next_command`", readme)
         self.assertNotIn("test HAP", readme)
         self.assertNotIn("test package", readme)
 
