@@ -26,6 +26,7 @@ class ReportTests(unittest.TestCase):
             self.assertEqual(result["latest_quality_gate"], "DRAFT_STATIC_PASS")
             self.assertEqual(result["user_action_required"], False)
             self.assertEqual(result["next_command"], "")
+            self.assertIsNone(result["real_device_preflight"])
             self.assertIn("pytest_result", result["evidence"])
             self.assertIn("team_export_manifest", result["evidence"])
 
@@ -195,6 +196,13 @@ class ReportTests(unittest.TestCase):
             result = report_run(root, "report-preflight")
 
             self.assertEqual(result["current_phase"], "complete")
+            self.assertEqual(result["real_device_preflight"]["status"], "ready")
+            self.assertEqual(result["real_device_preflight"]["runtime_mode"], "direct_smoke")
+            self.assertEqual(result["real_device_preflight"]["serial"], "SERIAL123")
+            self.assertEqual(result["real_device_preflight"]["approval_status"], "not_required")
+            self.assertEqual(result["real_device_preflight"]["input_status"], "ready")
+            self.assertEqual(result["real_device_preflight"]["decision_contract"]["agent_owner"], "leaf-test-author")
+            self.assertEqual(result["real_device_preflight"]["user_loop"]["position"], "observe_real_device_execution")
             self.assertIn("real_device_preflight", result["evidence"])
             self.assertIn("camera_direct_smoke", result["evidence"])
 

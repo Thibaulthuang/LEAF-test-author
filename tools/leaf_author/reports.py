@@ -17,6 +17,7 @@ def report_run(root: Path, run_id: str) -> dict[str, object]:
     evidence = _existing_artifacts(root, artifacts if isinstance(artifacts, dict) else {})
     approval_required = None if run.get("current_phase") == "complete" else _real_device_approval(root, artifacts if isinstance(artifacts, dict) else {})
     input_required = None if run.get("current_phase") == "complete" else _real_device_input(root, artifacts if isinstance(artifacts, dict) else {})
+    real_device_preflight = _real_device_preflight(root, artifacts if isinstance(artifacts, dict) else {})
     latest_quality_gate = _latest_quality_gate(root, str(run.get("domain", "")), artifacts if isinstance(artifacts, dict) else {})
     safe_to_auto_continue = bool(isinstance(resume_summary, dict) and resume_summary.get("safe_to_auto_continue")) and not approval_required and not input_required
     user_action_required = bool(isinstance(resume_summary, dict) and resume_summary.get("requires_user_confirmation")) or bool(approval_required) or bool(input_required)
@@ -42,6 +43,7 @@ def report_run(root: Path, run_id: str) -> dict[str, object]:
         "next_command": _next_command(run_id, run, safe_to_auto_continue, user_checkpoint, approval_required, input_required),
         "approval_required": approval_required,
         "input_required": input_required,
+        "real_device_preflight": real_device_preflight,
         "evidence": evidence,
         "context_policy": {
             "scope": "run_report",
@@ -148,6 +150,34 @@ def _real_device_input(root: Path, artifacts: dict[str, object]) -> dict[str, ob
         "missing": missing if isinstance(missing, list) else [],
         "required_input": payload.get("required_input"),
         "operator_message": payload.get("operator_message"),
+    }
+
+
+def _real_device_preflight(root: Path, artifacts: dict[str, object]) -> dict[str, object] | None:
+    value = artifacts.get("real_device_preflight")
+    if not isinstance(value, str) or not value:
+        return None
+    path = root / value
+    if not path.is_file():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    decision_contract = payload.get("decision_contract", {})
+    user_loop = payload.get("user_loop", {})
+    return {
+        "artifact": value,
+        "runtime_mode": payload.get("runtime_mode"),
+        "status": payload.get("status"),
+        "serial": payload.get("serial"),
+        "risk_level": payload.get("risk_level"),
+        "mutates_device_state": payload.get("mutates_device_state"),
+        "approval_status": payload.get("approval_status"),
+        "input_status": payload.get("input_status"),
+        "next_action": payload.get("next_action"),
+        "decision_contract": decision_contract if isinstance(decision_contract, dict) else {},
+        "user_loop": user_loop if isinstance(user_loop, dict) else {},
     }
 
 
