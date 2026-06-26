@@ -2,7 +2,13 @@ import unittest
 from contextlib import redirect_stdout
 from io import StringIO
 
-from tools.leaf_author.real_device_contract import build_real_device_contract, real_device_decision_contract, real_device_user_loop, validate_real_device_contract
+from tools.leaf_author.real_device_contract import (
+    build_real_device_contract,
+    build_runtime_evidence_contract,
+    real_device_decision_contract,
+    real_device_user_loop,
+    validate_real_device_contract,
+)
 
 
 class RealDeviceContractTests(unittest.TestCase):
@@ -46,6 +52,14 @@ class RealDeviceContractTests(unittest.TestCase):
         self.assertIn("layout_verified", camera_direct["required_evidence_fields"])
         self.assertTrue(camera_direct["requires_real_device_preflight"])
 
+    def test_runtime_evidence_contract_can_be_exported_by_domain(self):
+        manifest = build_runtime_evidence_contract("camera")
+
+        self.assertEqual(manifest["manifest_kind"], "leaf_runtime_evidence_contract")
+        self.assertEqual(manifest["domain"], "camera")
+        self.assertEqual(manifest["runtime_evidence"]["direct_smoke"]["artifact"], "camera_direct_smoke")
+        self.assertIn("ability_verified", manifest["runtime_evidence"]["direct_smoke"]["required_evidence_fields"])
+
     def test_real_device_contract_guard_rejects_incomplete_runtime_evidence_schema(self):
         manifest = build_real_device_contract()
         del manifest["runtime_evidence"]["camera"]["direct_smoke"]["required_evidence_fields"]
@@ -83,6 +97,18 @@ class RealDeviceContractTests(unittest.TestCase):
         payload = __import__("json").loads(output.getvalue())
         self.assertEqual(payload["manifest_kind"], "leaf_real_device_gate_contract")
         self.assertIn("preflight", payload["gates"])
+
+    def test_cli_runtime_evidence_contract_outputs_domain_json(self):
+        from tools.leaf_author.__main__ import main
+
+        output = StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["runtime-evidence-contract", "camera"])
+
+        self.assertEqual(exit_code, 0)
+        payload = __import__("json").loads(output.getvalue())
+        self.assertEqual(payload["manifest_kind"], "leaf_runtime_evidence_contract")
+        self.assertEqual(payload["runtime_evidence"]["capture_e2e"]["quality_gate"], "CAMERA_CAPTURE_E2E_PASS")
 
 
 if __name__ == "__main__":

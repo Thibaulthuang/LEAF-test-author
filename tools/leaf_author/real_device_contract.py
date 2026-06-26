@@ -47,6 +47,24 @@ def build_real_device_contract() -> dict[str, object]:
     }
 
 
+def build_runtime_evidence_contract(domain: str | None = None) -> dict[str, object]:
+    runtime_evidence = _runtime_evidence_contract()
+    if domain:
+        domain_evidence = runtime_evidence.get(domain, {})
+        return {
+            "schema_version": "1.0",
+            "manifest_kind": "leaf_runtime_evidence_contract",
+            "domain": domain,
+            "runtime_evidence": domain_evidence if isinstance(domain_evidence, dict) else {},
+        }
+    return {
+        "schema_version": "1.0",
+        "manifest_kind": "leaf_runtime_evidence_contract",
+        "domain": None,
+        "runtime_evidence": runtime_evidence,
+    }
+
+
 def validate_real_device_contract(contract: dict[str, object] | None = None) -> dict[str, object]:
     contract = contract or build_real_device_contract()
     issues: list[str] = []

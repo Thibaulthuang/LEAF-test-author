@@ -18,7 +18,7 @@ from tools.leaf_author.hypium import sync_openharmony_export
 from tools.leaf_author.openharmony_discovery import discover_hap_artifacts
 from tools.leaf_author.openharmony_project import scaffold_openharmony_test_project
 from tools.leaf_author.phase_guard import build_agent_handoff_contract, validate_phase_contract
-from tools.leaf_author.real_device_contract import build_real_device_contract
+from tools.leaf_author.real_device_contract import build_real_device_contract, build_runtime_evidence_contract
 from tools.leaf_author.reports import report_batch, report_run
 from tools.leaf_author.run_audit import audit_batch, audit_run
 from tools.leaf_author.run_registry import inspect_run, list_runs
@@ -122,6 +122,8 @@ def main(argv: list[str] | None = None) -> int:
     subparsers.add_parser("phase-guard")
     subparsers.add_parser("agent-handoff-contract")
     subparsers.add_parser("real-device-contract")
+    runtime_evidence_contract_parser = subparsers.add_parser("runtime-evidence-contract")
+    runtime_evidence_contract_parser.add_argument("domain", nargs="?")
     subparsers.add_parser("runtime-registry-contract")
 
     advance = subparsers.add_parser("advance")
@@ -331,6 +333,9 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "real-device-contract":
         print(json.dumps(build_real_device_contract(), ensure_ascii=False, indent=2))
+        return 0
+    if args.command == "runtime-evidence-contract":
+        print(json.dumps(build_runtime_evidence_contract(args.domain), ensure_ascii=False, indent=2))
         return 0
     if args.command == "runtime-registry-contract":
         print(json.dumps(build_runtime_registry_contract(), ensure_ascii=False, indent=2))
