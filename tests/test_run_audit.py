@@ -36,6 +36,12 @@ class RunAuditTests(unittest.TestCase):
             self.assertIn("context_manifest_ready", passed_checks)
             self.assertIn("handoff_ready", passed_checks)
             self.assertIn("user_loop_ready", passed_checks)
+            self.assertIn("context_slice_bounded", passed_checks)
+            self.assertIn("allowed_artifacts_bounded", passed_checks)
+            self.assertIn("referenced_artifacts_bounded", passed_checks)
+            self.assertIn("trigger_source_stable", passed_checks)
+            self.assertIn("user_checkpoint_auto_boundary", passed_checks)
+            self.assertIn("gui_agent_ui_tree_context", passed_checks)
             self.assertIn("workflow_phase_state_ready", passed_checks)
             self.assertIn("workflow_phase_state_matches_manifest", passed_checks)
             self.assertIn("runtime_evidence_artifact_ready", passed_checks)
@@ -164,6 +170,68 @@ class RunAuditTests(unittest.TestCase):
             self.assertEqual(result["status"], "failed")
             failed_checks = [check["name"] for check in result["checks"] if not check["passed"]]
             self.assertIn("workflow_phase_state_matches_manifest", failed_checks)
+
+    def test_audit_run_fails_when_context_manifest_loads_unbounded_artifacts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _complete_direct_smoke(root, "audit-context-drift")
+            manifest_path = root / ".leaf" / "runs" / "audit-context-drift" / "context_manifest.json"
+            payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+            payload["context_slice"] = ["workflow", "team_export_manifest", "camera_direct_smoke"]
+            payload["referenced_artifacts"]["camera_direct_smoke"] = ".leaf/runs/audit-context-drift/camera_direct_smoke.json"
+            payload["referenced_artifacts"]["run_audit"] = ".leaf/runs/audit-context-drift/run_audit.json"
+            manifest_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            result = audit_run(root, "audit-context-drift")
+
+            self.assertEqual(result["status"], "failed")
+            failed_checks = [check["name"] for check in result["checks"] if not check["passed"]]
+            self.assertIn("context_slice_bounded", failed_checks)
+            self.assertIn("referenced_artifacts_bounded", failed_checks)
+
+    def test_audit_run_fails_when_context_manifest_allows_auto_crossing_user_checkpoint(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "打开相机；点击拍照", run_id="audit-user-loop")
+            manifest_path = root / ".leaf" / "runs" / "audit-user-loop" / "context_manifest.json"
+            payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+            payload["safe_to_auto_continue"] = True
+            payload["user_loop"]["safe_to_auto_continue"] = True
+            payload["handoff"]["user_loop"]["safe_to_auto_continue"] = True
+            manifest_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            with patch("tools.leaf_author.run_audit.report_run", return_value=_plan_report_for_user_loop_manifest()):
+                result = audit_run(root, "audit-user-loop")
+
+            self.assertEqual(result["status"], "failed")
+            failed_checks = [check["name"] for check in result["checks"] if not check["passed"]]
+            self.assertIn("user_checkpoint_auto_boundary", failed_checks)
+
+    def test_audit_run_fails_when_gui_agent_handoff_omits_ui_tree_context(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "打开相机；点击拍照", run_id="audit-gui-context")
+            confirm_plan(root, "audit-gui-context")
+            advance_run(root, "audit-gui-context")
+            manifest_path = root / ".leaf" / "runs" / "audit-gui-context" / "context_manifest.json"
+            payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+            payload["agent_owner"] = "leaf-gui-agent"
+            payload["current_phase"] = "pytest_ran"
+            payload["next_action"] = "collect_gui_context"
+            payload["context_slice"] = ["workflow", "pytest_result"]
+            payload["handoff"]["to_agent"] = "leaf-gui-agent"
+            payload["handoff"]["current_phase"] = "pytest_ran"
+            payload["handoff"]["next_action"] = "collect_gui_context"
+            payload["handoff"]["context_slice"] = ["workflow", "pytest_result"]
+            payload["handoff"]["allowed_artifacts"] = ["pytest_result"]
+            manifest_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            with patch("tools.leaf_author.run_audit.report_run", return_value=_pytest_ran_report_for_gui_manifest()):
+                result = audit_run(root, "audit-gui-context")
+
+            self.assertEqual(result["status"], "failed")
+            failed_checks = [check["name"] for check in result["checks"] if not check["passed"]]
+            self.assertIn("gui_agent_ui_tree_context", failed_checks)
 
     def test_audit_run_fails_when_runtime_evidence_schema_fields_are_missing(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -339,6 +407,48 @@ def _completed_report_for_corrupt_manifest() -> dict[str, object]:
         },
         "evidence": {
             "context_manifest": ".leaf/runs/audit-no-handoff/context_manifest.json",
+        },
+    }
+
+
+def _plan_report_for_user_loop_manifest() -> dict[str, object]:
+    return {
+        "domain": "camera",
+        "platform": "openharmony",
+        "current_phase": "plan",
+        "next_action": "present_plan_for_confirmation",
+        "latest_quality_gate": "UNKNOWN",
+        "safe_to_auto_continue": True,
+        "user_action_required": True,
+        "decision_contract": {
+            "trigger_source": "workflow.json",
+            "agent_owner": "leaf-test-author",
+            "context_slice": ["workflow", "plan"],
+            "allowed_artifacts": ["workflow", "plan", "device_probe"],
+        },
+        "evidence": {
+            "context_manifest": ".leaf/runs/audit-user-loop/context_manifest.json",
+        },
+    }
+
+
+def _pytest_ran_report_for_gui_manifest() -> dict[str, object]:
+    return {
+        "domain": "camera",
+        "platform": "openharmony",
+        "current_phase": "pytest_ran",
+        "next_action": "collect_gui_context",
+        "latest_quality_gate": "DRAFT_STATIC_PASS",
+        "safe_to_auto_continue": True,
+        "user_action_required": False,
+        "decision_contract": {
+            "trigger_source": "workflow.json",
+            "agent_owner": "leaf-gui-agent",
+            "context_slice": ["workflow", "pytest_result"],
+            "allowed_artifacts": ["pytest_result"],
+        },
+        "evidence": {
+            "context_manifest": ".leaf/runs/audit-gui-context/context_manifest.json",
         },
     }
 

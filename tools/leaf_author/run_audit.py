@@ -13,6 +13,7 @@ from tools.leaf_author.batch_registry import resume_batch
 
 def audit_run(root: Path, run_id: str) -> dict[str, object]:
     initial_workflow_phase_state = _load_workflow_phase_state(root, run_id)
+    initial_context_manifest = _load_context_manifest_from_workflow(root, run_id)
     report = report_run(root, run_id)
     domain = str(report.get("domain", ""))
     checks = [
@@ -45,7 +46,7 @@ def audit_run(root: Path, run_id: str) -> dict[str, object]:
     )
     runtime_evidence = _load_runtime_evidence(root, evidence if isinstance(evidence, dict) else {}, domain, preflight if isinstance(preflight, dict) else None)
     checks.extend(_runtime_evidence_checks(runtime_evidence, latest_quality_gate))
-    context_manifest = _load_context_manifest(root, evidence if isinstance(evidence, dict) else {})
+    context_manifest = initial_context_manifest or _load_context_manifest(root, evidence if isinstance(evidence, dict) else {})
     checks.extend(_context_manifest_checks(context_manifest, report))
     workflow_phase_state = initial_workflow_phase_state if _has_phase_state_snapshot(initial_workflow_phase_state) else _load_workflow_phase_state(root, run_id)
     checks.extend(_workflow_phase_state_checks(workflow_phase_state, context_manifest, report))
@@ -364,6 +365,22 @@ def _load_context_manifest(root: Path, evidence: dict[str, object]) -> dict[str,
     return payload
 
 
+def _load_context_manifest_from_workflow(root: Path, run_id: str) -> dict[str, object] | None:
+    workflow_path = root / ".leaf" / "runs" / run_id / "workflow.json"
+    if not workflow_path.is_file():
+        return None
+    try:
+        workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(workflow, dict):
+        return None
+    artifacts = workflow.get("artifacts")
+    if not isinstance(artifacts, dict):
+        return None
+    return _load_context_manifest(root, artifacts)
+
+
 def _load_workflow_diagnostics(root: Path, evidence: dict[str, object]) -> dict[str, object] | None:
     value = evidence.get("workflow_diagnostics")
     if not isinstance(value, str) or not value:
@@ -397,12 +414,36 @@ def _context_manifest_checks(context_manifest: dict[str, object] | None, report:
             _check("context_manifest_ready", False, "Context manifest artifact is missing or unreadable."),
             _check("handoff_ready", False, "Context manifest handoff snapshot is missing."),
             _check("user_loop_ready", False, "Context manifest user_loop snapshot is missing."),
+            _check("context_slice_bounded", False, "Context manifest context slice is missing."),
+            _check("referenced_artifacts_bounded", False, "Context manifest referenced artifacts are missing."),
+            _check("trigger_source_stable", False, "Context manifest trigger source is missing."),
+            _check("user_checkpoint_auto_boundary", False, "Context manifest user checkpoint boundary is missing."),
+            _check("gui_agent_ui_tree_context", False, "Context manifest GUI agent context is missing."),
         ]
     handoff = context_manifest.get("handoff")
     user_loop = context_manifest.get("user_loop")
+    decision_contract = report.get("decision_contract", {})
+    if not isinstance(decision_contract, dict):
+        decision_contract = {}
+    context_slice = _string_list(context_manifest.get("context_slice"))
+    handoff_context_slice = _string_list(handoff.get("context_slice") if isinstance(handoff, dict) else None)
+    contract_context_slice = _string_list(decision_contract.get("context_slice"))
+    allowed_artifacts = _string_list(handoff.get("allowed_artifacts") if isinstance(handoff, dict) else None)
+    contract_allowed_artifacts = _string_list(decision_contract.get("allowed_artifacts"))
+    referenced_artifacts = context_manifest.get("referenced_artifacts")
+    referenced_artifacts = referenced_artifacts if isinstance(referenced_artifacts, dict) else {}
+    exposed_artifacts = set(context_slice) | set(allowed_artifacts) | {"workflow", "context_manifest"}
+    referenced_artifacts_bounded = all(str(key) in exposed_artifacts for key in referenced_artifacts)
+    trigger_source = context_manifest.get("trigger_source")
+    handoff_trigger_source = handoff.get("trigger_source") if isinstance(handoff, dict) else None
+    contract_trigger_source = decision_contract.get("trigger_source")
+    user_checkpoint = context_manifest.get("user_checkpoint")
+    requires_user_confirmation = isinstance(user_loop, dict) and bool(user_loop.get("requires_user_confirmation"))
+    safe_to_auto_continue = isinstance(user_loop, dict) and bool(user_loop.get("safe_to_auto_continue"))
+    agent_owner = context_manifest.get("agent_owner")
     handoff_ready = (
         isinstance(handoff, dict)
-        and handoff.get("to_agent") == report.get("decision_contract", {}).get("agent_owner")
+        and handoff.get("to_agent") == decision_contract.get("agent_owner")
         and handoff.get("current_phase") == report.get("current_phase")
         and handoff.get("next_action") == report.get("next_action")
         and handoff.get("attention_boundary") == "one_active_run"
@@ -419,6 +460,36 @@ def _context_manifest_checks(context_manifest: dict[str, object] | None, report:
         _check("context_manifest_ready", context_manifest.get("manifest_kind") == "run_context_manifest", "Context manifest artifact is present and typed."),
         _check("handoff_ready", handoff_ready, "Context manifest handoff matches the report decision contract."),
         _check("user_loop_ready", user_loop_ready, "Context manifest user_loop matches report checkpoint and auto-continue state."),
+        _check(
+            "context_slice_bounded",
+            context_slice == handoff_context_slice == contract_context_slice,
+            "Context manifest loads exactly the phase decision context slice.",
+        ),
+        _check(
+            "allowed_artifacts_bounded",
+            allowed_artifacts == contract_allowed_artifacts,
+            "Context manifest allowed artifacts match the phase decision contract.",
+        ),
+        _check(
+            "referenced_artifacts_bounded",
+            referenced_artifacts_bounded,
+            "Context manifest references only workflow, context manifest, context-slice artifacts, or allowed artifacts.",
+        ),
+        _check(
+            "trigger_source_stable",
+            trigger_source == handoff_trigger_source == contract_trigger_source == "workflow.json",
+            "Context manifest, handoff, and decision contract all use workflow.json as the trigger source.",
+        ),
+        _check(
+            "user_checkpoint_auto_boundary",
+            not ((user_checkpoint or requires_user_confirmation) and safe_to_auto_continue),
+            "Context manifest never marks a user checkpoint safe for automatic continuation.",
+        ),
+        _check(
+            "gui_agent_ui_tree_context",
+            agent_owner != "leaf-gui-agent" or "ui_tree" in context_slice,
+            "GUI agent handoffs include ui_tree in the bounded context slice.",
+        ),
     ]
 
 
