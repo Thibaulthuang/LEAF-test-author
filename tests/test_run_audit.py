@@ -213,12 +213,16 @@ class RunAuditTests(unittest.TestCase):
             self.assertEqual(result["real_device_summary"]["serials"], ["SERIAL123"])
             self.assertEqual(result["real_device_summary"]["runtime_modes"], ["direct_smoke"])
             self.assertEqual(result["real_device_summary"]["quality_gates"], ["CAMERA_DIRECT_SMOKE_PASS", "UNKNOWN"])
+            self.assertEqual(result["runtime_evidence_summary"]["total_traces"], 1)
+            self.assertEqual(result["runtime_evidence_summary"]["artifacts"], [".leaf/runs/audit-batch-pass/camera_direct_smoke.json"])
+            self.assertEqual(result["runtime_evidence_summary"]["failed_checks"], [])
             self.assertEqual(result["audit_path"], ".leaf/batches/audit-batch/batch_audit.json")
             self.assertTrue((root / result["audit_path"]).is_file())
             passed = [run for run in result["runs"] if run["status"] == "passed"][0]
             self.assertEqual(passed["real_device_trace"]["runtime_mode"], "direct_smoke")
             self.assertEqual(passed["real_device_trace"]["latest_quality_gate"], "CAMERA_DIRECT_SMOKE_PASS")
             self.assertEqual(passed["real_device_trace"]["artifacts"]["real_device_preflight"], ".leaf/runs/audit-batch-pass/real_device_preflight.json")
+            self.assertEqual(passed["runtime_evidence_trace"]["artifact"], ".leaf/runs/audit-batch-pass/camera_direct_smoke.json")
             failed = [run for run in result["runs"] if run["status"] == "failed"][0]
             self.assertIn("workflow_complete", failed["failed_checks"])
 

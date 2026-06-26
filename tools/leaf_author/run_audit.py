@@ -57,6 +57,7 @@ def audit_run(root: Path, run_id: str) -> dict[str, object]:
         real_device_input=real_device_input,
         preflight=preflight if isinstance(preflight, dict) else None,
     )
+    runtime_evidence_trace = _runtime_evidence_trace(runtime_evidence, checks)
 
     passed = all(bool(check["passed"]) for check in checks)
     payload = {
@@ -70,6 +71,7 @@ def audit_run(root: Path, run_id: str) -> dict[str, object]:
         "next_action": report.get("next_action"),
         "latest_quality_gate": latest_quality_gate,
         "real_device_trace": real_device_trace,
+        "runtime_evidence_trace": runtime_evidence_trace,
         "checks": checks,
         "evidence": {
             "report": "report-run",
@@ -106,6 +108,7 @@ def audit_batch(root: Path, batch_id: str) -> dict[str, object]:
             "failed": failed_count,
         },
         "real_device_summary": _batch_real_device_summary(runs),
+        "runtime_evidence_summary": _batch_runtime_evidence_summary(runs),
         "batch_checks": batch_checks,
         "focus_plan": resume_view.get("focus_plan") if isinstance(resume_view, dict) else None,
         "runs": [
@@ -115,6 +118,7 @@ def audit_batch(root: Path, batch_id: str) -> dict[str, object]:
                 "status": run.get("status"),
                 "latest_quality_gate": run.get("latest_quality_gate"),
                 "real_device_trace": run.get("real_device_trace") if isinstance(run.get("real_device_trace"), dict) else None,
+                "runtime_evidence_trace": run.get("runtime_evidence_trace") if isinstance(run.get("runtime_evidence_trace"), dict) else None,
                 "failed_checks": [check["name"] for check in run.get("checks", []) if isinstance(check, dict) and not check.get("passed")],
                 **({"error": run["error"]} if isinstance(run.get("error"), dict) else {}),
             }
@@ -276,6 +280,35 @@ def _runtime_evidence_checks(runtime_evidence: dict[str, object] | None, latest_
             "Runtime evidence includes required schema fields." if not missing_fields else f"Runtime evidence missing fields: {', '.join(missing_fields)}.",
         ),
     ]
+
+
+def _runtime_evidence_trace(runtime_evidence: dict[str, object] | None, checks: list[dict[str, object]]) -> dict[str, object] | None:
+    if not runtime_evidence:
+        return None
+    schema = runtime_evidence.get("schema")
+    schema = schema if isinstance(schema, dict) else {}
+    evidence = runtime_evidence.get("evidence", {})
+    evidence = evidence if isinstance(evidence, dict) else {}
+    required_fields = [str(field) for field in schema.get("required_evidence_fields", [])] if isinstance(schema.get("required_evidence_fields"), list) else []
+    runtime_check_names = {
+        "runtime_evidence_schema_ready",
+        "runtime_evidence_artifact_ready",
+        "runtime_evidence_quality_gate",
+        "runtime_evidence_required_fields",
+    }
+    failed_checks = [
+        str(check.get("name"))
+        for check in checks
+        if isinstance(check, dict) and check.get("name") in runtime_check_names and not check.get("passed")
+    ]
+    return {
+        "artifact": runtime_evidence.get("artifact"),
+        "quality_gate": runtime_evidence.get("quality_gate"),
+        "expected_quality_gate": schema.get("quality_gate"),
+        "required_evidence_fields": required_fields,
+        "missing_required_fields": [field for field in required_fields if field not in evidence],
+        "failed_checks": failed_checks,
+    }
 
 
 def _real_device_trace(
@@ -522,6 +555,27 @@ def _batch_real_device_summary(runs: list[dict[str, object]]) -> dict[str, objec
         "runtime_modes": runtime_modes,
         "quality_gates": quality_gates,
     }
+
+
+def _batch_runtime_evidence_summary(runs: list[dict[str, object]]) -> dict[str, object]:
+    traces = [run.get("runtime_evidence_trace") for run in runs if isinstance(run.get("runtime_evidence_trace"), dict)]
+    artifacts = sorted({str(trace.get("artifact")) for trace in traces if trace.get("artifact")})
+    quality_gates = sorted({str(trace.get("quality_gate")) for trace in traces if trace.get("quality_gate")})
+    failed_checks = sorted({check for trace in traces for check in _string_list(trace.get("failed_checks"))})
+    missing_required_fields = sorted({field for trace in traces for field in _string_list(trace.get("missing_required_fields"))})
+    return {
+        "total_traces": len(traces),
+        "artifacts": artifacts,
+        "quality_gates": quality_gates,
+        "failed_checks": failed_checks,
+        "missing_required_fields": missing_required_fields,
+    }
+
+
+def _string_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value]
 
 
 def _audit_batch_run(root: Path, run_id: str) -> dict[str, object]:
