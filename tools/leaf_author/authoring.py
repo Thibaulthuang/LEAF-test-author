@@ -218,6 +218,17 @@ def advance_run(
         if _has_artifact(workflow, "real_device_input"):
             _write_real_device_input_artifact(root, run_id, workflow, selected_runtime_mode, serial_decision)
             workflow = load_workflow(root, run_id)
+        _write_real_device_preflight_artifact(
+            root,
+            run_id,
+            workflow,
+            selected_runtime_mode,
+            serial=str(serial).strip(),
+            approval=approval,
+            approval_token=approval_token,
+            serial_decision=serial_decision,
+        )
+        workflow = load_workflow(root, run_id)
     current_phase = str(workflow.get("current_phase", ""))
     if current_phase == "hypium_ran" and run_real:
         current_phase = "pytest_ran"
@@ -549,6 +560,55 @@ def _write_real_device_input_artifact(
     workflow_payload = dict(workflow)
     artifacts = dict(workflow_payload.get("artifacts", {}))
     artifacts["real_device_input"] = str(path.relative_to(root))
+    workflow_payload["artifacts"] = artifacts
+    save_workflow(root, workflow_payload)
+    return {"path": str(path), "payload": payload}
+
+
+def _write_real_device_preflight_artifact(
+    root: Path,
+    run_id: str,
+    workflow: dict[str, object],
+    runtime_mode: str,
+    serial: str,
+    approval: dict[str, object],
+    approval_token: str | None,
+    serial_decision: dict[str, object],
+) -> dict[str, object]:
+    safety = approval["runtime_safety"] if isinstance(approval.get("runtime_safety"), dict) else {}
+    required_approval = approval.get("required_approval_token")
+    path = root / ".leaf" / "runs" / run_id / "real_device_preflight.json"
+    payload = {
+        "schema_version": "1.0",
+        "artifact_kind": "real_device_runtime_preflight",
+        "run_id": run_id,
+        "domain": workflow.get("domain"),
+        "runtime_mode": runtime_mode,
+        "status": "ready",
+        "serial": serial,
+        "risk_level": safety.get("risk_level"),
+        "mutates_device_state": bool(safety.get("mutates_device_state", True)),
+        "approval_status": "approved" if required_approval else "not_required",
+        "required_approval_token": required_approval,
+        "approval_token": approval_token if required_approval else None,
+        "input_status": "ready" if serial_decision.get("ready") else "blocked",
+        "next_action": "run_real_device_runtime",
+        "decision_contract": {
+            "trigger_source": "workflow.json",
+            "agent_owner": "leaf-test-author",
+            "context_slice": ["workflow", "runtime_safety", "real_device_input", "real_device_approval"],
+            "allowed_artifacts": ["workflow", "real_device_input", "real_device_approval"],
+        },
+        "user_loop": {
+            "position": "observe_real_device_execution",
+            "required_input": "",
+        },
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    workflow_payload = dict(workflow)
+    artifacts = dict(workflow_payload.get("artifacts", {}))
+    artifacts["real_device_preflight"] = str(path.relative_to(root))
     workflow_payload["artifacts"] = artifacts
     save_workflow(root, workflow_payload)
     return {"path": str(path), "payload": payload}

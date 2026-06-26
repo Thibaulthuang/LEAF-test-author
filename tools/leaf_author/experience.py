@@ -6,6 +6,12 @@ from pathlib import Path
 from tools.leaf_author.runtime_registry import classify_experience_result, experience_candidate_keys, runtime_artifact_keys
 from tools.leaf_author.workflow import load_workflow, save_workflow
 
+_REAL_DEVICE_GATE_ARTIFACTS = [
+    "real_device_approval",
+    "real_device_input",
+    "real_device_preflight",
+]
+
 
 def record_experience(root: Path, run_id: str) -> dict[str, object]:
     workflow = load_workflow(root, run_id)
@@ -40,6 +46,7 @@ def export_team_knowledge(root: Path, run_id: str) -> dict[str, object]:
     workflow = load_workflow(root, run_id)
     artifacts = dict(workflow.get("artifacts", {}))
     runtime_artifacts = {key: str(artifacts.get(key, "")) for key in runtime_artifact_keys(str(workflow.get("domain", "")))}
+    real_device_gate_artifacts = {key: str(artifacts.get(key, "")) for key in _REAL_DEVICE_GATE_ARTIFACTS}
     payload = {
         "schema_version": "1.0",
         "run_id": run_id,
@@ -53,6 +60,7 @@ def export_team_knowledge(root: Path, run_id: str) -> dict[str, object]:
             "validation": str(artifacts.get("validation", "")),
             "pytest_result": str(artifacts.get("pytest_result", "")),
             "hypium_result": str(artifacts.get("hypium_result", "")),
+            **real_device_gate_artifacts,
             **runtime_artifacts,
             "experience": str(artifacts.get("experience", "")),
         },
