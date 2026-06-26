@@ -74,6 +74,21 @@ class RunAuditTests(unittest.TestCase):
             failed_checks = [check["name"] for check in result["checks"] if not check["passed"]]
             self.assertIn("real_device_safety_profile", failed_checks)
 
+    def test_audit_run_fails_when_report_action_route_drifts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _complete_direct_smoke(root, "audit-action-route-drift")
+            report = report_run(root, "audit-action-route-drift")
+            report["action_route"]["agent_owner"] = "leaf-gui-agent"
+            report["action_route"]["command"] = "python3 -m tools.leaf_author inspect-ui-tree <run_id>"
+
+            with patch("tools.leaf_author.run_audit.report_run", return_value=report):
+                result = audit_run(root, "audit-action-route-drift")
+
+            self.assertEqual(result["status"], "failed")
+            failed_checks = [check["name"] for check in result["checks"] if not check["passed"]]
+            self.assertIn("report_action_route_matches_phase_contract", failed_checks)
+
     def test_audit_run_fails_when_preflight_decision_contract_handoff_drifts(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from tools.leaf_author.agent_handoff import AGENT_MODES, HANDOFF_RULES
 from tools.leaf_author.device_probe import HdcProbe, ProbeRunner
-from tools.leaf_author.phase_guard import validate_phase_contract
+from tools.leaf_author.phase_guard import build_agent_handoff_contract, validate_phase_contract
 from tools.leaf_author.real_device_contract import real_device_decision_contract, real_device_runtime_evidence_schema, validate_real_device_contract
 from tools.leaf_author.reports import report_run
 from tools.leaf_author.runtime_registry import runtime_quality_gates, runtime_safety_profile, validate_runtime_registry
@@ -33,6 +33,7 @@ def audit_run(
         _check("workflow_readable", report.get("current_phase") != "unreadable", "Workflow state is readable."),
         _check("workflow_complete", report.get("current_phase") == "complete", "Workflow current_phase is complete."),
         _check("no_user_action_required", report.get("user_action_required") is False, "No user checkpoint is pending."),
+        _check("report_action_route_matches_phase_contract", _report_action_route_matches_phase_contract(report), "Report action_route matches the phase handoff contract."),
     ]
     latest_quality_gate = str(report.get("latest_quality_gate", ""))
     accepted_gates = runtime_quality_gates(domain)
@@ -205,6 +206,35 @@ def _preflight_decision_contract_ready(preflight: dict[str, object]) -> bool:
         "target_policy",
     }
     return all(decision.get(key) == expected.get(key) for key in expected_keys)
+
+
+def _report_action_route_matches_phase_contract(report: dict[str, object]) -> bool:
+    route = report.get("action_route")
+    if not isinstance(route, dict):
+        return False
+    phase = str(report.get("current_phase", ""))
+    routes = build_agent_handoff_contract().get("action_routes")
+    if not isinstance(routes, dict):
+        return False
+    expected = routes.get(phase)
+    if not isinstance(expected, dict):
+        return False
+    keys = {
+        "phase",
+        "next_action",
+        "trigger_source",
+        "agent_owner",
+        "agent_mode",
+        "handoff_required",
+        "subagent_boundary",
+        "context_slice",
+        "allowed_artifacts",
+        "user_checkpoint",
+        "auto_safe",
+        "user_loop",
+        "command",
+    }
+    return all(route.get(key) == expected.get(key) for key in keys)
 
 
 def _preflight_safety_matches_registry(domain: str, preflight: dict[str, object]) -> bool:
