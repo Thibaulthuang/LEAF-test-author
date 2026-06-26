@@ -44,6 +44,7 @@ class RunAuditTests(unittest.TestCase):
             self.assertIn("context_slice_bounded", passed_checks)
             self.assertIn("allowed_artifacts_bounded", passed_checks)
             self.assertIn("referenced_artifacts_bounded", passed_checks)
+            self.assertIn("context_manifest_matches_phase_contract", passed_checks)
             self.assertIn("trigger_source_stable", passed_checks)
             self.assertIn("target_policy_handoff_ready", passed_checks)
             self.assertIn("user_checkpoint_auto_boundary", passed_checks)
@@ -359,6 +360,30 @@ class RunAuditTests(unittest.TestCase):
             failed_checks = [check["name"] for check in result["checks"] if not check["passed"]]
             self.assertIn("gui_agent_ui_tree_context", failed_checks)
 
+    def test_audit_run_fails_when_context_manifest_points_to_stale_phase_contract(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _complete_direct_smoke(root, "audit-stale-manifest")
+            manifest_path = root / ".leaf" / "runs" / "audit-stale-manifest" / "context_manifest.json"
+            payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+            payload["current_phase"] = "pytest_ran"
+            payload["next_action"] = "collect_gui_context"
+            payload["agent_owner"] = "leaf-gui-agent"
+            payload["context_slice"] = ["workflow", "pytest_result", "ui_tree"]
+            payload["allowed_artifacts"] = ["pytest_result"]
+            payload["handoff"]["current_phase"] = "pytest_ran"
+            payload["handoff"]["next_action"] = "collect_gui_context"
+            payload["handoff"]["to_agent"] = "leaf-gui-agent"
+            payload["handoff"]["context_slice"] = ["workflow", "pytest_result", "ui_tree"]
+            payload["handoff"]["allowed_artifacts"] = ["pytest_result"]
+            manifest_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            result = audit_run(root, "audit-stale-manifest")
+
+            self.assertEqual(result["status"], "failed")
+            failed_checks = [check["name"] for check in result["checks"] if not check["passed"]]
+            self.assertIn("context_manifest_matches_phase_contract", failed_checks)
+
     def test_audit_run_fails_when_runtime_evidence_schema_fields_are_missing(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -462,6 +487,31 @@ class RunAuditTests(unittest.TestCase):
             self.assertEqual(passed["runtime_evidence_trace"]["artifact"], ".leaf/runs/audit-batch-pass/camera_direct_smoke.json")
             failed = [run for run in result["runs"] if run["status"] == "failed"][0]
             self.assertIn("workflow_complete", failed["failed_checks"])
+
+    def test_audit_batch_exposes_context_manifest_phase_contract_drift(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _complete_direct_smoke(root, "audit-batch-stale-manifest")
+            create_batch(root, "audit-batch-stale-manifest", ["audit-batch-stale-manifest"])
+            manifest_path = root / ".leaf" / "runs" / "audit-batch-stale-manifest" / "context_manifest.json"
+            payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+            payload["current_phase"] = "pytest_ran"
+            payload["next_action"] = "collect_gui_context"
+            payload["agent_owner"] = "leaf-gui-agent"
+            payload["context_slice"] = ["workflow", "pytest_result", "ui_tree"]
+            payload["allowed_artifacts"] = ["pytest_result"]
+            payload["handoff"]["current_phase"] = "pytest_ran"
+            payload["handoff"]["next_action"] = "collect_gui_context"
+            payload["handoff"]["to_agent"] = "leaf-gui-agent"
+            payload["handoff"]["context_slice"] = ["workflow", "pytest_result", "ui_tree"]
+            payload["handoff"]["allowed_artifacts"] = ["pytest_result"]
+            manifest_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            result = audit_batch(root, "audit-batch-stale-manifest")
+
+            self.assertEqual(result["status"], "failed")
+            self.assertEqual(result["summary"]["failed"], 1)
+            self.assertIn("context_manifest_matches_phase_contract", result["runs"][0]["failed_checks"])
 
     def test_audit_batch_can_verify_live_device_for_completed_runs(self):
         with tempfile.TemporaryDirectory() as tmp:

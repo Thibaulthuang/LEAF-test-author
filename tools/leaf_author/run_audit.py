@@ -657,6 +657,7 @@ def _context_manifest_checks(context_manifest: dict[str, object] | None, report:
             _check("user_loop_ready", False, "Context manifest user_loop snapshot is missing."),
             _check("context_slice_bounded", False, "Context manifest context slice is missing."),
             _check("referenced_artifacts_bounded", False, "Context manifest referenced artifacts are missing."),
+            _check("context_manifest_matches_phase_contract", False, "Context manifest phase decision is missing."),
             _check("trigger_source_stable", False, "Context manifest trigger source is missing."),
             _check("target_policy_handoff_ready", False, "Context manifest target policy is missing."),
             _check("user_checkpoint_auto_boundary", False, "Context manifest user checkpoint boundary is missing."),
@@ -685,6 +686,17 @@ def _context_manifest_checks(context_manifest: dict[str, object] | None, report:
     requires_user_confirmation = isinstance(user_loop, dict) and bool(user_loop.get("requires_user_confirmation"))
     safe_to_auto_continue = isinstance(user_loop, dict) and bool(user_loop.get("safe_to_auto_continue"))
     agent_owner = context_manifest.get("agent_owner")
+    manifest_matches_phase_contract = (
+        context_manifest.get("current_phase") == report.get("current_phase")
+        and context_manifest.get("next_action") == report.get("next_action")
+        and agent_owner == decision_contract.get("agent_owner")
+        and context_slice == contract_context_slice
+        and context_manifest.get("user_checkpoint") == report.get("user_checkpoint")
+        and bool(context_manifest.get("safe_to_auto_continue")) == bool(report.get("safe_to_auto_continue"))
+        and isinstance(user_loop, dict)
+        and user_loop.get("position") == report.get("user_loop", {}).get("position")
+        and user_loop.get("required_input") == report.get("user_loop", {}).get("required_input")
+    )
     handoff_ready = (
         isinstance(handoff, dict)
         and handoff.get("to_agent") == decision_contract.get("agent_owner")
@@ -718,6 +730,11 @@ def _context_manifest_checks(context_manifest: dict[str, object] | None, report:
             "referenced_artifacts_bounded",
             referenced_artifacts_bounded,
             "Context manifest references only workflow, context manifest, context-slice artifacts, or allowed artifacts.",
+        ),
+        _check(
+            "context_manifest_matches_phase_contract",
+            manifest_matches_phase_contract,
+            "Context manifest top-level decision matches the current phase contract.",
         ),
         _check(
             "trigger_source_stable",
