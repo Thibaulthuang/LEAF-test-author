@@ -9,7 +9,9 @@ from typing import Optional
 from tools.leaf_author.authoring import advance_run, confirm_plan, start_new_case
 from tools.leaf_author.batch_registry import create_batch
 from tools.leaf_author.device_probe import ProbeCommandResult, select_real_device
+from tools.leaf_author.run_audit import audit_batch
 from tools.leaf_author.reports import report_batch, report_run
+from tools.leaf_author.ui_tree_diagnostics import inspect_ui_tree
 from tools.leaf_author.workflow_diagnostics import inspect_workflow_state
 
 
@@ -456,6 +458,43 @@ class ReportTests(unittest.TestCase):
             self.assertEqual(result["real_device_summary"]["approval_required"], 1)
             self.assertEqual(result["real_device_summary"]["approval_approved"], 1)
             self.assertEqual(result["real_device_summary"]["approval_tokens"], ["approve_camera_capture_e2e"])
+
+    def test_report_batch_includes_gui_handoff_summary_from_batch_audit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "打开相机；点击拍照", run_id="report-batch-gui")
+            confirm_plan(root, "report-batch-gui")
+            layout_path = "/data/local/tmp/layout_123.json"
+
+            def runner(args, timeout_s):
+                if args == ["/sdk/hdc", "-t", "SERIAL123", "shell", "param", "get", "const.product.model"]:
+                    return ProbeCommandResult(0, "ohos\n", "")
+                if args == ["/sdk/hdc", "-t", "SERIAL123", "shell", "param", "get", "const.ohos.apiversion"]:
+                    return ProbeCommandResult(0, "26\n", "")
+                if args == ["/sdk/hdc", "-t", "SERIAL123", "shell", "bm", "dump", "-n", "com.huawei.hmos.camera"]:
+                    return ProbeCommandResult(0, '"bundleName": "com.huawei.hmos.camera",\n"moduleName": "phone",\n', "")
+                if args == ["/sdk/hdc", "-t", "SERIAL123", "shell", "aa", "start", "-a", "com.huawei.hmos.camera.MainAbility", "-b", "com.huawei.hmos.camera", "-m", "phone"]:
+                    return ProbeCommandResult(0, "start ability successfully\n", "")
+                if args == ["/sdk/hdc", "-t", "SERIAL123", "shell", "uitest", "dumpLayout"]:
+                    return ProbeCommandResult(0, f"DumpLayout saved to:{layout_path}\n", "")
+                if args == ["/sdk/hdc", "-t", "SERIAL123", "shell", "cat", layout_path]:
+                    return ProbeCommandResult(0, '{"attributes":{"bundleName":"com.huawei.hmos.camera","abilityName":"com.huawei.hmos.camera.MainAbility","text":"相机"},"children":[]}\n', "")
+                if args == ["/sdk/hdc", "-t", "SERIAL123", "shell", "hilog", "-x"]:
+                    return ProbeCommandResult(0, "camera foreground log\n", "")
+                return ProbeCommandResult(1, "", f"unexpected {args}")
+
+            advance_run(root, "report-batch-gui", hdc_runner=runner, serial="SERIAL123", run_real=True, runtime_mode="direct_smoke", hdc_path="/sdk/hdc")
+            inspect_ui_tree(root, "report-batch-gui")
+            create_batch(root, "report-batch-gui", ["report-batch-gui"])
+            audit_batch(root, "report-batch-gui")
+
+            result = report_batch(root, "report-batch-gui")
+
+            self.assertEqual(result["gui_handoff_summary"]["total_artifacts"], 1)
+            self.assertEqual(result["gui_handoff_summary"]["ready"], 1)
+            self.assertEqual(result["gui_handoff_summary"]["failed"], 0)
+            self.assertEqual(result["gui_handoff_summary"]["attention_boundary"], "one_active_run")
+            self.assertEqual(result["evidence"]["batch_audit"], ".leaf/batches/report-batch-gui/batch_audit.json")
 
     def test_cli_report_commands_output_json(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -74,6 +74,7 @@ def report_batch(root: Path, batch_id: str) -> dict[str, object]:
     batch = inspect_batch(root, batch_id)
     runs = [_report_batch_run(root, run) for run in batch["runs"]]
     status_counts = Counter(_report_status(run) for run in runs)
+    batch_audit = _batch_audit_summary(root, batch_id)
     return {
         "schema_version": "1.0",
         "batch_id": batch_id,
@@ -87,8 +88,10 @@ def report_batch(root: Path, batch_id: str) -> dict[str, object]:
         },
         "real_device_summary": _batch_real_device_summary(runs),
         "runtime_evidence_summary": _batch_runtime_evidence_summary(runs),
+        "gui_handoff_summary": batch_audit["gui_handoff_summary"],
         "next_run_focus": _next_report_focus(runs),
         "runs": [_batch_report_summary(run) for run in runs],
+        "evidence": batch_audit["evidence"],
         "context_policy": {
             "scope": "batch_report",
             "load_strategy": "summaries_first_then_one_run_report",
@@ -106,6 +109,40 @@ def _existing_artifacts(root: Path, artifacts: dict[str, object]) -> dict[str, s
         if path.exists():
             evidence[key] = value
     return evidence
+
+
+def _batch_audit_summary(root: Path, batch_id: str) -> dict[str, object]:
+    audit_path = root / ".leaf" / "batches" / batch_id / "batch_audit.json"
+    default = {
+        "gui_handoff_summary": _empty_gui_handoff_summary(),
+        "evidence": {},
+    }
+    if not audit_path.is_file():
+        return default
+    try:
+        payload = json.loads(audit_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return default
+    if not isinstance(payload, dict):
+        return default
+    summary = payload.get("gui_handoff_summary")
+    evidence = {"batch_audit": str(audit_path.relative_to(root))}
+    return {
+        "gui_handoff_summary": summary if isinstance(summary, dict) else _empty_gui_handoff_summary(),
+        "evidence": evidence,
+    }
+
+
+def _empty_gui_handoff_summary() -> dict[str, object]:
+    return {
+        "total_artifacts": 0,
+        "ready": 0,
+        "failed": 0,
+        "ready_runs": [],
+        "failed_runs": [],
+        "artifacts": [],
+        "attention_boundary": "one_active_run",
+    }
 
 
 def _add_conventional_evidence(root: Path, run_id: str, evidence: dict[str, str]) -> None:
