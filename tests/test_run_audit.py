@@ -131,6 +131,36 @@ class RunAuditTests(unittest.TestCase):
             failed = [run for run in result["runs"] if run["status"] == "failed"][0]
             self.assertIn("workflow_complete", failed["failed_checks"])
 
+    def test_audit_batch_checks_resume_focus_plan_for_incomplete_batch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _complete_direct_smoke(root, "audit-focus-pass")
+            start_new_case(root, "camera", "打开相机；点击拍照", run_id="audit-focus-wait")
+            create_batch(root, "audit-focus-batch", ["audit-focus-pass", "audit-focus-wait"])
+
+            result = audit_batch(root, "audit-focus-batch")
+
+            self.assertEqual(result["focus_plan"]["selected_run_id"], "audit-focus-wait")
+            self.assertEqual(result["focus_plan"]["attention_boundary"], "one_active_run")
+            failed_checks = [check["name"] for check in result["batch_checks"] if not check["passed"]]
+            self.assertNotIn("batch_resume_focus_present", failed_checks)
+            self.assertNotIn("batch_resume_attention_boundary", failed_checks)
+            self.assertNotIn("batch_resume_focus_handoff", failed_checks)
+
+    def test_audit_batch_allows_empty_focus_plan_when_every_run_is_complete(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _complete_direct_smoke(root, "audit-focus-complete")
+            create_batch(root, "audit-focus-complete-batch", ["audit-focus-complete"])
+
+            result = audit_batch(root, "audit-focus-complete-batch")
+
+            self.assertEqual(result["status"], "passed")
+            self.assertIsNone(result["focus_plan"])
+            passed_checks = [check["name"] for check in result["batch_checks"] if check["passed"]]
+            self.assertIn("batch_resume_focus_complete", passed_checks)
+            self.assertIn("batch_resume_attention_boundary", passed_checks)
+
     def test_audit_batch_isolates_unreadable_run_workflow(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

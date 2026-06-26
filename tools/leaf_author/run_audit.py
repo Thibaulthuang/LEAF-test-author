@@ -8,6 +8,7 @@ from tools.leaf_author.real_device_contract import validate_real_device_contract
 from tools.leaf_author.reports import report_run
 from tools.leaf_author.runtime_registry import runtime_quality_gates, validate_runtime_registry
 from tools.leaf_author.workflow import load_workflow, save_workflow
+from tools.leaf_author.batch_registry import resume_batch
 
 
 def audit_run(root: Path, run_id: str) -> dict[str, object]:
@@ -64,17 +65,22 @@ def audit_batch(root: Path, batch_id: str) -> dict[str, object]:
     runs = [_audit_batch_run(root, run_id) for run_id in run_ids]
     passed_count = sum(1 for run in runs if run.get("status") == "passed")
     failed_count = len(runs) - passed_count
+    resume_view = _load_batch_resume_view(root, batch_id)
+    batch_checks = _batch_resume_checks(resume_view)
+    batch_failed_count = sum(1 for check in batch_checks if not check.get("passed"))
     payload = {
         "schema_version": "1.0",
         "manifest_kind": "leaf_batch_audit",
         "batch_id": batch_id,
         "title": batch.get("title", batch_id),
-        "status": "passed" if failed_count == 0 else "failed",
+        "status": "passed" if failed_count == 0 and batch_failed_count == 0 else "failed",
         "summary": {
             "total_runs": len(runs),
             "passed": passed_count,
             "failed": failed_count,
         },
+        "batch_checks": batch_checks,
+        "focus_plan": resume_view.get("focus_plan") if isinstance(resume_view, dict) else None,
         "runs": [
             {
                 "run_id": run.get("run_id"),
@@ -90,6 +96,7 @@ def audit_batch(root: Path, batch_id: str) -> dict[str, object]:
             "scope": "batch_audit",
             "load_strategy": "summaries_first_then_audit_one_run",
             "artifact_loading": "on_demand",
+            "attention_boundary": _batch_resume_attention_boundary(resume_view),
         },
     }
     return _write_batch_audit(root, batch_id, payload)
@@ -183,6 +190,58 @@ def _context_manifest_checks(context_manifest: dict[str, object] | None, report:
 def _load_batch_manifest(root: Path, batch_id: str) -> dict[str, object]:
     batch_path = root / ".leaf" / "batches" / batch_id / "batch.json"
     return json.loads(batch_path.read_text(encoding="utf-8"))
+
+
+def _load_batch_resume_view(root: Path, batch_id: str) -> dict[str, object]:
+    try:
+        return resume_batch(root, batch_id, auto_safe=False)
+    except Exception as exc:
+        return {
+            "focus_plan": None,
+            "context_policy": {},
+            "summary": {},
+            "error": {
+                "type": type(exc).__name__,
+                "message": str(exc),
+            },
+        }
+
+
+def _batch_resume_checks(resume_view: dict[str, object]) -> list[dict[str, object]]:
+    focus_plan = resume_view.get("focus_plan")
+    context_policy = resume_view.get("context_policy")
+    summary = resume_view.get("summary")
+    active_count = 0
+    if isinstance(summary, dict):
+        active_count = int(summary.get("waiting_for_confirmation", 0) or 0) + int(summary.get("in_progress", 0) or 0) + int(summary.get("failed", 0) or 0)
+    attention_boundary = isinstance(context_policy, dict) and context_policy.get("attention_boundary") == "one_active_run"
+    if active_count == 0:
+        return [
+            _check("batch_resume_attention_boundary", attention_boundary, "Batch resume context policy uses one active run boundary."),
+            _check("batch_resume_focus_complete", focus_plan is None, "Completed batches do not select an active focus run."),
+        ]
+    focus_present = isinstance(focus_plan, dict)
+    focus_handoff = (
+        focus_present
+        and focus_plan.get("attention_boundary") == "one_active_run"
+        and bool(focus_plan.get("selected_run_id"))
+        and bool(focus_plan.get("agent_owner"))
+        and isinstance(focus_plan.get("context_slice"), list)
+        and isinstance(focus_plan.get("allowed_artifacts"), list)
+        and isinstance(focus_plan.get("user_loop"), dict)
+    )
+    return [
+        _check("batch_resume_attention_boundary", attention_boundary, "Batch resume context policy uses one active run boundary."),
+        _check("batch_resume_focus_present", focus_present, "Incomplete batches expose one selected focus run."),
+        _check("batch_resume_focus_handoff", focus_handoff, "Batch focus plan includes agent, context, artifacts, and user loop metadata."),
+    ]
+
+
+def _batch_resume_attention_boundary(resume_view: dict[str, object]) -> object:
+    context_policy = resume_view.get("context_policy")
+    if isinstance(context_policy, dict):
+        return context_policy.get("attention_boundary")
+    return None
 
 
 def _audit_batch_run(root: Path, run_id: str) -> dict[str, object]:
