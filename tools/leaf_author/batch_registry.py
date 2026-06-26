@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from tools.leaf_author.authoring import resume_run
+from tools.leaf_author.agent_handoff import AGENT_MODES, HANDOFF_RULES
 from tools.leaf_author.phase_contract import batch_focus_priority_for_run
 from tools.leaf_author.run_registry import inspect_run
 from tools.leaf_author.target_policy import default_target_policy, normalize_target_policy
@@ -172,6 +173,7 @@ def _resume_batch_run(root: Path, run_id: str, auto_safe: bool) -> dict[str, obj
                 "operator_message": "Workflow state is unreadable; repair workflow.json before resuming this run.",
                 "user_checkpoint": "manual_operator_decision",
                 "agent_owner": "leaf-test-author",
+                "agent_mode": "orchestrator",
                 "context_slice": ["workflow"],
                 "trigger_source": "workflow.json",
                 "allowed_artifacts": ["workflow"],
@@ -217,12 +219,19 @@ def _batch_resume_focus_plan(runs: list[dict[str, object]]) -> dict[str, object]
     user_loop = summary.get("user_loop", {})
     if not isinstance(user_loop, dict):
         user_loop = {}
+    agent_owner = str(summary.get("agent_owner", "leaf-test-author"))
+    agent_mode = str(summary.get("agent_mode") or AGENT_MODES.get(agent_owner, "orchestrator"))
+    handoff_rule = HANDOFF_RULES.get(agent_owner, HANDOFF_RULES["leaf-test-author"])
     return {
         "selected_run_id": selected.get("run_id"),
         "selection_reason": _resume_focus_selection_reason(selected, summary),
         "attention_boundary": "one_active_run",
         "artifact_loading": "on_demand",
-        "agent_owner": summary.get("agent_owner"),
+        "agent_owner": agent_owner,
+        "agent_mode": agent_mode,
+        "handoff_required": bool(handoff_rule.get("handoff_required", False)),
+        "required_inputs": list(handoff_rule.get("required_inputs", [])) if isinstance(handoff_rule.get("required_inputs"), list) else [],
+        "subagent_boundary": str(handoff_rule.get("subagent_boundary", "")),
         "current_phase": selected.get("current_phase"),
         "next_action": selected.get("next_action"),
         "context_slice": summary.get("context_slice", []),

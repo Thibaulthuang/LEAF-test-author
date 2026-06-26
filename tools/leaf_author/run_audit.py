@@ -979,6 +979,7 @@ def _batch_resume_checks(resume_view: dict[str, object]) -> list[dict[str, objec
         focus_plan.get("agent_owner") != "leaf-gui-agent" or "ui_tree" in _string_list(focus_plan.get("context_slice"))
     )
     focus_target_policy = focus_present and _target_policy_handoff_ready(focus_plan.get("target_policy"), focus_plan.get("target_policy"))
+    focus_agent_handoff_rule = focus_present and _batch_focus_agent_handoff_rule_ready(focus_plan)
     return [
         _check("batch_resume_attention_boundary", attention_boundary, "Batch resume context policy uses one active run boundary."),
         _check("batch_resume_focus_present", focus_present, "Incomplete batches expose one selected focus run."),
@@ -987,7 +988,23 @@ def _batch_resume_checks(resume_view: dict[str, object]) -> list[dict[str, objec
         _check("batch_resume_focus_user_boundary", focus_user_boundary, "Batch focus plan never marks a user checkpoint safe for automatic continuation."),
         _check("batch_resume_focus_gui_context", focus_gui_context, "Batch GUI-agent focus includes ui_tree in the bounded context slice."),
         _check("batch_resume_focus_target_policy", focus_target_policy, "Batch focus plan preserves the system-app-only target policy."),
+        _check("batch_resume_focus_agent_handoff_rule", focus_agent_handoff_rule, "Batch focus plan preserves the expected agent mode and subagent handoff rule."),
     ]
+
+
+def _batch_focus_agent_handoff_rule_ready(focus_plan: object) -> bool:
+    if not isinstance(focus_plan, dict):
+        return False
+    agent_owner = str(focus_plan.get("agent_owner", ""))
+    expected_agent_mode = AGENT_MODES.get(agent_owner)
+    expected_handoff_rule = HANDOFF_RULES.get(agent_owner, {})
+    return (
+        expected_agent_mode is not None
+        and focus_plan.get("agent_mode") == expected_agent_mode
+        and focus_plan.get("handoff_required") == expected_handoff_rule.get("handoff_required")
+        and focus_plan.get("required_inputs") == expected_handoff_rule.get("required_inputs")
+        and focus_plan.get("subagent_boundary") == expected_handoff_rule.get("subagent_boundary")
+    )
 
 
 def _batch_focus_matches_selected_run(focus_plan: object, resume_view: dict[str, object]) -> bool:
@@ -1015,6 +1032,7 @@ def _batch_focus_matches_selected_run(focus_plan: object, resume_view: dict[str,
         focus_plan.get("current_phase") == selected.get("current_phase")
         and focus_plan.get("next_action") == selected.get("next_action")
         and focus_plan.get("agent_owner") == summary.get("agent_owner")
+        and focus_plan.get("agent_mode") == summary.get("agent_mode")
         and _string_list(focus_plan.get("context_slice")) == _string_list(summary.get("context_slice"))
         and _string_list(focus_plan.get("allowed_artifacts")) == _string_list(summary.get("allowed_artifacts"))
         and focus_plan.get("target_policy") == summary.get("target_policy")

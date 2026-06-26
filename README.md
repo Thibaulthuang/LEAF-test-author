@@ -257,7 +257,8 @@ and execution resumable without relying on conversational memory.
 Batch audit applies the same boundary at suite level. `audit-batch` checks that
 the `focus_plan` selects at most one active run, matches that run's resume
 summary, preserves its `agent_owner`, `context_slice`, `allowed_artifacts`, and
-`target_policy`, preserves its `user_loop`, never marks a user checkpoint safe
+`target_policy`, preserves its `agent_mode`, `handoff_required`,
+`required_inputs`, and `subagent_boundary`, preserves its `user_loop`, never marks a user checkpoint safe
 for automatic continuation, and requires `ui_tree` whenever the focus owner is
 `leaf-gui-agent`.
 

@@ -663,6 +663,7 @@ class RunAuditTests(unittest.TestCase):
             self.assertNotIn("batch_resume_focus_user_boundary", failed_checks)
             self.assertNotIn("batch_resume_focus_gui_context", failed_checks)
             self.assertNotIn("batch_resume_focus_target_policy", failed_checks)
+            self.assertNotIn("batch_resume_focus_agent_handoff_rule", failed_checks)
 
     def test_audit_batch_fails_when_focus_plan_drifts_from_selected_run_summary(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -715,6 +716,19 @@ class RunAuditTests(unittest.TestCase):
             self.assertEqual(result["status"], "failed")
             failed_checks = [check["name"] for check in result["batch_checks"] if not check["passed"]]
             self.assertIn("batch_resume_focus_gui_context", failed_checks)
+
+    def test_audit_batch_fails_when_focus_plan_agent_handoff_rule_drifts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "打开相机；点击拍照", run_id="audit-focus-agent")
+            create_batch(root, "audit-focus-agent-batch", ["audit-focus-agent"])
+
+            with patch("tools.leaf_author.run_audit.resume_batch", return_value=_batch_resume_view_with_agent_handoff_drift()):
+                result = audit_batch(root, "audit-focus-agent-batch")
+
+            self.assertEqual(result["status"], "failed")
+            failed_checks = [check["name"] for check in result["batch_checks"] if not check["passed"]]
+            self.assertIn("batch_resume_focus_agent_handoff_rule", failed_checks)
 
     def test_audit_batch_allows_empty_focus_plan_when_every_run_is_complete(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -1036,13 +1050,27 @@ def _batch_resume_view_with_target_policy_drift() -> dict[str, object]:
 def _batch_resume_view_with_gui_context_drift() -> dict[str, object]:
     view = _batch_resume_view_for_focus("audit-focus-gui")
     view["focus_plan"]["agent_owner"] = "leaf-gui-agent"
+    view["focus_plan"]["agent_mode"] = "focused_subagent"
+    view["focus_plan"]["handoff_required"] = True
+    view["focus_plan"]["required_inputs"] = ["run_id", "context_manifest", "referenced_artifacts", "specific_question"]
+    view["focus_plan"]["subagent_boundary"] = "read_only_gui_context"
     view["focus_plan"]["current_phase"] = "pytest_ran"
     view["focus_plan"]["next_action"] = "collect_gui_context"
     view["focus_plan"]["context_slice"] = ["workflow", "pytest_result"]
     view["runs"][0]["current_phase"] = "pytest_ran"
     view["runs"][0]["next_action"] = "collect_gui_context"
     view["runs"][0]["resume_summary"]["agent_owner"] = "leaf-gui-agent"
+    view["runs"][0]["resume_summary"]["agent_mode"] = "focused_subagent"
     view["runs"][0]["resume_summary"]["context_slice"] = ["workflow", "pytest_result"]
+    return view
+
+
+def _batch_resume_view_with_agent_handoff_drift() -> dict[str, object]:
+    view = _batch_resume_view_for_focus("audit-focus-agent")
+    view["focus_plan"]["agent_mode"] = "focused_subagent"
+    view["focus_plan"]["handoff_required"] = True
+    view["focus_plan"]["required_inputs"] = ["run_id"]
+    view["focus_plan"]["subagent_boundary"] = "read_only_gui_context"
     return view
 
 
@@ -1054,6 +1082,10 @@ def _batch_resume_view_for_focus(run_id: str) -> dict[str, object]:
             "attention_boundary": "one_active_run",
             "artifact_loading": "on_demand",
             "agent_owner": "leaf-test-author",
+            "agent_mode": "orchestrator",
+            "handoff_required": False,
+            "required_inputs": ["run_id", "workflow", "decision_contract"],
+            "subagent_boundary": "workflow_orchestration",
             "current_phase": "plan",
             "next_action": "present_plan_for_confirmation",
             "context_slice": ["workflow", "plan"],
@@ -1084,6 +1116,7 @@ def _batch_resume_view_for_focus(run_id: str) -> dict[str, object]:
                 "next_action": "present_plan_for_confirmation",
                 "resume_summary": {
                     "agent_owner": "leaf-test-author",
+                    "agent_mode": "orchestrator",
                     "context_slice": ["workflow", "plan"],
                     "allowed_artifacts": ["workflow", "plan", "device_probe"],
                     "target_policy": {"scope": "system_app_only", "forbidden_terms": ["hap"]},

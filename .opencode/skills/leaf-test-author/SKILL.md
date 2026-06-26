@@ -93,8 +93,9 @@ focused run. Reports expose `latest_quality_gate`, `user_checkpoint`,
 device logs, or result evidence into context unless the next decision
 specifically needs them.
 When a batch response includes `focus_plan`, treat its `target_policy`,
-`agent_owner`, `context_slice`, `allowed_artifacts`, and `user_loop` as the
-bounded handoff contract for the single selected run.
+`agent_owner`, `agent_mode`, `handoff_required`, `required_inputs`,
+`subagent_boundary`, `context_slice`, `allowed_artifacts`, and `user_loop` as
+the bounded handoff contract for the single selected run.
 
 Batch auto-resume must obey the same confirmation rules as single-run resume.
 It must not confirm plans on behalf of the user and must not run real-device
