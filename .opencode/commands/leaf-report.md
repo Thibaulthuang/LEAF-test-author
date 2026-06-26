@@ -15,20 +15,24 @@ Report the current LEAF workflow decision state for one run or one batch.
    matches a run under `.leaf/runs/`.
 3. Prefer `python3 -m tools.leaf_author report-batch <batch_id>` when the
    argument matches a batch under `.leaf/batches/`.
-4. Present the report fields that determine the next operator decision:
+4. If the report is complete, run `python3 -m tools.leaf_author audit-run <run_id>`
+   or `python3 -m tools.leaf_author audit-batch <batch_id>` before summarizing
+   completion. Present audit `status`, failed checks, and the latest quality
+   gate.
+5. Present the report fields that determine the next operator decision:
    `current_phase`, `latest_quality_gate`, `user_action_required`,
    `user_checkpoint`, `user_loop`, `decision_contract`, `next_command`, and
    `evidence`.
-5. Do not open large artifacts unless the user asks or the report points to a
+6. Do not open large artifacts unless the user asks or the report points to a
    specific evidence file that must be inspected.
-6. If `user_checkpoint` is present, stop and ask the user. If `next_command`
+7. If `user_checkpoint` is present, stop and ask the user. If `next_command`
    is safe local work, run it only when it stays inside the workflow's
    auto-safe policy.
-7. Use `decision_contract.agent_owner` and `decision_contract.context_slice` to
+8. Use `decision_contract.agent_owner` and `decision_contract.context_slice` to
    decide whether the main author agent should continue or hand off to a domain
    or GUI subagent. Use `.leaf/runs/<run_id>/context_manifest.json` as the
    artifact handoff packet.
-8. Treat `next_command` as contract output. For real-device checkpoints it must
+9. Treat `next_command` as contract output. For real-device checkpoints it must
    come from the runtime registry and should use `--runtime-mode <mode>` when
    the domain has a registered runtime mode.
 
