@@ -114,6 +114,10 @@ python3 -m tools.leaf_author validate-extension-contract camera
 python3 -m tools.leaf_author validate-extension-contract camera --strict-real-device
 ```
 
+The extension contract combines domain hooks, runtime registry status,
+real-device gate status, phase guard status, and agent handoff metadata so a new
+domain plugin can be reviewed before it is used for real-device execution.
+
 Validate the phase trigger, context, agent, and user-in-loop contract:
 
 ```bash

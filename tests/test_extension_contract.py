@@ -20,13 +20,21 @@ class ExtensionContractTests(unittest.TestCase):
         self.assertIn("camera_direct_smoke", contract["runtime_contract"]["artifact_keys"])
         self.assertIn("CAMERA_DIRECT_SMOKE_PASS", contract["runtime_contract"]["quality_gates"])
         self.assertEqual(contract["runtime_contract"]["safety_profiles"]["direct_smoke"]["mutates_device_state"], False)
+        self.assertEqual(contract["runtime_contract"]["runtime_registry_status"], "stable")
+        self.assertEqual(contract["runtime_contract"]["registry_manifest_kind"], "leaf_runtime_registry_contract")
         self.assertEqual(
             contract["runtime_contract"]["safety_profiles"]["capture_e2e"]["requires_approval_token"],
             "approve_camera_capture_e2e",
         )
+        self.assertEqual(contract["real_device_gate_contract"]["status"], "stable")
+        self.assertEqual(contract["real_device_gate_contract"]["manifest_kind"], "leaf_real_device_gate_contract")
+        self.assertEqual(contract["real_device_gate_contract"]["gates"]["approval"]["user_loop"]["position"], "approve_real_device")
+        self.assertEqual(contract["real_device_gate_contract"]["execution_preflight"]["artifact"], "real_device_preflight")
         self.assertIn("e2e_ready", contract["phase_contract"]["real_device_checkpoint_phases"])
         self.assertEqual(contract["phase_contract"]["trigger_source"], "workflow.json")
         self.assertEqual(contract["phase_contract"]["phase_guard_status"], "stable")
+        self.assertEqual(contract["phase_contract"]["real_device_gate_status"], "stable")
+        self.assertEqual(contract["phase_contract"]["runtime_registry_status"], "stable")
         self.assertEqual(contract["agent_handoff_contract"]["attention_boundary"], "one_active_run")
         self.assertIn("leaf-gui-agent", contract["agent_handoff_contract"]["agents"])
         self.assertIn("real_device_confirmation", contract["agent_handoff_contract"]["user_checkpoints"])

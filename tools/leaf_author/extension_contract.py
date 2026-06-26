@@ -6,13 +6,16 @@ from pathlib import Path
 from tools.leaf_author.domain_registry import is_domain_registered
 from tools.leaf_author.phase_contract import load_phase_contract
 from tools.leaf_author.phase_guard import build_agent_handoff_contract, validate_phase_contract
+from tools.leaf_author.real_device_contract import build_real_device_contract, validate_real_device_contract
 from tools.leaf_author.runtime_registry import (
+    build_runtime_registry_contract,
     default_real_device_runtime_mode,
     quality_artifact_priority,
     registered_runtime_modes,
     runtime_artifact_keys,
     runtime_quality_gates,
     runtime_safety_profile,
+    validate_runtime_registry,
 )
 
 
@@ -20,6 +23,10 @@ def build_extension_contract(domain: str) -> dict[str, object]:
     phase_contract = load_phase_contract()
     handoff_contract = build_agent_handoff_contract(phase_contract)
     phase_guard = validate_phase_contract()
+    real_device_contract = build_real_device_contract()
+    real_device_guard = validate_real_device_contract(real_device_contract)
+    runtime_registry_contract = build_runtime_registry_contract()
+    runtime_registry_guard = validate_runtime_registry(runtime_registry_contract)
     runtime_modes = registered_runtime_modes(domain)
     missing = []
     if not is_domain_registered(domain):
@@ -28,6 +35,10 @@ def build_extension_contract(domain: str) -> dict[str, object]:
         missing.append("runtime_registry: register runtime modes and quality gates when real-device evidence is required")
     if phase_guard["status"] != "stable":
         missing.append("phase_guard: workflow-contract.json must pass trigger, context, agent, and user-loop validation")
+    if real_device_guard["status"] != "stable":
+        missing.append("real_device_contract: approval/input/preflight gates must pass stability validation")
+    if runtime_registry_guard["status"] != "stable":
+        missing.append("runtime_registry: registered runtime modes, artifacts, quality gates, and safety profiles must pass validation")
     status = "ready" if not missing else "incomplete"
     return {
         "schema_version": "1.0",
@@ -49,12 +60,22 @@ def build_extension_contract(domain: str) -> dict[str, object]:
             "quality_artifact_priority": quality_artifact_priority(domain),
             "quality_gates": runtime_quality_gates(domain),
             "safety_profiles": {mode: runtime_safety_profile(domain, mode) for mode in runtime_modes},
+            "runtime_registry_status": runtime_registry_guard["status"],
+            "registry_manifest_kind": runtime_registry_contract["manifest_kind"],
+        },
+        "real_device_gate_contract": {
+            "status": real_device_guard["status"],
+            "manifest_kind": real_device_contract["manifest_kind"],
+            "gates": real_device_contract["gates"],
+            "execution_preflight": real_device_contract["execution_preflight"],
         },
         "phase_contract": {
             "source": "docs/workflow-contract.json",
             "trigger_source": "workflow.json",
             "decision_function": "tools.leaf_author.phase_contract.decide_next_step",
             "phase_guard_status": phase_guard["status"],
+            "real_device_gate_status": phase_guard.get("real_device_gate_status"),
+            "runtime_registry_status": phase_guard.get("runtime_registry_status"),
             "real_device_checkpoint_phases": _checkpoint_phases(phase_contract, "real_device_confirmation"),
             "user_loop_positions": _user_loop_positions(phase_contract),
             "batch_focus_priorities": _batch_focus_priorities(phase_contract),
@@ -90,11 +111,16 @@ def validate_extension_contract(domain: str, strict_real_device: bool = False) -
     missing = contract.get("readiness", {}).get("missing", [])
     missing_items = list(missing) if isinstance(missing, list) else []
     runtime_contract = contract.get("runtime_contract", {})
+    real_device_contract = contract.get("real_device_gate_contract", {})
     if strict_real_device and isinstance(runtime_contract, dict):
         if not runtime_contract.get("default_real_device_mode"):
             missing_items.append("runtime_registry: register a default real-device runtime mode")
         if not runtime_contract.get("quality_gates"):
             missing_items.append("runtime_registry: register real-device quality gates")
+        if runtime_contract.get("runtime_registry_status") != "stable":
+            missing_items.append("runtime_registry: runtime registry guard must be stable")
+        if isinstance(real_device_contract, dict) and real_device_contract.get("status") != "stable":
+            missing_items.append("real_device_contract: real-device gate guard must be stable")
     if missing_items:
         status = "incomplete"
     return {

@@ -129,6 +129,8 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
         self.assertIn("export-extension-contract camera", readme)
         self.assertIn("validate-extension-contract camera", readme)
         self.assertIn("validate-extension-contract camera --strict-real-device", readme)
+        self.assertIn("real-device gate status", readme)
+        self.assertIn("runtime registry status", readme)
         self.assertIn("phase-guard", readme)
         self.assertIn("agent-handoff-contract", readme)
         self.assertIn("real-device-contract", readme)
