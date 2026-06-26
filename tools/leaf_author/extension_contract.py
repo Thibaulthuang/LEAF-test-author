@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 from tools.leaf_author.domain_registry import is_domain_registered
 from tools.leaf_author.phase_contract import load_phase_contract
 from tools.leaf_author.runtime_registry import (
@@ -50,6 +53,29 @@ def build_extension_contract(domain: str) -> dict[str, object]:
             "status": status,
             "missing": missing,
         },
+    }
+
+
+def export_extension_contract(domain: str, output_path: Path) -> dict[str, object]:
+    contract = build_extension_contract(domain)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(contract, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return {
+        "domain": domain,
+        "status": contract["readiness"]["status"],
+        "output_path": str(output_path),
+    }
+
+
+def validate_extension_contract(domain: str) -> dict[str, object]:
+    contract = build_extension_contract(domain)
+    status = str(contract.get("readiness", {}).get("status", "incomplete"))
+    missing = contract.get("readiness", {}).get("missing", [])
+    return {
+        "domain": domain,
+        "status": status,
+        "missing": missing if isinstance(missing, list) else [],
+        "exit_code": 0 if status == "ready" else 1,
     }
 
 

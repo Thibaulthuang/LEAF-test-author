@@ -109,6 +109,8 @@ Export the framework extension contract for a domain:
 
 ```bash
 python3 -m tools.leaf_author extension-contract camera
+python3 -m tools.leaf_author export-extension-contract camera --output /tmp/camera-extension.json
+python3 -m tools.leaf_author validate-extension-contract camera
 ```
 
 Run safe local stages directly:

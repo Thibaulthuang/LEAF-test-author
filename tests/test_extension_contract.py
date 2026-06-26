@@ -1,9 +1,11 @@
 import json
+import tempfile
 import unittest
 from contextlib import redirect_stdout
 from io import StringIO
+from pathlib import Path
 
-from tools.leaf_author.extension_contract import build_extension_contract
+from tools.leaf_author.extension_contract import build_extension_contract, export_extension_contract, validate_extension_contract
 
 
 class ExtensionContractTests(unittest.TestCase):
@@ -40,6 +42,51 @@ class ExtensionContractTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertEqual(payload["domain"], "camera")
         self.assertEqual(payload["manifest_kind"], "leaf_framework_extension_contract")
+
+    def test_export_extension_contract_writes_manifest_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output_path = Path(tmp) / "camera-extension.json"
+
+            result = export_extension_contract("camera", output_path)
+
+            self.assertEqual(result["output_path"], str(output_path))
+            payload = json.loads(output_path.read_text(encoding="utf-8"))
+            self.assertEqual(payload["domain"], "camera")
+            self.assertEqual(payload["readiness"]["status"], "ready")
+
+    def test_validate_extension_contract_reports_ready_and_incomplete_status(self):
+        ready = validate_extension_contract("camera")
+        incomplete = validate_extension_contract("display")
+
+        self.assertEqual(ready["status"], "ready")
+        self.assertEqual(ready["exit_code"], 0)
+        self.assertEqual(incomplete["status"], "incomplete")
+        self.assertEqual(incomplete["exit_code"], 1)
+
+    def test_cli_export_and_validate_extension_contract(self):
+        from tools.leaf_author.__main__ import main
+
+        with tempfile.TemporaryDirectory() as tmp:
+            output_path = Path(tmp) / "camera-extension.json"
+            export_output = StringIO()
+            with redirect_stdout(export_output):
+                export_exit = main(["export-extension-contract", "camera", "--output", str(output_path)])
+
+            validate_output = StringIO()
+            with redirect_stdout(validate_output):
+                validate_exit = main(["validate-extension-contract", "camera"])
+
+            incomplete_output = StringIO()
+            with redirect_stdout(incomplete_output):
+                incomplete_exit = main(["validate-extension-contract", "display"])
+
+            self.assertEqual(export_exit, 0)
+            self.assertTrue(output_path.exists())
+            self.assertEqual(json.loads(export_output.getvalue())["output_path"], str(output_path))
+            self.assertEqual(validate_exit, 0)
+            self.assertEqual(json.loads(validate_output.getvalue())["status"], "ready")
+            self.assertEqual(incomplete_exit, 1)
+            self.assertEqual(json.loads(incomplete_output.getvalue())["status"], "incomplete")
 
 
 if __name__ == "__main__":

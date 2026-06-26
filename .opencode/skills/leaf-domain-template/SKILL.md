@@ -60,6 +60,8 @@ Adding a domain normally requires reviewing these files:
 
 - `python3 -m tools.leaf_author extension-contract <domain>`: export the
   framework extension manifest and check missing domain/runtime hooks.
+- `python3 -m tools.leaf_author validate-extension-contract <domain>`: fail
+  fast when a domain is missing required registry hooks.
 - `tools/leaf_author/domain_registry.py`: register the domain contract for
   target feature inference, semantic plan validation, and action mapping.
 - `tools/leaf_author/runtime_registry.py`: register real-device runtime modes

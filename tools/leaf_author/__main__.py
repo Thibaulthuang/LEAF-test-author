@@ -13,7 +13,7 @@ from tools.leaf_author.device_diagnostics import discover_test_targets, inspect_
 from tools.leaf_author.device_probe import HdcProbe
 from tools.leaf_author.e2e import run_e2e
 from tools.leaf_author.e2e_report import write_e2e_preflight_report
-from tools.leaf_author.extension_contract import build_extension_contract
+from tools.leaf_author.extension_contract import build_extension_contract, export_extension_contract, validate_extension_contract
 from tools.leaf_author.hypium import sync_openharmony_export
 from tools.leaf_author.openharmony_discovery import discover_hap_artifacts
 from tools.leaf_author.openharmony_project import scaffold_openharmony_test_project
@@ -84,6 +84,13 @@ def main(argv: list[str] | None = None) -> int:
 
     extension_contract_parser = subparsers.add_parser("extension-contract")
     extension_contract_parser.add_argument("domain")
+
+    export_extension_contract_parser = subparsers.add_parser("export-extension-contract")
+    export_extension_contract_parser.add_argument("domain")
+    export_extension_contract_parser.add_argument("--output", type=Path, required=True)
+
+    validate_extension_contract_parser = subparsers.add_parser("validate-extension-contract")
+    validate_extension_contract_parser.add_argument("domain")
 
     advance = subparsers.add_parser("advance")
     advance.add_argument("run_id")
@@ -255,6 +262,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "extension-contract":
         print(json.dumps(build_extension_contract(args.domain), ensure_ascii=False, indent=2))
         return 0
+    if args.command == "export-extension-contract":
+        print(json.dumps(export_extension_contract(args.domain, args.output), ensure_ascii=False, indent=2))
+        return 0
+    if args.command == "validate-extension-contract":
+        result = validate_extension_contract(args.domain)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return int(result["exit_code"])
     if args.command == "advance":
         print(
             json.dumps(
