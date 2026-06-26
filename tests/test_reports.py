@@ -42,6 +42,21 @@ class ReportTests(unittest.TestCase):
             self.assertEqual(result["user_checkpoint"], "first_plan_confirmation")
             self.assertIn("confirm", result["operator_message"].lower())
 
+    def test_report_run_returns_repair_prompt_for_unreadable_workflow(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "坏 workflow", run_id="report-unreadable")
+            (root / ".leaf" / "runs" / "report-unreadable" / "workflow.json").write_text("", encoding="utf-8")
+
+            result = report_run(root, "report-unreadable")
+
+            self.assertEqual(result["current_phase"], "unreadable")
+            self.assertEqual(result["next_action"], "repair_workflow")
+            self.assertEqual(result["user_checkpoint"], "manual_operator_decision")
+            self.assertEqual(result["user_loop"]["position"], "manual_triage")
+            self.assertEqual(result["decision_contract"]["context_slice"], ["workflow"])
+            self.assertIn("error", result)
+
     def test_report_run_uses_domain_runtime_quality_priority(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

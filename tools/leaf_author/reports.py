@@ -12,6 +12,8 @@ from tools.leaf_author.runtime_registry import approved_real_device_next_command
 
 def report_run(root: Path, run_id: str) -> dict[str, object]:
     run = inspect_run(root, run_id)
+    if run.get("current_phase") == "unreadable" or isinstance(run.get("error"), dict):
+        return _unreadable_run_report(run)
     resume_summary = run.get("resume_summary", {})
     artifacts = run.get("artifacts", {})
     evidence = _existing_artifacts(root, artifacts if isinstance(artifacts, dict) else {})

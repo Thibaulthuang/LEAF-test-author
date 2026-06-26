@@ -45,6 +45,34 @@ class RunRegistryTests(unittest.TestCase):
             self.assertIn("case", result["artifacts"])
             self.assertEqual(result["context_policy"]["scope"], "single_run")
 
+    def test_list_runs_includes_unreadable_workflow_summary(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "坏 workflow", run_id="run-bad")
+            (root / ".leaf" / "runs" / "run-bad" / "workflow.json").write_text("", encoding="utf-8")
+
+            result = list_runs(root)
+
+            self.assertEqual(result["total"], 1)
+            self.assertEqual(result["runs"][0]["run_id"], "run-bad")
+            self.assertEqual(result["runs"][0]["current_phase"], "unreadable")
+            self.assertEqual(result["runs"][0]["next_action"], "repair_workflow")
+            self.assertIn("error", result["runs"][0])
+
+    def test_inspect_run_returns_unreadable_workflow_context(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "坏 workflow", run_id="run-inspect-bad")
+            (root / ".leaf" / "runs" / "run-inspect-bad" / "workflow.json").write_text("", encoding="utf-8")
+
+            result = inspect_run(root, "run-inspect-bad")
+
+            self.assertEqual(result["run_id"], "run-inspect-bad")
+            self.assertEqual(result["current_phase"], "unreadable")
+            self.assertEqual(result["next_action"], "repair_workflow")
+            self.assertEqual(result["resume_summary"]["user_checkpoint"], "manual_operator_decision")
+            self.assertIn("error", result)
+
     def test_cli_list_and_inspect_runs_output_json(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
