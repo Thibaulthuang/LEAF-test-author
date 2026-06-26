@@ -48,6 +48,22 @@ class PhaseGuardTests(unittest.TestCase):
         self.assertIn("real_device_confirmation", contract["user_loop_rules"]["blocking_checkpoints"])
         self.assertEqual(contract["user_loop_rules"]["checkpoint_owner"], "user")
         self.assertEqual(contract["user_loop_rules"]["auto_continue_requires"], ["confirmed_plan", "auto_safe", "no_user_checkpoint"])
+        self.assertEqual(contract["action_routes"]["plan"]["next_action"], "present_plan_for_confirmation")
+        self.assertEqual(contract["action_routes"]["plan"]["agent_owner"], "leaf-test-author")
+        self.assertEqual(contract["action_routes"]["plan"]["agent_mode"], "orchestrator")
+        self.assertEqual(contract["action_routes"]["plan"]["user_loop"]["position"], "approve_plan")
+        self.assertEqual(contract["action_routes"]["plan"]["command"], "python3 -m tools.leaf_author report-run <run_id>")
+        self.assertEqual(contract["action_routes"]["pytest_ran"]["next_action"], "collect_gui_context")
+        self.assertEqual(contract["action_routes"]["pytest_ran"]["agent_owner"], "leaf-gui-agent")
+        self.assertEqual(contract["action_routes"]["pytest_ran"]["agent_mode"], "focused_subagent")
+        self.assertIn("ui_tree", contract["action_routes"]["pytest_ran"]["context_slice"])
+        self.assertEqual(contract["action_routes"]["pytest_ran"]["command"], "python3 -m tools.leaf_author inspect-ui-tree <run_id>")
+        self.assertEqual(contract["action_routes"]["e2e_ready"]["next_action"], "run_real_hypium")
+        self.assertEqual(contract["action_routes"]["e2e_ready"]["user_checkpoint"], "real_device_confirmation")
+        self.assertEqual(contract["action_routes"]["e2e_ready"]["user_loop"]["position"], "approve_real_device")
+        self.assertEqual(contract["action_routes"]["e2e_ready"]["command"], "python3 -m tools.leaf_author report-run <run_id>")
+        self.assertEqual(contract["action_routes"]["complete"]["next_action"], "complete")
+        self.assertEqual(contract["action_routes"]["complete"]["command"], "")
 
     def test_phase_guard_rejects_hap_or_install_oriented_contract_language(self):
         contract = {

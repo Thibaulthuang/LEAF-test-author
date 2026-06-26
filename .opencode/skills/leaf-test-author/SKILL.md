@@ -114,6 +114,17 @@ by `tools.leaf_author.phase_contract`. Treat `resume_summary.trigger_source`,
 `resume_summary.user_loop` as the runtime decision contract. Do not duplicate a
 separate phase table in prompt text.
 
+`python3 -m tools.leaf_author agent-handoff-contract` exposes
+`action_routes` for every phase. Each route binds `next_action` to the
+authoritative `agent_owner`, `agent_mode`, `context_slice`, `allowed_artifacts`,
+`user_loop`, and an operator command. Rule: do not dispatch from memory.
+OpenCode must read the current run report or resume summary, then use the matching
+`action_routes[<current_phase>].command` as the command hint. If a route has a
+`user_checkpoint`, present the report and stop for the user instead of running
+the later phase intent directly; for example, `e2e_ready.next_action` can remain
+`run_real_hypium` while the operator command is still `report-run <run_id>`
+until `real_device_confirmation` is satisfied.
+
 Use `python3 -m tools.leaf_author opencode-contract` after changing OpenCode
 commands or skills. It verifies that slash commands still delegate to
 `leaf-test-author` and that the skill layer still references the machine
@@ -127,7 +138,7 @@ UI-tree context. Use `python3 -m tools.leaf_author target-policy` when a
 domain, GUI, or execution subagent needs the shared system-app-only target
 boundary. Use `python3 -m tools.leaf_author agent-handoff-contract` when a
 domain, GUI, or execution subagent needs the current machine-readable handoff
-map. Use `python3 -m tools.leaf_author real-device-contract` when a subagent
+map and phase `action_routes`. Use `python3 -m tools.leaf_author real-device-contract` when a subagent
 needs the stable approval/input/preflight gates, `agent_mode`,
 `handoff_required`, `required_inputs`, and `subagent_boundary` for real-device
 runtime execution. Use `python3 -m tools.leaf_author runtime-evidence-contract <domain>`

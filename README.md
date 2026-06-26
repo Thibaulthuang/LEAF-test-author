@@ -217,7 +217,14 @@ input. `agent-handoff-contract` prints the stable handoff map: which phases each
 agent owns, which context slice each phase may load, which phases can auto-run,
 and where the user must re-enter the loop. It also prints `agent_mode`,
 `handoff_required`, required handoff inputs such as `specific_question`, and the
-user-loop rule that the checkpoint owner is the user.
+user-loop rule that the checkpoint owner is the user. Its `action_routes`
+section is the machine-readable bridge from `workflow.json.current_phase` to
+the next operator command. Each route repeats `next_action`, `agent_owner`,
+`agent_mode`, `context_slice`, `allowed_artifacts`, `user_loop`, checkpoint
+state, and a command hint. OpenCode should use that route after `report-run` or
+`resume`; it should not infer commands from conversation memory. When a route
+has a `user_checkpoint`, the command hint stays on `report-run <run_id>` so the
+user remains in the loop before a later real-device intent is executed.
 
 `target-policy` prints the shared system-app-only boundary used by phase
 decisions, reports, real-device gates, and batch handoffs. Domain plugins and

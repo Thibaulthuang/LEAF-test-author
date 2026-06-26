@@ -52,6 +52,17 @@ def validate_phase_contract(contract: dict[str, object] | None = None, *, includ
             issues.append(f"{phase_name}: leaf-gui-agent phases must include ui_tree in context_slice")
         if not isinstance(phase.get("batch_focus_priority"), int):
             issues.append(f"{phase_name}: batch_focus_priority must be an integer")
+        route = _action_route(str(phase_name), phase, contract)
+        if route.get("trigger_source") != "workflow.json":
+            issues.append(f"{phase_name}: action route trigger_source must be workflow.json")
+        if phase.get("next_action") != route.get("next_action"):
+            issues.append(f"{phase_name}: action route next_action must match phase next_action")
+        if phase.get("agent_owner") != route.get("agent_owner"):
+            issues.append(f"{phase_name}: action route agent_owner must match phase agent_owner")
+        if phase.get("user_loop") != route.get("user_loop"):
+            issues.append(f"{phase_name}: action route user_loop must match phase user_loop")
+        if phase.get("agent_owner") == "leaf-gui-agent" and route.get("command") != _entrypoint(contract, "inspect_ui_tree"):
+            issues.append(f"{phase_name}: leaf-gui-agent action route must use inspect-ui-tree")
 
     target_policy = target_policy_from_contract(contract)
     forbidden_terms = target_policy_forbidden_terms(target_policy)
@@ -94,6 +105,7 @@ def build_agent_handoff_contract(contract: dict[str, object] | None = None) -> d
     checkpoint_phases: dict[str, list[str]] = defaultdict(list)
     auto_safe_phases: list[str] = []
     context_slices: dict[str, list[str]] = {}
+    action_routes: dict[str, dict[str, object]] = {}
 
     if isinstance(phases, dict):
         for phase_name, phase in phases.items():
@@ -107,6 +119,7 @@ def build_agent_handoff_contract(contract: dict[str, object] | None = None) -> d
             if bool(phase.get("auto_safe")):
                 auto_safe_phases.append(str(phase_name))
             context_slices[str(phase_name)] = _string_list(phase.get("context_slice"))
+            action_routes[str(phase_name)] = _action_route(str(phase_name), phase, contract)
 
     context_policy = contract.get("context_policy", {})
     resume_policy = contract.get("resume_policy", {})
@@ -127,11 +140,61 @@ def build_agent_handoff_contract(contract: dict[str, object] | None = None) -> d
         "user_loop_rules": USER_LOOP_RULES,
         "agents": {owner: phases for owner, phases in sorted(agent_phases.items())},
         "context_slices": context_slices,
+        "action_routes": action_routes,
         "user_checkpoints": {checkpoint: phases for checkpoint, phases in sorted(checkpoint_phases.items())},
         "auto_safe_phases": auto_safe_phases,
         "real_device_gates": build_real_device_contract()["gates"],
         "runtime_registry": build_runtime_registry_contract()["domains"],
     }
+
+
+def _action_route(phase_name: str, phase: dict[str, object], contract: dict[str, object]) -> dict[str, object]:
+    owner = str(phase.get("agent_owner", "leaf-test-author"))
+    user_loop = phase.get("user_loop") if isinstance(phase.get("user_loop"), dict) else {}
+    return {
+        "phase": phase_name,
+        "next_action": str(phase.get("next_action", "inspect_workflow_state")),
+        "trigger_source": str(phase.get("trigger_source", "workflow.json")),
+        "agent_owner": owner,
+        "agent_mode": AGENT_MODES.get(owner, "orchestrator"),
+        "handoff_required": bool(HANDOFF_RULES.get(owner, {}).get("handoff_required", False)),
+        "subagent_boundary": str(HANDOFF_RULES.get(owner, {}).get("subagent_boundary", "")),
+        "context_slice": _string_list(phase.get("context_slice")),
+        "allowed_artifacts": _string_list(phase.get("allowed_artifacts")),
+        "user_checkpoint": phase.get("user_checkpoint"),
+        "auto_safe": bool(phase.get("auto_safe", False)),
+        "user_loop": user_loop,
+        "command": _command_for_phase(phase_name, phase, contract),
+    }
+
+
+def _command_for_phase(phase_name: str, phase: dict[str, object], contract: dict[str, object]) -> str:
+    next_action = str(phase.get("next_action", ""))
+    if next_action == "complete" or phase_name == "complete":
+        return ""
+    if phase.get("user_checkpoint"):
+        return _entrypoint(contract, "report_run")
+    if phase.get("agent_owner") == "leaf-gui-agent" or next_action == "collect_gui_context":
+        return _entrypoint(contract, "inspect_ui_tree")
+    if next_action in {"validate_pytest_draft", "run_pytest_draft", "record_experience", "export_team_knowledge"}:
+        return "python3 -m tools.leaf_author resume <run_id> --auto-safe"
+    if next_action in {"provide_system_app_target", "inspect_system_app_target"}:
+        return "python3 -m tools.leaf_author inspect-target <run_id> --serial <serial> --bundle-name <bundle>"
+    if next_action == "run_real_hypium":
+        return "python3 -m tools.leaf_author advance <run_id> --run-real --runtime-mode <mode> --serial <serial> --approval-token <token>"
+    if next_action == "inspect_e2e_readiness":
+        return "python3 -m tools.leaf_author inspect-e2e-readiness <run_id> --serial <serial> --bundle-name <bundle>"
+    if next_action == "inspect_openharmony_build":
+        return "python3 -m tools.leaf_author build-openharmony-haps <run_id> --project-dir <dir>"
+    return _entrypoint(contract, "report_run")
+
+
+def _entrypoint(contract: dict[str, object], name: str) -> str:
+    entrypoints = contract.get("entrypoints")
+    if not isinstance(entrypoints, dict):
+        entrypoints = {}
+    value = entrypoints.get(name)
+    return str(value) if isinstance(value, str) else ""
 
 
 def _expect_phase_value(phases: dict[str, object], phase_name: str, field: str, expected: object, issues: list[str]) -> None:
