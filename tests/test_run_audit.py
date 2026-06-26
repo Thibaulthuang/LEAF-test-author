@@ -41,6 +41,7 @@ class RunAuditTests(unittest.TestCase):
             self.assertIn("allowed_artifacts_bounded", passed_checks)
             self.assertIn("referenced_artifacts_bounded", passed_checks)
             self.assertIn("trigger_source_stable", passed_checks)
+            self.assertIn("target_policy_handoff_ready", passed_checks)
             self.assertIn("user_checkpoint_auto_boundary", passed_checks)
             self.assertIn("gui_agent_ui_tree_context", passed_checks)
             self.assertIn("workflow_phase_state_ready", passed_checks)
@@ -188,6 +189,23 @@ class RunAuditTests(unittest.TestCase):
             failed_checks = [check["name"] for check in result["checks"] if not check["passed"]]
             self.assertIn("handoff_ready", failed_checks)
 
+    def test_audit_run_refreshes_legacy_context_manifest_before_checks(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _complete_direct_smoke(root, "audit-legacy-manifest")
+            manifest_path = root / ".leaf" / "runs" / "audit-legacy-manifest" / "context_manifest.json"
+            payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+            payload.pop("target_policy", None)
+            payload["handoff"].pop("target_policy", None)
+            manifest_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            result = audit_run(root, "audit-legacy-manifest")
+
+            self.assertEqual(result["status"], "passed")
+            refreshed = json.loads(manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual(refreshed["target_policy"]["scope"], "system_app_only")
+            self.assertEqual(refreshed["handoff"]["target_policy"]["scope"], "system_app_only")
+
     def test_audit_run_fails_when_workflow_phase_state_drifts_from_manifest(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -220,6 +238,22 @@ class RunAuditTests(unittest.TestCase):
             failed_checks = [check["name"] for check in result["checks"] if not check["passed"]]
             self.assertIn("context_slice_bounded", failed_checks)
             self.assertIn("referenced_artifacts_bounded", failed_checks)
+
+    def test_audit_run_fails_when_context_manifest_target_policy_drifts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _complete_direct_smoke(root, "audit-target-policy-drift")
+            manifest_path = root / ".leaf" / "runs" / "audit-target-policy-drift" / "context_manifest.json"
+            payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+            payload["target_policy"]["scope"] = "hap_package"
+            payload["handoff"]["target_policy"]["scope"] = "hap_package"
+            manifest_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            result = audit_run(root, "audit-target-policy-drift")
+
+            self.assertEqual(result["status"], "failed")
+            failed_checks = [check["name"] for check in result["checks"] if not check["passed"]]
+            self.assertIn("target_policy_handoff_ready", failed_checks)
 
     def test_audit_run_fails_when_context_manifest_allows_auto_crossing_user_checkpoint(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -225,9 +225,12 @@ for each registered real-device mode, such as Camera direct smoke requiring
 Each `resume` refreshes `.leaf/runs/<run_id>/context_manifest.json`. This file is
 the handoff boundary for multi-agent and multi-case work: it names the active
 agent, the context slice to load, existing artifact paths, the user checkpoint,
-and the attention boundary `one_active_run`. It also includes a `handoff`
-snapshot with `from_agent`, `to_agent`, `next_action`, `allowed_artifacts`, and
-the referenced artifact paths for the next owner. The embedded `user_loop`
+the target policy, and the attention boundary `one_active_run`. It also includes
+a `handoff` snapshot with `from_agent`, `to_agent`, `next_action`,
+`allowed_artifacts`, `target_policy`, and the referenced artifact paths for the
+next owner. The embedded `target_policy.scope` is `system_app_only`, so
+subagents and domain plugins must not ask users for application packages on the
+OpenCode-facing path. The embedded `user_loop`
 snapshot carries `requires_user_confirmation` and `safe_to_auto_continue`, so
 subagents can return control to the user instead of crossing checkpoints.
 Domain and GUI agents should use this manifest plus specific evidence paths

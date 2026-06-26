@@ -46,7 +46,8 @@ def audit_run(root: Path, run_id: str) -> dict[str, object]:
     )
     runtime_evidence = _load_runtime_evidence(root, evidence if isinstance(evidence, dict) else {}, domain, preflight if isinstance(preflight, dict) else None)
     checks.extend(_runtime_evidence_checks(root, runtime_evidence, latest_quality_gate))
-    context_manifest = initial_context_manifest or _load_context_manifest(root, evidence if isinstance(evidence, dict) else {})
+    refreshed_context_manifest = _load_context_manifest_from_workflow(root, run_id) or _load_context_manifest(root, evidence if isinstance(evidence, dict) else {})
+    context_manifest = _auditable_context_manifest(initial_context_manifest, refreshed_context_manifest)
     checks.extend(_context_manifest_checks(context_manifest, report))
     workflow_phase_state = initial_workflow_phase_state if _has_phase_state_snapshot(initial_workflow_phase_state) else _load_workflow_phase_state(root, run_id)
     checks.extend(_workflow_phase_state_checks(workflow_phase_state, context_manifest, report))
@@ -413,6 +414,30 @@ def _load_context_manifest_from_workflow(root: Path, run_id: str) -> dict[str, o
     return _load_context_manifest(root, artifacts)
 
 
+def _auditable_context_manifest(
+    initial_context_manifest: dict[str, object] | None,
+    refreshed_context_manifest: dict[str, object] | None,
+) -> dict[str, object] | None:
+    if not isinstance(initial_context_manifest, dict):
+        return refreshed_context_manifest
+    if not isinstance(refreshed_context_manifest, dict):
+        return initial_context_manifest
+    if not _legacy_context_manifest_can_refresh(initial_context_manifest):
+        return initial_context_manifest
+    return refreshed_context_manifest
+
+
+def _legacy_context_manifest_can_refresh(context_manifest: dict[str, object]) -> bool:
+    handoff = context_manifest.get("handoff")
+    if not isinstance(handoff, dict):
+        return False
+    target_policy = context_manifest.get("target_policy")
+    handoff_target_policy = handoff.get("target_policy")
+    if target_policy is not None or handoff_target_policy is not None:
+        return False
+    return True
+
+
 def _load_workflow_diagnostics(root: Path, evidence: dict[str, object]) -> dict[str, object] | None:
     value = evidence.get("workflow_diagnostics")
     if not isinstance(value, str) or not value:
@@ -547,6 +572,7 @@ def _context_manifest_checks(context_manifest: dict[str, object] | None, report:
             _check("context_slice_bounded", False, "Context manifest context slice is missing."),
             _check("referenced_artifacts_bounded", False, "Context manifest referenced artifacts are missing."),
             _check("trigger_source_stable", False, "Context manifest trigger source is missing."),
+            _check("target_policy_handoff_ready", False, "Context manifest target policy is missing."),
             _check("user_checkpoint_auto_boundary", False, "Context manifest user checkpoint boundary is missing."),
             _check("gui_agent_ui_tree_context", False, "Context manifest GUI agent context is missing."),
         ]
@@ -567,6 +593,8 @@ def _context_manifest_checks(context_manifest: dict[str, object] | None, report:
     trigger_source = context_manifest.get("trigger_source")
     handoff_trigger_source = handoff.get("trigger_source") if isinstance(handoff, dict) else None
     contract_trigger_source = decision_contract.get("trigger_source")
+    target_policy = context_manifest.get("target_policy")
+    handoff_target_policy = handoff.get("target_policy") if isinstance(handoff, dict) else None
     user_checkpoint = context_manifest.get("user_checkpoint")
     requires_user_confirmation = isinstance(user_loop, dict) and bool(user_loop.get("requires_user_confirmation"))
     safe_to_auto_continue = isinstance(user_loop, dict) and bool(user_loop.get("safe_to_auto_continue"))
@@ -611,6 +639,11 @@ def _context_manifest_checks(context_manifest: dict[str, object] | None, report:
             "Context manifest, handoff, and decision contract all use workflow.json as the trigger source.",
         ),
         _check(
+            "target_policy_handoff_ready",
+            _target_policy_handoff_ready(target_policy, handoff_target_policy),
+            "Context manifest and handoff keep the system-app-only target policy stable.",
+        ),
+        _check(
             "user_checkpoint_auto_boundary",
             not ((user_checkpoint or requires_user_confirmation) and safe_to_auto_continue),
             "Context manifest never marks a user checkpoint safe for automatic continuation.",
@@ -621,6 +654,12 @@ def _context_manifest_checks(context_manifest: dict[str, object] | None, report:
             "GUI agent handoffs include ui_tree in the bounded context slice.",
         ),
     ]
+
+
+def _target_policy_handoff_ready(target_policy: object, handoff_target_policy: object) -> bool:
+    if not isinstance(target_policy, dict) or not isinstance(handoff_target_policy, dict):
+        return False
+    return target_policy == handoff_target_policy and target_policy.get("scope") == "system_app_only"
 
 
 def _load_workflow_phase_state(root: Path, run_id: str) -> dict[str, object] | None:

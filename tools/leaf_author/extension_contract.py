@@ -75,6 +75,7 @@ def build_extension_contract(domain: str) -> dict[str, object]:
             "trigger_source": "workflow.json",
             "decision_function": "tools.leaf_author.phase_contract.decide_next_step",
             "phase_guard_status": phase_guard["status"],
+            "target_policy": handoff_contract["target_policy"],
             "real_device_gate_status": phase_guard.get("real_device_gate_status"),
             "runtime_registry_status": phase_guard.get("runtime_registry_status"),
             "real_device_checkpoint_phases": _checkpoint_phases(phase_contract, "real_device_confirmation"),
@@ -84,6 +85,7 @@ def build_extension_contract(domain: str) -> dict[str, object]:
         "agent_handoff_contract": {
             "attention_boundary": handoff_contract["context_policy"].get("attention_boundary"),
             "artifact_loading": handoff_contract["context_policy"].get("artifact_loading"),
+            "target_policy": handoff_contract["target_policy"],
             "agents": handoff_contract["agents"],
             "auto_safe_phases": handoff_contract["auto_safe_phases"],
             "user_checkpoints": handoff_contract["user_checkpoints"],

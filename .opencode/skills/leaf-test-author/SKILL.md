@@ -149,12 +149,15 @@ is needed for a diagnosis.
 Each `resume`, `inspect-run`, or `report-run` refreshes
 `.leaf/runs/<run_id>/context_manifest.json`. Use that manifest as the handoff
 packet for subagents: it contains the active `agent_owner`, `context_slice`,
-`referenced_artifacts`, `user_checkpoint`, and `attention_boundary`. It also
-contains a `handoff` object with `from_agent`, `to_agent`, `next_action`,
-`allowed_artifacts`, and the bounded `context_slice` for the next owner. The
-manifest `user_loop` snapshot records `requires_user_confirmation` and
-`safe_to_auto_continue`, so a subagent can tell whether it should act, observe,
-or return control to the user. If the manifest says `leaf-gui-agent`, pass the
+`referenced_artifacts`, `user_checkpoint`, `target_policy`, and
+`attention_boundary`. It also contains a `handoff` object with `from_agent`,
+`to_agent`, `next_action`, `allowed_artifacts`, `target_policy`, and the bounded
+`context_slice` for the next owner. The manifest `target_policy.scope` is
+`system_app_only`; subagents and domain plugins must not ask users for
+application packages on this OpenCode-facing path. The manifest `user_loop`
+snapshot records `requires_user_confirmation` and `safe_to_auto_continue`, so a
+subagent can tell whether it should act, observe, or return control to the user.
+If the manifest says `leaf-gui-agent`, pass the
 UI snapshot index path and the specific question; do not pass the full run
 directory unless diagnosis requires it.
 For real-device execution gates, use `real-device-contract` plus

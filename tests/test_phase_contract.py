@@ -13,6 +13,7 @@ class PhaseContractTests(unittest.TestCase):
     def test_contract_contains_agent_context_and_user_loop_metadata(self):
         contract = load_phase_contract()
 
+        self.assertEqual(contract["target_policy"]["scope"], "system_app_only")
         plan_phase = contract["phases"]["plan"]
         self.assertEqual(plan_phase["user_checkpoint"], "first_plan_confirmation")
         self.assertEqual(plan_phase["agent_owner"], "leaf-test-author")
@@ -123,6 +124,8 @@ class PhaseContractTests(unittest.TestCase):
             self.assertEqual(payload["handoff"]["context_slice"], ["workflow", "pytest_result", "ui_tree"])
             self.assertEqual(payload["handoff"]["allowed_artifacts"], ["pytest_result"])
             self.assertEqual(payload["handoff"]["referenced_artifacts"]["pytest_result"], ".leaf/runs/handoff-manifest/pytest_result.json")
+            self.assertEqual(payload["target_policy"]["scope"], "system_app_only")
+            self.assertEqual(payload["handoff"]["target_policy"]["scope"], "system_app_only")
             self.assertEqual(payload["user_loop"]["position"], "observe_safe_local_progress")
             self.assertEqual(payload["user_loop"]["required_input"], "")
             self.assertEqual(payload["user_loop"]["user_checkpoint"], None)
