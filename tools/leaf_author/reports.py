@@ -14,10 +14,11 @@ def report_run(root: Path, run_id: str) -> dict[str, object]:
     resume_summary = run.get("resume_summary", {})
     artifacts = run.get("artifacts", {})
     evidence = _existing_artifacts(root, artifacts if isinstance(artifacts, dict) else {})
+    approval_required = _real_device_approval(root, artifacts if isinstance(artifacts, dict) else {})
     latest_quality_gate = _latest_quality_gate(root, str(run.get("domain", "")), artifacts if isinstance(artifacts, dict) else {})
-    safe_to_auto_continue = bool(isinstance(resume_summary, dict) and resume_summary.get("safe_to_auto_continue"))
-    user_action_required = bool(isinstance(resume_summary, dict) and resume_summary.get("requires_user_confirmation"))
-    user_checkpoint = _user_checkpoint(run, user_action_required)
+    safe_to_auto_continue = bool(isinstance(resume_summary, dict) and resume_summary.get("safe_to_auto_continue")) and not approval_required
+    user_action_required = bool(isinstance(resume_summary, dict) and resume_summary.get("requires_user_confirmation")) or bool(approval_required)
+    user_checkpoint = "real_device_confirmation" if approval_required else _user_checkpoint(run, user_action_required)
     user_loop = resume_summary.get("user_loop", {}) if isinstance(resume_summary, dict) else {}
     decision_contract = {
         "trigger_source": resume_summary.get("trigger_source", "") if isinstance(resume_summary, dict) else "",
@@ -40,7 +41,8 @@ def report_run(root: Path, run_id: str) -> dict[str, object]:
         "user_loop": user_loop,
         "decision_contract": decision_contract,
         "operator_message": resume_summary.get("operator_message", "") if isinstance(resume_summary, dict) else "",
-        "next_command": _next_command(run_id, run, safe_to_auto_continue, user_checkpoint),
+        "next_command": _next_command(run_id, run, safe_to_auto_continue, user_checkpoint, approval_required),
+        "approval_required": approval_required,
         "evidence": evidence,
         "context_policy": {
             "scope": "run_report",
@@ -104,6 +106,29 @@ def _latest_quality_gate(root: Path, domain: str, artifacts: dict[str, object]) 
     return "UNKNOWN"
 
 
+def _real_device_approval(root: Path, artifacts: dict[str, object]) -> dict[str, object] | None:
+    value = artifacts.get("real_device_approval")
+    if not isinstance(value, str) or not value:
+        return None
+    path = root / value
+    if not path.is_file():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    if payload.get("status") != "blocked":
+        return None
+    return {
+        "artifact": value,
+        "runtime_mode": payload.get("runtime_mode"),
+        "required_approval_token": payload.get("required_approval_token"),
+        "risk_level": payload.get("risk_level"),
+        "mutates_device_state": payload.get("mutates_device_state"),
+        "operator_message": payload.get("operator_message"),
+    }
+
+
 def _user_checkpoint(run: dict[str, object], user_action_required: bool) -> str | None:
     resume_summary = run.get("resume_summary", {})
     if isinstance(resume_summary, dict):
@@ -119,9 +144,20 @@ def _user_checkpoint(run: dict[str, object], user_action_required: bool) -> str 
     return "manual_operator_decision"
 
 
-def _next_command(run_id: str, run: dict[str, object], safe_to_auto_continue: bool, user_checkpoint: str | None) -> str:
+def _next_command(
+    run_id: str,
+    run: dict[str, object],
+    safe_to_auto_continue: bool,
+    user_checkpoint: str | None,
+    approval_required: dict[str, object] | None = None,
+) -> str:
     if safe_to_auto_continue:
         return f"python3 -m tools.leaf_author resume {run_id} --auto-safe"
+    if approval_required:
+        runtime_mode = approval_required.get("runtime_mode")
+        approval_token = approval_required.get("required_approval_token")
+        if isinstance(runtime_mode, str) and runtime_mode and isinstance(approval_token, str) and approval_token:
+            return f"python3 -m tools.leaf_author advance {run_id} --run-real --runtime-mode {runtime_mode} --serial <serial> --approval-token {approval_token}"
     if user_checkpoint == "first_plan_confirmation":
         return f"python3 -m tools.leaf_author confirm-plan {run_id}"
     if user_checkpoint == "real_device_confirmation":

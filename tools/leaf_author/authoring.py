@@ -155,6 +155,7 @@ def advance_run(
     if run_real and selected_runtime_mode:
         approval = _real_device_approval_decision(domain, selected_runtime_mode, approval_token)
         if not approval["approved"]:
+            approval_artifact = _write_real_device_approval_artifact(root, run_id, workflow, selected_runtime_mode, approval)
             return {
                 "run_id": run_id,
                 "status": "blocked",
@@ -164,6 +165,7 @@ def advance_run(
                 "next_action": "request_real_device_approval",
                 "required_approval_token": approval["required_approval_token"],
                 "runtime_safety": approval["runtime_safety"],
+                "real_device_approval_path": approval_artifact["path"],
                 "resume_summary": {
                     "requires_user_confirmation": True,
                     "safe_to_auto_continue": False,
@@ -339,3 +341,36 @@ def _real_device_approval_decision(domain: str, runtime_mode: str, approval_toke
         "required_approval_token": required,
         "runtime_safety": safety,
     }
+
+
+def _write_real_device_approval_artifact(
+    root: Path,
+    run_id: str,
+    workflow: dict[str, object],
+    runtime_mode: str,
+    approval: dict[str, object],
+) -> dict[str, object]:
+    path = root / ".leaf" / "runs" / run_id / "real_device_approval.json"
+    safety = approval["runtime_safety"] if isinstance(approval.get("runtime_safety"), dict) else {}
+    payload = {
+        "schema_version": "1.0",
+        "artifact_kind": "real_device_approval_decision",
+        "run_id": run_id,
+        "domain": workflow.get("domain"),
+        "runtime_mode": runtime_mode,
+        "status": "approved" if approval.get("approved") else "blocked",
+        "required_approval_token": approval.get("required_approval_token"),
+        "risk_level": safety.get("risk_level"),
+        "mutates_device_state": bool(safety.get("mutates_device_state", True)),
+        "operator_message": safety.get("operator_message", "Explicit real-device approval is required."),
+        "user_checkpoint": "real_device_confirmation",
+        "next_action": "request_real_device_approval" if not approval.get("approved") else "run_real_device_runtime",
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    workflow_payload = dict(workflow)
+    artifacts = dict(workflow_payload.get("artifacts", {}))
+    artifacts["real_device_approval"] = str(path.relative_to(root))
+    workflow_payload["artifacts"] = artifacts
+    save_workflow(root, workflow_payload)
+    return {"path": str(path), "payload": payload}

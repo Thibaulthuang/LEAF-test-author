@@ -252,7 +252,15 @@ class LeafAuthorStageTests(unittest.TestCase):
             self.assertEqual(result["required_approval_token"], "approve_camera_capture_e2e")
             self.assertEqual(result["runtime_safety"]["mutates_device_state"], True)
             capture.assert_not_called()
-            self.assertEqual(load_workflow(root, "stage-camera-capture-blocked")["current_phase"], "hypium_draft")
+            approval_path = root / ".leaf" / "runs" / "stage-camera-capture-blocked" / "real_device_approval.json"
+            self.assertTrue(approval_path.exists())
+            approval = json.loads(approval_path.read_text(encoding="utf-8"))
+            self.assertEqual(approval["status"], "blocked")
+            self.assertEqual(approval["required_approval_token"], "approve_camera_capture_e2e")
+            self.assertEqual(approval["runtime_mode"], "capture_e2e")
+            workflow = load_workflow(root, "stage-camera-capture-blocked")
+            self.assertEqual(workflow["current_phase"], "hypium_draft")
+            self.assertEqual(workflow["artifacts"]["real_device_approval"], ".leaf/runs/stage-camera-capture-blocked/real_device_approval.json")
 
     def test_advance_camera_capture_real_e2e_records_capture_gate_after_approval(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -76,6 +76,22 @@ class ReportTests(unittest.TestCase):
                 "python3 -m tools.leaf_author advance report-real --run-real --runtime-mode direct_smoke --serial <serial>",
             )
 
+    def test_report_run_surfaces_real_device_approval_blocker(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "打开相机；点击拍照", run_id="report-approval")
+            confirm_plan(root, "report-approval")
+
+            blocked = advance_run(root, "report-approval", run_real=True, runtime_mode="capture_e2e", serial="SERIAL123")
+            result = report_run(root, "report-approval")
+
+            self.assertEqual(blocked["status"], "blocked")
+            self.assertEqual(result["user_checkpoint"], "real_device_confirmation")
+            self.assertEqual(result["user_action_required"], True)
+            self.assertIn("real_device_approval", result["evidence"])
+            self.assertEqual(result["approval_required"]["required_approval_token"], "approve_camera_capture_e2e")
+            self.assertIn("--approval-token approve_camera_capture_e2e", result["next_command"])
+
     def test_report_batch_summarizes_runs_and_next_focus(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
