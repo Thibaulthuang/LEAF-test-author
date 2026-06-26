@@ -18,6 +18,7 @@ class RealDeviceContractTests(unittest.TestCase):
         self.assertEqual(approval["agent_owner"], "leaf-test-author")
         self.assertEqual(approval["context_slice"], ["workflow", "real_device_approval"])
         self.assertEqual(approval["allowed_artifacts"], ["workflow", "real_device_approval"])
+        self.assertEqual(approval["target_policy"]["scope"], "system_app_only")
 
         device_input = real_device_decision_contract("input")
         self.assertEqual(device_input["context_slice"], ["workflow", "real_device_input"])
@@ -25,6 +26,7 @@ class RealDeviceContractTests(unittest.TestCase):
 
         preflight = real_device_decision_contract("preflight")
         self.assertEqual(preflight["agent_owner"], "leaf-test-author")
+        self.assertEqual(preflight["target_policy"]["scope"], "system_app_only")
         self.assertIn("runtime_safety", preflight["context_slice"])
         self.assertIn("real_device_approval", preflight["allowed_artifacts"])
         self.assertIn("real_device_input", preflight["allowed_artifacts"])

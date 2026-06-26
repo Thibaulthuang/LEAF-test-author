@@ -42,6 +42,7 @@ class ReportTests(unittest.TestCase):
             self.assertEqual(result["user_action_required"], True)
             self.assertEqual(result["user_checkpoint"], "first_plan_confirmation")
             self.assertIn("confirm", result["operator_message"].lower())
+            self.assertEqual(result["decision_contract"]["target_policy"]["scope"], "system_app_only")
 
     def test_report_run_includes_workflow_diagnostics_evidence_when_present(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -122,6 +123,7 @@ class ReportTests(unittest.TestCase):
             self.assertEqual(result["user_loop"]["required_input"], "approve_camera_capture_e2e")
             self.assertEqual(result["decision_contract"]["agent_owner"], "leaf-test-author")
             self.assertEqual(result["decision_contract"]["context_slice"], ["workflow", "real_device_approval"])
+            self.assertEqual(result["decision_contract"]["target_policy"]["scope"], "system_app_only")
             self.assertEqual(result["operator_message"], result["approval_required"]["operator_message"])
             self.assertIn("real_device_approval", result["evidence"])
             self.assertEqual(result["approval_required"]["required_approval_token"], "approve_camera_capture_e2e")
@@ -230,6 +232,7 @@ class ReportTests(unittest.TestCase):
             self.assertEqual(result["real_device_preflight"]["approval_status"], "not_required")
             self.assertEqual(result["real_device_preflight"]["input_status"], "ready")
             self.assertEqual(result["real_device_preflight"]["decision_contract"]["agent_owner"], "leaf-test-author")
+            self.assertEqual(result["real_device_preflight"]["decision_contract"]["target_policy"]["scope"], "system_app_only")
             self.assertEqual(result["real_device_preflight"]["user_loop"]["position"], "observe_real_device_execution")
             self.assertEqual(result["runtime_evidence_summary"]["artifact"], ".leaf/runs/report-preflight/camera_direct_smoke.json")
             self.assertEqual(result["runtime_evidence_summary"]["quality_gate"], "CAMERA_DIRECT_SMOKE_PASS")
@@ -326,6 +329,7 @@ class ReportTests(unittest.TestCase):
             self.assertEqual(result["summary"]["safe_to_auto_continue"], 1)
             self.assertEqual(result["next_run_focus"]["run_id"], "report-safe")
             self.assertEqual(result["runs"][0]["run_id"], "report-wait")
+            self.assertEqual(result["runs"][0]["decision_contract"]["target_policy"]["scope"], "system_app_only")
 
     def test_report_batch_isolates_unreadable_run_workflow(self):
         with tempfile.TemporaryDirectory() as tmp:

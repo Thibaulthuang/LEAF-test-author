@@ -9,6 +9,11 @@ from tools.leaf_author.real_device_contract import real_device_decision_contract
 from tools.leaf_author.run_registry import inspect_run
 from tools.leaf_author.runtime_registry import approved_real_device_next_command, quality_artifact_priority, real_device_next_command
 
+_SYSTEM_APP_TARGET_POLICY = {
+    "scope": "system_app_only",
+    "forbidden_terms": ["hap", "test hap", "app hap", "install_hap", "build_app_and_test"],
+}
+
 
 def report_run(root: Path, run_id: str) -> dict[str, object]:
     run = inspect_run(root, run_id)
@@ -199,7 +204,7 @@ def _real_device_preflight(root: Path, artifacts: dict[str, object]) -> dict[str
         "approval_status": payload.get("approval_status"),
         "input_status": payload.get("input_status"),
         "next_action": payload.get("next_action"),
-        "decision_contract": decision_contract if isinstance(decision_contract, dict) else {},
+        "decision_contract": _with_target_policy(decision_contract if isinstance(decision_contract, dict) else {}),
         "user_loop": user_loop if isinstance(user_loop, dict) else {},
     }
 
@@ -322,7 +327,7 @@ def _approval_user_loop(approval_required: dict[str, object]) -> dict[str, str]:
 
 
 def _approval_decision_contract() -> dict[str, object]:
-    return real_device_decision_contract("approval")
+    return _with_target_policy(real_device_decision_contract("approval"))
 
 
 def _input_user_loop(input_required: dict[str, object]) -> dict[str, str]:
@@ -331,7 +336,7 @@ def _input_user_loop(input_required: dict[str, object]) -> dict[str, str]:
 
 
 def _input_decision_contract() -> dict[str, object]:
-    return real_device_decision_contract("input")
+    return _with_target_policy(real_device_decision_contract("input"))
 
 
 def _report_user_loop(
@@ -363,6 +368,7 @@ def _report_decision_contract(
         "agent_owner": resume_summary.get("agent_owner", "") if isinstance(resume_summary, dict) else "",
         "context_slice": resume_summary.get("context_slice", []) if isinstance(resume_summary, dict) else [],
         "allowed_artifacts": resume_summary.get("allowed_artifacts", []) if isinstance(resume_summary, dict) else [],
+        "target_policy": resume_summary.get("target_policy", _SYSTEM_APP_TARGET_POLICY) if isinstance(resume_summary, dict) else _SYSTEM_APP_TARGET_POLICY,
     }
 
 
@@ -467,6 +473,7 @@ def _unreadable_run_report(root: Path, run_summary: dict[str, object]) -> dict[s
             "agent_owner": "leaf-test-author",
             "context_slice": ["workflow"],
             "allowed_artifacts": ["workflow"],
+            "target_policy": _SYSTEM_APP_TARGET_POLICY,
         },
         "operator_message": "Workflow state is unreadable; repair workflow.json before reporting or resuming this run.",
         "next_command": "",
@@ -508,6 +515,7 @@ def _batch_report_summary(run: dict[str, object]) -> dict[str, object]:
         "user_action_required": run.get("user_action_required"),
         "user_checkpoint": run.get("user_checkpoint"),
         "next_command": run.get("next_command"),
+        "decision_contract": run.get("decision_contract") if isinstance(run.get("decision_contract"), dict) else {},
         "real_device_preflight": _batch_preflight_summary(real_device_preflight if isinstance(real_device_preflight, dict) else None),
         "runtime_evidence": _batch_runtime_evidence_detail(runtime_evidence if isinstance(runtime_evidence, dict) else None),
     }
@@ -597,3 +605,9 @@ def _string_list(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
     return [str(item) for item in value]
+
+
+def _with_target_policy(decision_contract: dict[str, object]) -> dict[str, object]:
+    if isinstance(decision_contract.get("target_policy"), dict):
+        return decision_contract
+    return {**decision_contract, "target_policy": _SYSTEM_APP_TARGET_POLICY}
