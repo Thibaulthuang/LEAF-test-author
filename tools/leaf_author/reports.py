@@ -19,13 +19,9 @@ def report_run(root: Path, run_id: str) -> dict[str, object]:
     safe_to_auto_continue = bool(isinstance(resume_summary, dict) and resume_summary.get("safe_to_auto_continue")) and not approval_required
     user_action_required = bool(isinstance(resume_summary, dict) and resume_summary.get("requires_user_confirmation")) or bool(approval_required)
     user_checkpoint = "real_device_confirmation" if approval_required else _user_checkpoint(run, user_action_required)
-    user_loop = resume_summary.get("user_loop", {}) if isinstance(resume_summary, dict) else {}
-    decision_contract = {
-        "trigger_source": resume_summary.get("trigger_source", "") if isinstance(resume_summary, dict) else "",
-        "agent_owner": resume_summary.get("agent_owner", "") if isinstance(resume_summary, dict) else "",
-        "context_slice": resume_summary.get("context_slice", []) if isinstance(resume_summary, dict) else [],
-        "allowed_artifacts": resume_summary.get("allowed_artifacts", []) if isinstance(resume_summary, dict) else [],
-    }
+    user_loop = _report_user_loop(resume_summary, approval_required)
+    decision_contract = _report_decision_contract(resume_summary, approval_required)
+    operator_message = _report_operator_message(resume_summary, approval_required)
     return {
         "schema_version": "1.0",
         "run_id": run_id,
@@ -40,7 +36,7 @@ def report_run(root: Path, run_id: str) -> dict[str, object]:
         "user_checkpoint": user_checkpoint,
         "user_loop": user_loop,
         "decision_contract": decision_contract,
-        "operator_message": resume_summary.get("operator_message", "") if isinstance(resume_summary, dict) else "",
+        "operator_message": operator_message,
         "next_command": _next_command(run_id, run, safe_to_auto_continue, user_checkpoint, approval_required),
         "approval_required": approval_required,
         "evidence": evidence,
@@ -127,6 +123,51 @@ def _real_device_approval(root: Path, artifacts: dict[str, object]) -> dict[str,
         "mutates_device_state": payload.get("mutates_device_state"),
         "operator_message": payload.get("operator_message"),
     }
+
+
+def _approval_user_loop(approval_required: dict[str, object]) -> dict[str, str]:
+    required_input = approval_required.get("required_approval_token")
+    return {
+        "position": "approve_real_device",
+        "required_input": str(required_input) if isinstance(required_input, str) else "",
+    }
+
+
+def _approval_decision_contract() -> dict[str, object]:
+    return {
+        "trigger_source": "workflow.json",
+        "agent_owner": "leaf-test-author",
+        "context_slice": ["workflow", "real_device_approval"],
+        "allowed_artifacts": ["workflow", "real_device_approval"],
+    }
+
+
+def _report_user_loop(resume_summary: object, approval_required: dict[str, object] | None) -> dict[str, object]:
+    if approval_required:
+        return _approval_user_loop(approval_required)
+    if isinstance(resume_summary, dict):
+        user_loop = resume_summary.get("user_loop", {})
+        return user_loop if isinstance(user_loop, dict) else {}
+    return {}
+
+
+def _report_decision_contract(resume_summary: object, approval_required: dict[str, object] | None) -> dict[str, object]:
+    if approval_required:
+        return _approval_decision_contract()
+    return {
+        "trigger_source": resume_summary.get("trigger_source", "") if isinstance(resume_summary, dict) else "",
+        "agent_owner": resume_summary.get("agent_owner", "") if isinstance(resume_summary, dict) else "",
+        "context_slice": resume_summary.get("context_slice", []) if isinstance(resume_summary, dict) else [],
+        "allowed_artifacts": resume_summary.get("allowed_artifacts", []) if isinstance(resume_summary, dict) else [],
+    }
+
+
+def _report_operator_message(resume_summary: object, approval_required: dict[str, object] | None) -> str:
+    if approval_required:
+        return str(approval_required.get("operator_message", ""))
+    if isinstance(resume_summary, dict):
+        return str(resume_summary.get("operator_message", ""))
+    return ""
 
 
 def _user_checkpoint(run: dict[str, object], user_action_required: bool) -> str | None:
