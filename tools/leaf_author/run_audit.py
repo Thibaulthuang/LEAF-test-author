@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from tools.leaf_author.device_probe import HdcProbe, ProbeRunner
 from tools.leaf_author.phase_guard import validate_phase_contract
 from tools.leaf_author.real_device_contract import real_device_runtime_evidence_schema, validate_real_device_contract
 from tools.leaf_author.reports import report_run
@@ -11,7 +12,14 @@ from tools.leaf_author.workflow import load_workflow, save_workflow
 from tools.leaf_author.batch_registry import resume_batch
 
 
-def audit_run(root: Path, run_id: str) -> dict[str, object]:
+def audit_run(
+    root: Path,
+    run_id: str,
+    *,
+    live_device: bool = False,
+    hdc_runner: ProbeRunner | None = None,
+    hdc_path: str = "hdc",
+) -> dict[str, object]:
     initial_workflow_phase_state = _load_workflow_phase_state(root, run_id)
     initial_context_manifest = _load_context_manifest_from_workflow(root, run_id)
     report = report_run(root, run_id)
@@ -34,6 +42,8 @@ def audit_run(root: Path, run_id: str) -> dict[str, object]:
     device_selection = report.get("device_selection")
     preflight = report.get("real_device_preflight")
     checks.extend(_real_device_preflight_checks(domain, preflight if isinstance(preflight, dict) else None, device_selection if isinstance(device_selection, dict) else None))
+    live_device_result = _live_device_result(preflight if isinstance(preflight, dict) else None, live_device=live_device, hdc_runner=hdc_runner, hdc_path=hdc_path)
+    checks.extend(_live_device_checks(live_device_result, enabled=live_device))
     checks.extend(_device_selection_checks(device_selection if isinstance(device_selection, dict) else None, preflight if isinstance(preflight, dict) else None))
     evidence = report.get("evidence", {})
     real_device_input = _load_real_device_input(root, evidence if isinstance(evidence, dict) else {})
@@ -60,6 +70,7 @@ def audit_run(root: Path, run_id: str) -> dict[str, object]:
         device_selection=device_selection if isinstance(device_selection, dict) else None,
         real_device_input=real_device_input,
         preflight=preflight if isinstance(preflight, dict) else None,
+        live_device_result=live_device_result,
     )
     runtime_evidence_trace = _runtime_evidence_trace(runtime_evidence, checks)
 
@@ -175,6 +186,50 @@ def _preflight_safety_matches_registry(domain: str, preflight: dict[str, object]
         and preflight.get("approval_status") == expected_approval_status
         and (not required_token or preflight.get("approval_token") == required_token)
     )
+
+
+def _live_device_result(
+    preflight: dict[str, object] | None,
+    *,
+    live_device: bool,
+    hdc_runner: ProbeRunner | None,
+    hdc_path: str,
+) -> dict[str, object] | None:
+    if not live_device:
+        return None
+    serial = preflight.get("serial") if isinstance(preflight, dict) else None
+    if not isinstance(serial, str) or not serial.strip():
+        return {
+            "status": "unavailable",
+            "serial": serial,
+            "reason": "preflight serial is missing",
+        }
+    selection = HdcProbe(runner=hdc_runner, hdc_path=hdc_path).select_device(serial=serial.strip())
+    if selection.get("status") != "selected":
+        return {
+            "status": "unavailable",
+            "serial": serial.strip(),
+            "reason": selection.get("reason"),
+            "targets": selection.get("targets", []),
+        }
+    return {
+        "status": "connected",
+        "serial": selection.get("serial"),
+        "targets": selection.get("targets", []),
+        "device": selection.get("device") if isinstance(selection.get("device"), dict) else {},
+    }
+
+
+def _live_device_checks(live_device_result: dict[str, object] | None, *, enabled: bool) -> list[dict[str, object]]:
+    if not enabled:
+        return []
+    return [
+        _check(
+            "real_device_live_connected",
+            isinstance(live_device_result, dict) and live_device_result.get("status") == "connected",
+            "Preflight serial is currently connected through hdc.",
+        )
+    ]
 
 
 def _device_selection_checks(device_selection: dict[str, object] | None, preflight: dict[str, object] | None) -> list[dict[str, object]]:
@@ -369,6 +424,7 @@ def _real_device_trace(
     device_selection: dict[str, object] | None,
     real_device_input: dict[str, object] | None,
     preflight: dict[str, object] | None,
+    live_device_result: dict[str, object] | None = None,
 ) -> dict[str, object]:
     artifacts = {
         "device_selection": device_selection.get("artifact") if isinstance(device_selection, dict) else None,
@@ -398,6 +454,7 @@ def _real_device_trace(
         "mutates_device_state": preflight.get("mutates_device_state") if isinstance(preflight, dict) else None,
         "required_approval_token": preflight.get("required_approval_token") if isinstance(preflight, dict) else None,
         "approval_status": preflight.get("approval_status") if isinstance(preflight, dict) else None,
+        "live_device": live_device_result,
         "latest_quality_gate": latest_quality_gate,
         "artifacts": artifacts,
     }

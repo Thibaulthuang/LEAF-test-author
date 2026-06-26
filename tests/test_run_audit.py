@@ -73,6 +73,45 @@ class RunAuditTests(unittest.TestCase):
             failed_checks = [check["name"] for check in result["checks"] if not check["passed"]]
             self.assertIn("real_device_safety_profile", failed_checks)
 
+    def test_audit_run_can_verify_preflight_serial_is_currently_connected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _complete_direct_smoke(root, "audit-live-device")
+
+            def runner(args, timeout_s):
+                if args == ["/sdk/hdc", "list", "targets"]:
+                    return ProbeCommandResult(0, "SERIAL123\n", "")
+                if args == ["/sdk/hdc", "-t", "SERIAL123", "shell", "param", "get", "const.product.model"]:
+                    return ProbeCommandResult(0, "ohos\n", "")
+                if args == ["/sdk/hdc", "-t", "SERIAL123", "shell", "param", "get", "const.ohos.apiversion"]:
+                    return ProbeCommandResult(0, "26\n", "")
+                return ProbeCommandResult(1, "", f"unexpected {args}")
+
+            result = audit_run(root, "audit-live-device", live_device=True, hdc_runner=runner, hdc_path="/sdk/hdc")
+
+            self.assertEqual(result["status"], "passed")
+            self.assertEqual(result["real_device_trace"]["live_device"]["status"], "connected")
+            self.assertEqual(result["real_device_trace"]["live_device"]["serial"], "SERIAL123")
+            passed_checks = [check["name"] for check in result["checks"] if check["passed"]]
+            self.assertIn("real_device_live_connected", passed_checks)
+
+    def test_audit_run_fails_live_device_check_when_preflight_serial_is_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _complete_direct_smoke(root, "audit-live-missing")
+
+            def runner(args, timeout_s):
+                if args == ["/sdk/hdc", "list", "targets"]:
+                    return ProbeCommandResult(0, "OTHER_SERIAL\n", "")
+                return ProbeCommandResult(1, "", f"unexpected {args}")
+
+            result = audit_run(root, "audit-live-missing", live_device=True, hdc_runner=runner, hdc_path="/sdk/hdc")
+
+            self.assertEqual(result["status"], "failed")
+            self.assertEqual(result["real_device_trace"]["live_device"]["status"], "unavailable")
+            failed_checks = [check["name"] for check in result["checks"] if not check["passed"]]
+            self.assertIn("real_device_live_connected", failed_checks)
+
     def test_audit_run_includes_workflow_diagnostics_when_present(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -370,16 +409,28 @@ class RunAuditTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             _complete_direct_smoke(root, "audit-cli")
+            fake_hdc = root / "fake_hdc"
+            fake_hdc.write_text(
+                "#!/bin/sh\n"
+                "if [ \"$1\" = \"list\" ]; then echo SERIAL123; exit 0; fi\n"
+                "if [ \"$4\" = \"param\" ] && [ \"$6\" = \"const.product.model\" ]; then echo ohos; exit 0; fi\n"
+                "if [ \"$4\" = \"param\" ] && [ \"$6\" = \"const.ohos.apiversion\" ]; then echo 26; exit 0; fi\n"
+                "echo unexpected \"$@\" >&2\n"
+                "exit 1\n",
+                encoding="utf-8",
+            )
+            fake_hdc.chmod(0o755)
 
             from tools.leaf_author.__main__ import main
 
             output = StringIO()
             with redirect_stdout(output):
-                exit_code = main(["audit-run", "audit-cli", "--root", str(root)])
+                exit_code = main(["audit-run", "audit-cli", "--root", str(root), "--live-device", "--hdc-path", str(fake_hdc)])
 
             payload = json.loads(output.getvalue())
             self.assertEqual(exit_code, 0)
             self.assertEqual(payload["status"], "passed")
+            self.assertIn("live_device", payload["real_device_trace"])
 
     def test_audit_batch_summarizes_passed_and_failed_runs(self):
         with tempfile.TemporaryDirectory() as tmp:
