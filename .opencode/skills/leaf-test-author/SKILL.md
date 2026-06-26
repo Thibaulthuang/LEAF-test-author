@@ -118,9 +118,12 @@ context. Use `python3 -m tools.leaf_author agent-handoff-contract` when a
 domain, GUI, or execution subagent needs the current machine-readable handoff
 map. Use `python3 -m tools.leaf_author real-device-contract` when a subagent
 needs the stable approval/input/preflight gates for real-device runtime
-execution. Use `python3 -m tools.leaf_author runtime-registry-contract` when a
-domain plugin or execution subagent needs the registered runtime modes,
-quality gates, runtime artifacts, and safety profiles.
+execution. Use `python3 -m tools.leaf_author runtime-evidence-contract <domain>`
+when a domain plugin or execution subagent needs the required evidence fields
+for each real-device runtime artifact. Use
+`python3 -m tools.leaf_author runtime-registry-contract` when a domain plugin or
+execution subagent needs the registered runtime modes, quality gates, runtime
+artifacts, and safety profiles.
 
 - `plan` with `confirmed_plan=false`: present `plan.json` and must stop for
   `first_plan_confirmation`.
@@ -157,7 +160,9 @@ directory unless diagnosis requires it.
 For real-device execution gates, use `real-device-contract` plus
 `real_device_approval.json`, `real_device_input.json`, or
 `real_device_preflight.json` instead of reconstructing gate logic in prompt
-text.
+text. For runtime pass/fail evidence, use `runtime-evidence-contract <domain>`
+and the concrete runtime artifact such as `camera_direct_smoke.json` instead of
+guessing which evidence fields are sufficient.
 
 ## Subagent Boundaries
 

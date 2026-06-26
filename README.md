@@ -115,11 +115,14 @@ python3 -m tools.leaf_author extension-contract camera
 python3 -m tools.leaf_author export-extension-contract camera --output /tmp/camera-extension.json
 python3 -m tools.leaf_author validate-extension-contract camera
 python3 -m tools.leaf_author validate-extension-contract camera --strict-real-device
+python3 -m tools.leaf_author runtime-evidence-contract camera
 ```
 
 The extension contract combines domain hooks, runtime registry status,
 real-device gate status, phase guard status, and agent handoff metadata so a new
 domain plugin can be reviewed before it is used for real-device execution.
+`runtime-evidence-contract <domain>` prints the runtime artifact schema that a
+domain plugin must satisfy for report and audit evidence checks.
 
 Validate the phase trigger, context, agent, and user-in-loop contract:
 
@@ -127,6 +130,7 @@ Validate the phase trigger, context, agent, and user-in-loop contract:
 python3 -m tools.leaf_author phase-guard
 python3 -m tools.leaf_author agent-handoff-contract
 python3 -m tools.leaf_author real-device-contract
+python3 -m tools.leaf_author runtime-evidence-contract camera
 python3 -m tools.leaf_author runtime-registry-contract
 ```
 
@@ -213,6 +217,9 @@ position that subagents should use before or during device execution.
 `runtime-registry-contract` prints the registered runtime modes, default mode,
 runtime artifacts, quality gates, and safety profiles that domain plugins must
 keep complete before real-device execution can be considered stable.
+`runtime-evidence-contract <domain>` prints the required runtime evidence fields
+for each registered real-device mode, such as Camera direct smoke requiring
+`layout_verified`, `bundle_verified`, and `ability_verified`.
 
 Each `resume` refreshes `.leaf/runs/<run_id>/context_manifest.json`. This file is
 the handoff boundary for multi-agent and multi-case work: it names the active
