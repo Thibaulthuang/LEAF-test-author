@@ -114,6 +114,7 @@ def main(argv: list[str] | None = None) -> int:
     clickable_group.add_argument("--not-clickable", dest="clickable", action="store_false")
     inspect_ui_tree_parser.set_defaults(clickable=None)
     inspect_ui_tree_parser.add_argument("--limit", type=int, default=10)
+    inspect_ui_tree_parser.add_argument("--no-diff", action="store_true")
 
     audit_run_parser = subparsers.add_parser("audit-run")
     audit_run_parser.add_argument("run_id")
@@ -334,6 +335,7 @@ def main(argv: list[str] | None = None) -> int:
                     node_type=args.node_type,
                     clickable=args.clickable,
                     limit=args.limit,
+                    include_diffs=not args.no_diff,
                 ),
                 ensure_ascii=False,
                 indent=2,

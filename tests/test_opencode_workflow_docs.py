@@ -161,6 +161,8 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
         self.assertIn("requires `ui_tree`", readme)
         self.assertIn("targeted UI-tree diagnostics", readme)
         self.assertIn("filters by `phase` or `action_id`", readme)
+        self.assertIn("adjacent snapshot diffs", readme)
+        self.assertIn("`--no-diff`", readme)
         self.assertNotIn("test HAP", readme)
         self.assertNotIn("test package", readme)
 
@@ -208,6 +210,7 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
         self.assertIn("leaf-gui-agent", skill)
         self.assertIn("inspect-ui-tree", skill)
         self.assertIn("one-run attention boundary", skill)
+        self.assertIn("adjacent snapshot `diffs`", skill)
         self.assertIn("User-In-Loop", skill)
         self.assertIn("first_plan_confirmation", skill)
         self.assertIn("real_device_confirmation", skill)

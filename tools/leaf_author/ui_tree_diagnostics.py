@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from tools.leaf_author.reports import report_run
-from tools.leaf_author.runtime.ui_tree import find_candidates
+from tools.leaf_author.runtime.ui_tree import diff_indexes, find_candidates
 
 
 def inspect_ui_tree(
@@ -18,6 +18,7 @@ def inspect_ui_tree(
     node_type: str | None = None,
     clickable: bool | None = None,
     limit: int = 10,
+    include_diffs: bool = True,
 ) -> dict[str, object]:
     report = report_run(root, run_id)
     runtime_summary = report.get("runtime_evidence_summary")
@@ -33,7 +34,8 @@ def inspect_ui_tree(
         if action_id and snapshot.get("action_id") != action_id:
             continue
         snapshots.append(_inspect_snapshot(root, snapshot, _selectors(node_id, text, node_type, clickable), limit))
-    return {
+    diffs = _snapshot_diffs(root, snapshots) if include_diffs else []
+    payload = {
         "schema_version": "1.0",
         "manifest_kind": "leaf_ui_tree_diagnostics",
         "run_id": run_id,
@@ -47,6 +49,7 @@ def inspect_ui_tree(
         },
         "snapshot_count": len(snapshots),
         "snapshots": snapshots,
+        "diff_count": len(diffs),
         "context_policy": {
             "scope": "ui_tree_diagnostics",
             "load_strategy": "runtime_evidence_summary_then_selected_indexes",
@@ -54,6 +57,9 @@ def inspect_ui_tree(
             "attention_boundary": "one_active_run",
         },
     }
+    if include_diffs:
+        payload["diffs"] = diffs
+    return payload
 
 
 def _inspect_snapshot(root: Path, snapshot: dict[str, object], selectors: list[dict[str, object]], limit: int) -> dict[str, object]:
@@ -85,6 +91,35 @@ def _load_index(root: Path, index_path: str) -> dict[str, object]:
     except json.JSONDecodeError:
         return {}
     return payload if isinstance(payload, dict) else {}
+
+
+def _snapshot_diffs(root: Path, snapshots: list[dict[str, object]]) -> list[dict[str, object]]:
+    diffs = []
+    for before, after in zip(snapshots, snapshots[1:]):
+        before_index = _index_from_snapshot(root, before)
+        after_index = _index_from_snapshot(root, after)
+        if not before_index or not after_index:
+            continue
+        diff = diff_indexes(before_index, after_index)
+        diffs.append(
+            {
+                "from_phase": before.get("phase"),
+                "from_action_id": before.get("action_id"),
+                "to_phase": after.get("phase"),
+                "to_action_id": after.get("action_id"),
+                **diff,
+            }
+        )
+    return diffs
+
+
+def _index_from_snapshot(root: Path, snapshot: dict[str, object]) -> dict[str, object]:
+    index_path = snapshot.get("index_path")
+    if not isinstance(index_path, str):
+        return {}
+    payload = _load_index(root, index_path)
+    index = payload.get("index") if isinstance(payload, dict) else {}
+    return index if isinstance(index, dict) else {}
 
 
 def _snapshot_refs_from_artifacts(root: Path, report: dict[str, object]) -> list[dict[str, object]]:

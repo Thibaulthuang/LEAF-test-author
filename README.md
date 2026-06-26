@@ -245,7 +245,9 @@ requires `ui_tree` whenever the focus owner is `leaf-gui-agent`.
 Use `inspect-ui-tree <run_id>` for targeted UI-tree diagnostics after runtime
 evidence exists. It reads the indexed snapshot paths exposed by `report-run`,
 filters by `phase` or `action_id`, and can search candidates by id, text, type,
-or clickability without loading the raw layout into the main agent context.
+or clickability without loading the raw layout into the main agent context. When
+multiple snapshots match, it also reports adjacent snapshot diffs; pass
+`--no-diff` when only selector candidates are needed.
 
 ## Development
 

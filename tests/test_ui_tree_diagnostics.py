@@ -57,8 +57,32 @@ class UiTreeDiagnosticsTests(unittest.TestCase):
             self.assertEqual(payload["snapshot_count"], 1)
             self.assertEqual(payload["snapshots"][0]["candidates"][0]["id"], "shutter")
 
+    def test_inspect_ui_tree_summarizes_adjacent_snapshot_diffs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_run_with_ui_snapshots(root, include_after=True)
 
-def _write_run_with_ui_snapshots(root: Path) -> None:
+            result = inspect_ui_tree(root, "ui-diag")
+
+            self.assertEqual(result["snapshot_count"], 2)
+            self.assertEqual(result["diff_count"], 1)
+            self.assertEqual(result["diffs"][0]["from_phase"], "after_launch")
+            self.assertEqual(result["diffs"][0]["to_phase"], "after_click")
+            self.assertEqual(result["diffs"][0]["node_count_delta"], 1)
+            self.assertIn("done", result["diffs"][0]["added_node_ids"])
+
+    def test_inspect_ui_tree_can_disable_diffs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_run_with_ui_snapshots(root, include_after=True)
+
+            result = inspect_ui_tree(root, "ui-diag", include_diffs=False)
+
+            self.assertNotIn("diffs", result)
+            self.assertEqual(result["diff_count"], 0)
+
+
+def _write_run_with_ui_snapshots(root: Path, include_after: bool = False) -> None:
     create_workflow(root, "camera", "打开相机", run_id="ui-diag")
     raw = json.dumps(
         {
@@ -71,6 +95,20 @@ def _write_run_with_ui_snapshots(root: Path) -> None:
         ensure_ascii=False,
     )
     snapshot = write_ui_snapshot(root, "ui-diag", phase="after_launch", action_id="camera_direct", raw_layout=raw)
+    snapshots = [snapshot]
+    if include_after:
+        after_raw = json.dumps(
+            {
+                "attributes": {"bundleName": "com.huawei.hmos.camera", "abilityName": "com.huawei.hmos.camera.MainAbility"},
+                "children": [
+                    {"attributes": {"id": "shutter", "type": "Button", "clickable": "true", "bounds": "[0,0][10,10]"}, "children": []},
+                    {"attributes": {"id": "label", "text": "拍照", "clickable": "false", "bounds": "[20,0][50,10]"}, "children": []},
+                    {"attributes": {"id": "done", "text": "完成", "clickable": "true", "bounds": "[60,0][90,10]"}, "children": []},
+                ],
+            },
+            ensure_ascii=False,
+        )
+        snapshots.append(write_ui_snapshot(root, "ui-diag", phase="after_click", action_id="camera_tap", raw_layout=after_raw))
     run_dir = root / ".leaf" / "runs" / "ui-diag"
     artifact = run_dir / "camera_direct_smoke.json"
     artifact.write_text(
@@ -84,14 +122,15 @@ def _write_run_with_ui_snapshots(root: Path) -> None:
                     "ability_verified": True,
                     "ui_snapshot_refs": [
                         {
-                            "phase": snapshot["phase"],
-                            "action_id": snapshot["action_id"],
-                            "raw_path": snapshot["raw_path"],
-                            "index_path": snapshot["index_path"],
-                            "foreground": snapshot["foreground"],
-                            "node_count": snapshot["node_count"],
-                            "clickable_count": snapshot["clickable_count"],
+                            "phase": item["phase"],
+                            "action_id": item["action_id"],
+                            "raw_path": item["raw_path"],
+                            "index_path": item["index_path"],
+                            "foreground": item["foreground"],
+                            "node_count": item["node_count"],
+                            "clickable_count": item["clickable_count"],
                         }
+                        for item in snapshots
                     ],
                 },
             },

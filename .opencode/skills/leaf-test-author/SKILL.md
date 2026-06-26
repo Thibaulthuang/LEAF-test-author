@@ -167,6 +167,8 @@ When a report includes UI snapshot references, prefer
 `python3 -m tools.leaf_author inspect-ui-tree <run_id>` with `--phase`,
 `--action-id`, and selector filters before opening raw layout files. This keeps
 GUI diagnosis on indexed evidence and preserves the one-run attention boundary.
+Use the default adjacent snapshot `diffs` to reason about before/after UI
+changes; pass `--no-diff` when only selector candidates are needed.
 
 ## Subagent Boundaries
 
