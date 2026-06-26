@@ -125,6 +125,22 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
         self.assertNotIn("test-runner HAP", combined)
         self.assertNotIn("@ohos/hypium", combined)
 
+    def test_leaf_author_documents_stable_triggers_context_agents_and_user_loop(self):
+        root = Path(__file__).resolve().parents[1]
+        skill = (root / ".opencode" / "skills" / "leaf-test-author" / "SKILL.md").read_text(encoding="utf-8")
+
+        self.assertIn("Stable Phase Triggers", skill)
+        self.assertIn("workflow.json is authoritative", skill)
+        self.assertIn("Context Control", skill)
+        self.assertIn("load one run", skill)
+        self.assertIn("Subagent Boundaries", skill)
+        self.assertIn("leaf-test-author", skill)
+        self.assertIn("leaf-gui-agent", skill)
+        self.assertIn("User-In-Loop", skill)
+        self.assertIn("first_plan_confirmation", skill)
+        self.assertIn("real_device_confirmation", skill)
+        self.assertIn("must stop", skill)
+
 
 if __name__ == "__main__":
     unittest.main()

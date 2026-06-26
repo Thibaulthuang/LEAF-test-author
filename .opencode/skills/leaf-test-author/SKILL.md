@@ -95,6 +95,66 @@ Batch auto-resume must obey the same confirmation rules as single-run resume.
 It must not confirm plans on behalf of the user and must not run real-device
 actions from `--auto-safe`.
 
+## Stable Phase Triggers
+
+`workflow.json is authoritative`; conversation memory is not. Before choosing a
+next action, load `workflow.json` through `resume`, `report-run`, or
+`report-batch`, then dispatch from `current_phase`, `confirmed_plan`,
+`next_action`, and `resume_summary`.
+
+- `plan` with `confirmed_plan=false`: present `plan.json` and must stop for
+  `first_plan_confirmation`.
+- `hypium_draft` or `pytest_draft` with `confirmed_plan=true`: safe local
+  validation may run through `resume --auto-safe`.
+- `validated`, `pytest_ran`, `gui_context_collected`, and `experience_recorded`:
+  safe local stages may continue automatically.
+- `e2e_ready` or any real-device action: must stop for
+  `real_device_confirmation` unless the user has explicitly approved that exact
+  action in the current run.
+- `complete`: report evidence and do not rerun actions unless the user asks for
+  a new run or explicit rerun.
+
+## Context Control
+
+For multi-case work, load one run at a time. Start with `list-runs` or
+`report-batch`, inspect only `next_run_focus`, and open large evidence only when
+the focused run's report points to it. Do not load all layout dumps, device
+logs, generated drafts, or evidence files into one prompt. UI tree raw files are
+evidence; prefer their generated index files and summaries unless raw inspection
+is needed for a diagnosis.
+
+## Subagent Boundaries
+
+- `leaf-test-author`: owns workflow state, phase decisions, user checkpoints,
+  report presentation, and when to call deterministic tools.
+- Domain skills such as `leaf-camera`: own semantic step expansion, action
+  mappings, selector hints, domain quality gates, and domain failure meanings.
+- `leaf-gui-agent`: owns UI tree inspection, candidate analysis, layout diff
+  interpretation, and GUI evidence recommendations. It does not mutate device
+  state without an explicit workflow action and user approval.
+- Deterministic Python tools under `tools/leaf_author/`: own file writes,
+  runtime execution, evidence persistence, and stable JSON outputs.
+
+Use a subagent when a task needs focused domain or GUI reasoning that would
+otherwise load too much context into `leaf-test-author`. Keep the handoff
+artifact-based: pass run id, report summary, UI snapshot index path, and the
+specific question.
+
+## User-In-Loop
+
+The user sits at explicit workflow checkpoints, not every internal step.
+
+- `first_plan_confirmation`: user approves the plan and safe local authoring
+  only. After this, local validation and evidence collection may continue.
+- `real_device_confirmation`: user approves a named device action such as
+  Camera direct smoke or Camera capture. Camera capture must say that it takes a
+  photo and creates a media file.
+- Repair/rerun decisions: when a quality gate fails, present the failure reason,
+  evidence paths, and proposed next command before mutating device state again.
+
+If a checkpoint is present, the agent must stop and ask the user. It must not
+infer consent from previous runs, batch membership, or successful preflight.
+
 ## First MVP Scope
 
 The first implementation supports:

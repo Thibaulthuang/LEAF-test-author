@@ -8,6 +8,8 @@ from tools.leaf_author.device_probe import ProbeRunner
 from tools.leaf_author.device_probe import HdcProbe
 from tools.leaf_author.e2e import run_e2e
 from tools.leaf_author.e2e_report import write_e2e_preflight_report
+from tools.leaf_author.runtime.actions import ActionRunner
+from tools.leaf_author.runtime.device import DeviceSession, command_succeeded, command_text
 from tools.leaf_author.runtime.evidence import write_ui_snapshot
 from tools.leaf_author.runtime.ui_tree import build_index, diff_indexes, find_candidates, parse_layout
 from tools.leaf_author.workflow import load_workflow, save_workflow
@@ -81,6 +83,8 @@ def run_camera_direct_smoke(
     hdc_runner: ProbeRunner | None = None,
 ) -> dict[str, object]:
     probe = HdcProbe(runner=hdc_runner, hdc_path=hdc_path)
+    session = DeviceSession(root=root, run_id=run_id, serial=serial, runner=probe.runner, hdc_path=probe.hdc_path)
+    actions = ActionRunner(session)
     device = probe.probe(serial=serial)
     if device.get("status") != "connected":
         return _write_direct_smoke(
@@ -115,19 +119,22 @@ def run_camera_direct_smoke(
             },
         )
 
-    launch = _run_hdc(
-        probe,
-        [probe.hdc_path, "-t", serial, "shell", "aa", "start", "-a", ability_name, "-b", bundle_name, "-m", resolved_module],
-        30,
+    launch_action = actions.execute(
+        {
+            "id": "camera_direct_launch",
+            "action": "system_app.launch",
+            "params": {"bundle": bundle_name, "ability": ability_name, "module": resolved_module},
+        }
     )
-    ui_tree = _run_hdc(probe, [probe.hdc_path, "-t", serial, "shell", "uitest", "dumpLayout"], 10)
-    layout_path = _layout_path(_command_text(ui_tree))
-    layout_file = _run_hdc(probe, [probe.hdc_path, "-t", serial, "shell", "cat", layout_path], 10) if layout_path else None
-    ui_tree_text = _command_text(layout_file) if layout_file and _command_succeeded(layout_file) else _command_text(ui_tree)
+    launch = launch_action["result"]
+    layout = session.client.dump_layout()
+    ui_tree = layout["dump"]
+    layout_path = layout["path"]
+    ui_tree_text = str(layout["raw_layout"])
     ui_snapshot = write_ui_snapshot(root, run_id, phase="after_launch", action_id="camera_direct", raw_layout=ui_tree_text)
-    hilog = _run_hdc(probe, [probe.hdc_path, "-t", serial, "shell", "hilog", "-x"], 10)
+    hilog = session.client.hilog()
     layout_verified = _layout_verified(ui_tree_text, bundle_name, ability_name)
-    passed = _command_succeeded(launch) and _command_succeeded(ui_tree) and layout_verified
+    passed = command_succeeded(launch) and command_succeeded(ui_tree) and layout_verified
     return _write_direct_smoke(
         root,
         run_id,
@@ -147,7 +154,7 @@ def run_camera_direct_smoke(
                     "after_launch": ui_snapshot,
                 },
                 "ui_tree_excerpt": ui_tree_text[:4000],
-                "hilog_excerpt": _command_text(hilog)[:4000],
+                "hilog_excerpt": command_text(hilog)[:4000],
             },
             "commands": [
                 "hdc shell bm dump -n <camera_bundle>",
@@ -171,6 +178,8 @@ def run_camera_capture_e2e(
     hdc_runner: ProbeRunner | None = None,
 ) -> dict[str, object]:
     probe = HdcProbe(runner=hdc_runner, hdc_path=hdc_path)
+    session = DeviceSession(root=root, run_id=run_id, serial=serial, runner=probe.runner, hdc_path=probe.hdc_path)
+    actions = ActionRunner(session)
     device = probe.probe(serial=serial)
     if device.get("status") != "connected":
         return _write_capture_e2e(
@@ -205,13 +214,16 @@ def run_camera_capture_e2e(
             },
         )
 
-    launch = _run_hdc(
-        probe,
-        [probe.hdc_path, "-t", serial, "shell", "aa", "start", "-a", ability_name, "-b", bundle_name, "-m", resolved_module],
-        30,
+    launch_action = actions.execute(
+        {
+            "id": "camera_capture_launch",
+            "action": "system_app.launch",
+            "params": {"bundle": bundle_name, "ability": ability_name, "module": resolved_module},
+        }
     )
-    before = _dump_layout(probe, serial)
-    before_text = _command_text(before["layout"])
+    launch = launch_action["result"]
+    before = session.client.dump_layout()
+    before_text = str(before["raw_layout"])
     before_snapshot = write_ui_snapshot(root, run_id, phase="before_capture", action_id="camera_capture", raw_layout=before_text)
     before_index = build_index(parse_layout(before_text))
     photo_mode_candidates = find_candidates(before_index, selectors=[{"id": "COMPONENT_ID_CONTROL_PHOTO_2"}, {"text": "拍照"}])
@@ -219,27 +231,27 @@ def run_camera_capture_e2e(
     photo_mode_node = _first_candidate(photo_mode_candidates, required_id="COMPONENT_ID_CONTROL_PHOTO_2", required_text="拍照")
     shutter_node = _first_candidate(shutter_candidates, required_id="COMPONENT_ID_SHUTTER_PHOTO_1", required_clickable=True)
     tap = _node_center(shutter_node) if shutter_node else None
-    before_media = _list_camera_media(probe, serial) if tap else []
+    before_media = _list_camera_media(session) if tap else []
     capture = (
-        _run_hdc(probe, [probe.hdc_path, "-t", serial, "shell", "uitest", "uiInput", "click", str(tap["x"]), str(tap["y"])], 10)
+        actions.execute({"id": "camera_capture_tap_shutter", "action": "ui.click", "params": {"x": tap["x"], "y": tap["y"]}})["result"]
         if tap
         else {"args": [], "exit_code": 1, "stdout": "", "stderr": "shutter node not found"}
     )
-    after = _dump_layout(probe, serial) if _command_succeeded(capture) else {"path": None, "layout": {"exit_code": 1, "stdout": "", "stderr": "capture failed"}}
-    after_media = _list_camera_media(probe, serial) if _command_succeeded(capture) else []
+    after = session.client.dump_layout() if command_succeeded(capture) else {"path": None, "layout": {"exit_code": 1, "stdout": "", "stderr": "capture failed"}, "raw_layout": "capture failed"}
+    after_media = _list_camera_media(session) if command_succeeded(capture) else []
     new_media_files = _new_media_files(before_media, after_media)
-    after_text = _command_text(after["layout"])
+    after_text = str(after["raw_layout"])
     after_snapshot = write_ui_snapshot(root, run_id, phase="after_capture", action_id="camera_capture", raw_layout=after_text)
     after_index = build_index(parse_layout(after_text))
-    hilog = _run_hdc(probe, [probe.hdc_path, "-t", serial, "shell", "hilog", "-x"], 10)
+    hilog = session.client.hilog()
     before_verified = _layout_verified(before_text, bundle_name, ability_name)
     after_verified = _layout_verified(after_text, bundle_name, ability_name)
     passed = (
-        _command_succeeded(launch)
+        command_succeeded(launch)
         and before_verified
         and photo_mode_node is not None
         and shutter_node is not None
-        and _command_succeeded(capture)
+        and command_succeeded(capture)
         and after_verified
         and bool(new_media_files)
     )
@@ -286,7 +298,7 @@ def run_camera_capture_e2e(
                 "shutter_candidates": shutter_candidates[:5],
                 "ui_tree_excerpt": before_text[:4000],
                 "after_ui_tree_excerpt": after_text[:4000],
-                "hilog_excerpt": _command_text(hilog)[:4000],
+                "hilog_excerpt": command_text(hilog)[:4000],
             },
             "commands": [
                 "hdc shell bm dump -n <camera_bundle>",
@@ -451,45 +463,8 @@ def _target_app(bundle_name: str, module_name: str | None) -> dict[str, object]:
     }
 
 
-def _run_hdc(probe: HdcProbe, args: list[str], timeout_s: int) -> dict[str, object]:
-    result = probe.runner(args, timeout_s)
-    return {
-        "args": args,
-        "exit_code": result.exit_code,
-        "stdout": result.stdout.strip(),
-        "stderr": result.stderr.strip(),
-    }
-
-
-def _command_text(result: dict[str, object]) -> str:
-    return str(result.get("stdout") or result.get("stderr") or "")
-
-
-def _command_succeeded(result: dict[str, object]) -> bool:
-    if result.get("exit_code") != 0:
-        return False
-    text = _command_text(result).lower()
-    failure_markers = ("failed", "error code", "not connect to server", "connect server failed")
-    return not any(marker in text for marker in failure_markers)
-
-
-def _layout_path(text: str) -> str | None:
-    marker = "DumpLayout saved to:"
-    if marker not in text:
-        return None
-    return text.split(marker, 1)[1].strip().splitlines()[0].strip() or None
-
-
 def _layout_verified(text: str, bundle_name: str, ability_name: str) -> bool:
     return bundle_name in text and ability_name in text
-
-
-def _dump_layout(probe: HdcProbe, serial: str) -> dict[str, object]:
-    ui_tree = _run_hdc(probe, [probe.hdc_path, "-t", serial, "shell", "uitest", "dumpLayout"], 10)
-    layout_path = _layout_path(_command_text(ui_tree))
-    layout_file = _run_hdc(probe, [probe.hdc_path, "-t", serial, "shell", "cat", layout_path], 10) if layout_path else None
-    layout = layout_file if layout_file and _command_succeeded(layout_file) else ui_tree
-    return {"path": layout_path, "layout": layout}
 
 
 def _find_layout_node(text: str, node_id: str, text_value: str | None = None, clickable: bool | None = None) -> dict[str, object] | None:
@@ -562,15 +537,8 @@ def _node_center(node: dict[str, object] | None) -> dict[str, int] | None:
     return {"x": (x1 + x2) // 2, "y": (y1 + y2) // 2}
 
 
-def _list_camera_media(probe: HdcProbe, serial: str) -> list[str]:
-    result = _run_hdc(
-        probe,
-        [probe.hdc_path, "-t", serial, "shell", "find", "/storage/media/100/local/files/Photo", "-maxdepth", "3", "-type", "f"],
-        10,
-    )
-    if not _command_succeeded(result):
-        return []
-    return sorted(line.strip() for line in _command_text(result).splitlines() if line.strip())
+def _list_camera_media(session: DeviceSession) -> list[str]:
+    return session.client.list_files("/storage/media/100/local/files/Photo", maxdepth=3)
 
 
 def _new_media_files(before: list[str], after: list[str]) -> list[str]:
@@ -670,7 +638,7 @@ def _capture_failure_reason(
     after_verified: bool,
     new_media_files: list[str],
 ) -> str:
-    if not _command_succeeded(launch):
+    if not command_succeeded(launch):
         return "CAMERA_LAUNCH_FAILED"
     if not before_verified:
         return "BEFORE_LAYOUT_NOT_CAMERA"
@@ -678,7 +646,7 @@ def _capture_failure_reason(
         return "PHOTO_MODE_NODE_MISSING"
     if shutter_node is None:
         return "SHUTTER_NODE_MISSING"
-    if not _command_succeeded(capture):
+    if not command_succeeded(capture):
         return "SHUTTER_CLICK_FAILED"
     if not after_verified:
         return "AFTER_LAYOUT_NOT_CAMERA"
