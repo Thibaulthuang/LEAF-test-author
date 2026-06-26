@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from tools.leaf_author.batch_registry import inspect_batch
 from tools.leaf_author.phase_guard import validate_phase_contract
 from tools.leaf_author.real_device_contract import validate_real_device_contract
 from tools.leaf_author.reports import report_run
@@ -41,6 +42,40 @@ def audit_run(root: Path, run_id: str) -> dict[str, object]:
         "evidence": {
             "report": "report-run",
             "real_device_preflight": preflight.get("artifact") if isinstance(preflight, dict) else None,
+        },
+    }
+
+
+def audit_batch(root: Path, batch_id: str) -> dict[str, object]:
+    batch = inspect_batch(root, batch_id)
+    runs = [audit_run(root, str(run["run_id"])) for run in batch["runs"]]
+    passed_count = sum(1 for run in runs if run.get("status") == "passed")
+    failed_count = len(runs) - passed_count
+    return {
+        "schema_version": "1.0",
+        "manifest_kind": "leaf_batch_audit",
+        "batch_id": batch_id,
+        "title": batch.get("title", batch_id),
+        "status": "passed" if failed_count == 0 else "failed",
+        "summary": {
+            "total_runs": len(runs),
+            "passed": passed_count,
+            "failed": failed_count,
+        },
+        "runs": [
+            {
+                "run_id": run.get("run_id"),
+                "domain": run.get("domain"),
+                "status": run.get("status"),
+                "latest_quality_gate": run.get("latest_quality_gate"),
+                "failed_checks": [check["name"] for check in run.get("checks", []) if isinstance(check, dict) and not check.get("passed")],
+            }
+            for run in runs
+        ],
+        "context_policy": {
+            "scope": "batch_audit",
+            "load_strategy": "summaries_first_then_audit_one_run",
+            "artifact_loading": "on_demand",
         },
     }
 

@@ -6,8 +6,9 @@ from io import StringIO
 from pathlib import Path
 
 from tools.leaf_author.authoring import advance_run, confirm_plan, start_new_case
+from tools.leaf_author.batch_registry import create_batch
 from tools.leaf_author.device_probe import ProbeCommandResult
-from tools.leaf_author.run_audit import audit_run
+from tools.leaf_author.run_audit import audit_batch, audit_run
 
 
 class RunAuditTests(unittest.TestCase):
@@ -50,6 +51,40 @@ class RunAuditTests(unittest.TestCase):
             payload = json.loads(output.getvalue())
             self.assertEqual(exit_code, 0)
             self.assertEqual(payload["status"], "passed")
+
+    def test_audit_batch_summarizes_passed_and_failed_runs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _complete_direct_smoke(root, "audit-batch-pass")
+            start_new_case(root, "camera", "打开相机；点击拍照", run_id="audit-batch-fail")
+            create_batch(root, "audit-batch", ["audit-batch-pass", "audit-batch-fail"])
+
+            result = audit_batch(root, "audit-batch")
+
+            self.assertEqual(result["manifest_kind"], "leaf_batch_audit")
+            self.assertEqual(result["status"], "failed")
+            self.assertEqual(result["summary"]["total_runs"], 2)
+            self.assertEqual(result["summary"]["passed"], 1)
+            self.assertEqual(result["summary"]["failed"], 1)
+            failed = [run for run in result["runs"] if run["status"] == "failed"][0]
+            self.assertIn("workflow_complete", failed["failed_checks"])
+
+    def test_cli_audit_batch_outputs_json_and_exit_code(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _complete_direct_smoke(root, "audit-batch-cli")
+            create_batch(root, "audit-batch-cli", ["audit-batch-cli"])
+
+            from tools.leaf_author.__main__ import main
+
+            output = StringIO()
+            with redirect_stdout(output):
+                exit_code = main(["audit-batch", "audit-batch-cli", "--root", str(root)])
+
+            payload = json.loads(output.getvalue())
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(payload["status"], "passed")
+            self.assertEqual(payload["summary"]["passed"], 1)
 
 
 def _complete_direct_smoke(root: Path, run_id: str) -> None:

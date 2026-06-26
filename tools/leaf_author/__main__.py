@@ -20,7 +20,7 @@ from tools.leaf_author.openharmony_project import scaffold_openharmony_test_proj
 from tools.leaf_author.phase_guard import build_agent_handoff_contract, validate_phase_contract
 from tools.leaf_author.real_device_contract import build_real_device_contract
 from tools.leaf_author.reports import report_batch, report_run
-from tools.leaf_author.run_audit import audit_run
+from tools.leaf_author.run_audit import audit_batch, audit_run
 from tools.leaf_author.run_registry import inspect_run, list_runs
 from tools.leaf_author.runtime_registry import build_runtime_registry_contract
 
@@ -89,6 +89,10 @@ def main(argv: list[str] | None = None) -> int:
     audit_run_parser = subparsers.add_parser("audit-run")
     audit_run_parser.add_argument("run_id")
     audit_run_parser.add_argument("--root", type=Path, default=Path("."))
+
+    audit_batch_parser = subparsers.add_parser("audit-batch")
+    audit_batch_parser.add_argument("batch_id")
+    audit_batch_parser.add_argument("--root", type=Path, default=Path("."))
 
     extension_contract_parser = subparsers.add_parser("extension-contract")
     extension_contract_parser.add_argument("domain")
@@ -276,6 +280,10 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "audit-run":
         result = audit_run(args.root, args.run_id)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0 if result["status"] == "passed" else 1
+    if args.command == "audit-batch":
+        result = audit_batch(args.root, args.batch_id)
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0 if result["status"] == "passed" else 1
     if args.command == "extension-contract":
