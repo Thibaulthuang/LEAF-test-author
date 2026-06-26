@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from tools.leaf_author.batch_registry import inspect_batch
@@ -7,6 +8,7 @@ from tools.leaf_author.phase_guard import validate_phase_contract
 from tools.leaf_author.real_device_contract import validate_real_device_contract
 from tools.leaf_author.reports import report_run
 from tools.leaf_author.runtime_registry import runtime_quality_gates, validate_runtime_registry
+from tools.leaf_author.workflow import load_workflow, save_workflow
 
 
 def audit_run(root: Path, run_id: str) -> dict[str, object]:
@@ -30,7 +32,7 @@ def audit_run(root: Path, run_id: str) -> dict[str, object]:
     checks.extend(_real_device_preflight_checks(preflight if isinstance(preflight, dict) else None))
 
     passed = all(bool(check["passed"]) for check in checks)
-    return {
+    payload = {
         "schema_version": "1.0",
         "manifest_kind": "leaf_run_audit",
         "run_id": run_id,
@@ -44,6 +46,7 @@ def audit_run(root: Path, run_id: str) -> dict[str, object]:
             "real_device_preflight": preflight.get("artifact") if isinstance(preflight, dict) else None,
         },
     }
+    return _write_run_audit(root, run_id, payload)
 
 
 def audit_batch(root: Path, batch_id: str) -> dict[str, object]:
@@ -51,7 +54,7 @@ def audit_batch(root: Path, batch_id: str) -> dict[str, object]:
     runs = [audit_run(root, str(run["run_id"])) for run in batch["runs"]]
     passed_count = sum(1 for run in runs if run.get("status") == "passed")
     failed_count = len(runs) - passed_count
-    return {
+    payload = {
         "schema_version": "1.0",
         "manifest_kind": "leaf_batch_audit",
         "batch_id": batch_id,
@@ -78,6 +81,7 @@ def audit_batch(root: Path, batch_id: str) -> dict[str, object]:
             "artifact_loading": "on_demand",
         },
     }
+    return _write_batch_audit(root, batch_id, payload)
 
 
 def _real_device_preflight_checks(preflight: dict[str, object] | None) -> list[dict[str, object]]:
@@ -96,3 +100,23 @@ def _check(name: str, passed: bool, message: str) -> dict[str, object]:
         "passed": bool(passed),
         "message": message,
     }
+
+
+def _write_run_audit(root: Path, run_id: str, payload: dict[str, object]) -> dict[str, object]:
+    path = root / ".leaf" / "runs" / run_id / "run_audit.json"
+    payload["audit_path"] = str(path.relative_to(root))
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    workflow = load_workflow(root, run_id)
+    artifacts = dict(workflow.get("artifacts", {}))
+    artifacts["run_audit"] = str(path.relative_to(root))
+    workflow["artifacts"] = artifacts
+    save_workflow(root, workflow)
+    return payload
+
+
+def _write_batch_audit(root: Path, batch_id: str, payload: dict[str, object]) -> dict[str, object]:
+    path = root / ".leaf" / "batches" / batch_id / "batch_audit.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload["audit_path"] = str(path.relative_to(root))
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return payload

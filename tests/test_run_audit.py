@@ -8,6 +8,7 @@ from pathlib import Path
 from tools.leaf_author.authoring import advance_run, confirm_plan, start_new_case
 from tools.leaf_author.batch_registry import create_batch
 from tools.leaf_author.device_probe import ProbeCommandResult
+from tools.leaf_author.reports import report_run
 from tools.leaf_author.run_audit import audit_batch, audit_run
 
 
@@ -23,6 +24,11 @@ class RunAuditTests(unittest.TestCase):
             self.assertEqual(result["status"], "passed")
             self.assertEqual(result["latest_quality_gate"], "CAMERA_DIRECT_SMOKE_PASS")
             self.assertIn("real_device_preflight", result["evidence"])
+            self.assertEqual(result["audit_path"], ".leaf/runs/audit-pass/run_audit.json")
+            self.assertTrue((root / result["audit_path"]).is_file())
+            workflow = json.loads((root / ".leaf" / "runs" / "audit-pass" / "workflow.json").read_text(encoding="utf-8"))
+            self.assertEqual(workflow["artifacts"]["run_audit"], ".leaf/runs/audit-pass/run_audit.json")
+            self.assertEqual(report_run(root, "audit-pass")["evidence"]["run_audit"], ".leaf/runs/audit-pass/run_audit.json")
             self.assertTrue(all(check["passed"] for check in result["checks"]))
 
     def test_audit_run_fails_incomplete_run(self):
@@ -66,6 +72,8 @@ class RunAuditTests(unittest.TestCase):
             self.assertEqual(result["summary"]["total_runs"], 2)
             self.assertEqual(result["summary"]["passed"], 1)
             self.assertEqual(result["summary"]["failed"], 1)
+            self.assertEqual(result["audit_path"], ".leaf/batches/audit-batch/batch_audit.json")
+            self.assertTrue((root / result["audit_path"]).is_file())
             failed = [run for run in result["runs"] if run["status"] == "failed"][0]
             self.assertIn("workflow_complete", failed["failed_checks"])
 
