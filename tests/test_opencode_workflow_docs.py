@@ -148,6 +148,11 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
         self.assertIn("--runtime-mode direct_smoke", readme)
         self.assertIn("approve_camera_capture_e2e", readme)
         self.assertIn("Report `next_command`", readme)
+        self.assertIn("Batch audit applies the same boundary", readme)
+        self.assertIn("focus_plan", readme)
+        self.assertIn("matches that run's resume", readme)
+        self.assertIn("never marks a user checkpoint safe", readme)
+        self.assertIn("requires `ui_tree`", readme)
         self.assertNotIn("test HAP", readme)
         self.assertNotIn("test package", readme)
 

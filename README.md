@@ -235,6 +235,12 @@ instead of loading the full run directory.
 This keeps attention scoped to the active run and makes multi-case authoring
 and execution resumable without relying on conversational memory.
 
+Batch audit applies the same boundary at suite level. `audit-batch` checks that
+the `focus_plan` selects at most one active run, matches that run's resume
+summary, preserves its `agent_owner`, `context_slice`, `allowed_artifacts`, and
+`user_loop`, never marks a user checkpoint safe for automatic continuation, and
+requires `ui_tree` whenever the focus owner is `leaf-gui-agent`.
+
 ## Development
 
 Run tests with the project virtual environment:
