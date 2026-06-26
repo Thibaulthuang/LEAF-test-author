@@ -105,6 +105,12 @@ python3 -m tools.leaf_author report-run run-demo
 python3 -m tools.leaf_author report-batch camera-suite
 ```
 
+Export the framework extension contract for a domain:
+
+```bash
+python3 -m tools.leaf_author extension-contract camera
+```
+
 Run safe local stages directly:
 
 ```bash

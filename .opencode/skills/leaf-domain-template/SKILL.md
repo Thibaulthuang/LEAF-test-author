@@ -58,6 +58,8 @@ from real-device gates.
 
 Adding a domain normally requires reviewing these files:
 
+- `python3 -m tools.leaf_author extension-contract <domain>`: export the
+  framework extension manifest and check missing domain/runtime hooks.
 - `tools/leaf_author/domain_registry.py`: register the domain contract for
   target feature inference, semantic plan validation, and action mapping.
 - `tools/leaf_author/runtime_registry.py`: register real-device runtime modes

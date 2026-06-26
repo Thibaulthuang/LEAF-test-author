@@ -9,6 +9,12 @@ _GENERIC_EXPERIENCE_KEYS = ["hypium_result", "pytest_result"]
 _DOMAIN_RUNTIME_ARTIFACTS = {
     "camera": ["camera_capture_e2e", "camera_direct_smoke"],
 }
+_DOMAIN_RUNTIME_QUALITY_GATES = {
+    "camera": {
+        "camera_capture_e2e": "CAMERA_CAPTURE_E2E_PASS",
+        "camera_direct_smoke": "CAMERA_DIRECT_SMOKE_PASS",
+    },
+}
 _GENERIC_QUALITY_ARTIFACTS = [
     "hypium_result",
     "e2e_run",
@@ -26,6 +32,9 @@ _DOMAIN_DIAGNOSTIC_ARTIFACTS = {
 }
 _DEFAULT_REAL_DEVICE_RUNTIME_MODE = {
     "camera": "direct_smoke",
+}
+_DOMAIN_RUNTIME_MODES = {
+    "camera": ["direct_smoke", "capture_e2e"],
 }
 _RUNTIME_EXPERIENCE_RULES = {
     "HYPIUM_REAL_PASS": {
@@ -63,6 +72,10 @@ def resolve_runtime_mode(
     return modes[0] if modes else None
 
 
+def registered_runtime_modes(domain: str) -> list[str]:
+    return list(_DOMAIN_RUNTIME_MODES.get(domain, []))
+
+
 def experience_candidate_keys(domain: str) -> list[str]:
     runtime_keys = _DOMAIN_RUNTIME_ARTIFACTS.get(domain, [])
     return ["hypium_result", *runtime_keys, "pytest_result"]
@@ -91,6 +104,11 @@ def real_device_next_command(run_id: str, domain: str) -> str:
     if runtime_mode:
         return f"python3 -m tools.leaf_author advance {run_id} --run-real --runtime-mode {runtime_mode} --serial <serial>"
     return f"python3 -m tools.leaf_author advance {run_id} --run-real --serial <serial>"
+
+
+def runtime_quality_gates(domain: str) -> list[str]:
+    gates_by_artifact = _DOMAIN_RUNTIME_QUALITY_GATES.get(domain, {})
+    return [gate for key in quality_artifact_priority(domain) if (gate := gates_by_artifact.get(key))]
 
 
 def classify_experience_result(domain: str, run_result: dict[str, object]) -> dict[str, object]:

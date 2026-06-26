@@ -13,6 +13,7 @@ from tools.leaf_author.device_diagnostics import discover_test_targets, inspect_
 from tools.leaf_author.device_probe import HdcProbe
 from tools.leaf_author.e2e import run_e2e
 from tools.leaf_author.e2e_report import write_e2e_preflight_report
+from tools.leaf_author.extension_contract import build_extension_contract
 from tools.leaf_author.hypium import sync_openharmony_export
 from tools.leaf_author.openharmony_discovery import discover_hap_artifacts
 from tools.leaf_author.openharmony_project import scaffold_openharmony_test_project
@@ -80,6 +81,9 @@ def main(argv: list[str] | None = None) -> int:
     report_batch_parser = subparsers.add_parser("report-batch")
     report_batch_parser.add_argument("batch_id")
     report_batch_parser.add_argument("--root", type=Path, default=Path("."))
+
+    extension_contract_parser = subparsers.add_parser("extension-contract")
+    extension_contract_parser.add_argument("domain")
 
     advance = subparsers.add_parser("advance")
     advance.add_argument("run_id")
@@ -247,6 +251,9 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "report-batch":
         print(json.dumps(report_batch(args.root, args.batch_id), ensure_ascii=False, indent=2))
+        return 0
+    if args.command == "extension-contract":
+        print(json.dumps(build_extension_contract(args.domain), ensure_ascii=False, indent=2))
         return 0
     if args.command == "advance":
         print(

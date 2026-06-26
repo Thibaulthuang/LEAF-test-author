@@ -28,6 +28,14 @@ def domain_contract(domain: str) -> DomainContract:
     )
 
 
+def registered_domain_names() -> list[str]:
+    return ["camera"]
+
+
+def is_domain_registered(domain: str) -> bool:
+    return domain in registered_domain_names()
+
+
 def target_feature_for_steps(domain: str, steps: list[str]) -> str:
     return domain_contract(domain).target_feature(steps)
 
