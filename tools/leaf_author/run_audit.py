@@ -98,6 +98,7 @@ def audit_batch(root: Path, batch_id: str) -> dict[str, object]:
             "passed": passed_count,
             "failed": failed_count,
         },
+        "real_device_summary": _batch_real_device_summary(runs),
         "batch_checks": batch_checks,
         "focus_plan": resume_view.get("focus_plan") if isinstance(resume_view, dict) else None,
         "runs": [
@@ -372,6 +373,19 @@ def _batch_resume_attention_boundary(resume_view: dict[str, object]) -> object:
     if isinstance(context_policy, dict):
         return context_policy.get("attention_boundary")
     return None
+
+
+def _batch_real_device_summary(runs: list[dict[str, object]]) -> dict[str, object]:
+    traces = [run.get("real_device_trace") for run in runs if isinstance(run.get("real_device_trace"), dict)]
+    serials = sorted({str(trace.get("serial")) for trace in traces if trace.get("serial")})
+    runtime_modes = sorted({str(trace.get("runtime_mode")) for trace in traces if trace.get("runtime_mode")})
+    quality_gates = sorted({str(trace.get("latest_quality_gate")) for trace in traces if trace.get("latest_quality_gate")})
+    return {
+        "total_traces": len(traces),
+        "serials": serials,
+        "runtime_modes": runtime_modes,
+        "quality_gates": quality_gates,
+    }
 
 
 def _audit_batch_run(root: Path, run_id: str) -> dict[str, object]:
