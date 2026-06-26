@@ -90,6 +90,13 @@ class RunAuditTests(unittest.TestCase):
             self.assertIn("real_device_input_matches_preflight", passed_checks)
             self.assertIn("real_device_input_source_matches_selection", passed_checks)
             self.assertIn("real_device_preflight_source_matches_selection", passed_checks)
+            self.assertEqual(result["real_device_trace"]["serial"], "SERIAL123")
+            self.assertEqual(result["real_device_trace"]["serial_source"], "device_selection")
+            self.assertEqual(result["real_device_trace"]["runtime_mode"], "direct_smoke")
+            self.assertEqual(result["real_device_trace"]["latest_quality_gate"], "CAMERA_DIRECT_SMOKE_PASS")
+            self.assertEqual(result["real_device_trace"]["artifacts"]["device_selection"], ".leaf/runs/audit-selection/device_selection.json")
+            self.assertEqual(result["real_device_trace"]["artifacts"]["real_device_input"], ".leaf/runs/audit-selection/real_device_input.json")
+            self.assertEqual(result["real_device_trace"]["artifacts"]["real_device_preflight"], ".leaf/runs/audit-selection/real_device_preflight.json")
 
     def test_audit_run_fails_incomplete_run(self):
         with tempfile.TemporaryDirectory() as tmp:

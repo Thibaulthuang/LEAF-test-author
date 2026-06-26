@@ -46,6 +46,12 @@ def audit_run(root: Path, run_id: str) -> dict[str, object]:
     checks.extend(_context_manifest_checks(context_manifest, report))
     workflow_diagnostics = _load_workflow_diagnostics(root, evidence if isinstance(evidence, dict) else {})
     checks.extend(_workflow_diagnostics_checks(workflow_diagnostics))
+    real_device_trace = _real_device_trace(
+        latest_quality_gate=latest_quality_gate,
+        device_selection=device_selection if isinstance(device_selection, dict) else None,
+        real_device_input=real_device_input,
+        preflight=preflight if isinstance(preflight, dict) else None,
+    )
 
     passed = all(bool(check["passed"]) for check in checks)
     payload = {
@@ -58,6 +64,7 @@ def audit_run(root: Path, run_id: str) -> dict[str, object]:
         "current_phase": report.get("current_phase"),
         "next_action": report.get("next_action"),
         "latest_quality_gate": latest_quality_gate,
+        "real_device_trace": real_device_trace,
         "checks": checks,
         "evidence": {
             "report": "report-run",
@@ -196,6 +203,42 @@ def _real_device_input_checks(
             )
         )
     return checks
+
+
+def _real_device_trace(
+    *,
+    latest_quality_gate: str,
+    device_selection: dict[str, object] | None,
+    real_device_input: dict[str, object] | None,
+    preflight: dict[str, object] | None,
+) -> dict[str, object]:
+    artifacts = {
+        "device_selection": device_selection.get("artifact") if isinstance(device_selection, dict) else None,
+        "real_device_input": real_device_input.get("artifact") if isinstance(real_device_input, dict) else None,
+        "real_device_preflight": preflight.get("artifact") if isinstance(preflight, dict) else None,
+    }
+    serial = None
+    serial_source = None
+    runtime_mode = None
+    if isinstance(preflight, dict):
+        serial = preflight.get("serial")
+        serial_source = preflight.get("serial_source")
+        runtime_mode = preflight.get("runtime_mode")
+    if serial is None and isinstance(real_device_input, dict):
+        serial = real_device_input.get("serial")
+    if serial_source is None and isinstance(real_device_input, dict):
+        serial_source = real_device_input.get("serial_source")
+    if runtime_mode is None and isinstance(real_device_input, dict):
+        runtime_mode = real_device_input.get("runtime_mode")
+    if serial is None and isinstance(device_selection, dict):
+        serial = device_selection.get("serial")
+    return {
+        "serial": serial,
+        "serial_source": serial_source,
+        "runtime_mode": runtime_mode,
+        "latest_quality_gate": latest_quality_gate,
+        "artifacts": artifacts,
+    }
 
 
 def _load_context_manifest(root: Path, evidence: dict[str, object]) -> dict[str, object] | None:
