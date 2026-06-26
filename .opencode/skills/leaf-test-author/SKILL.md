@@ -69,10 +69,12 @@ continue automatically:
 
 The second confirmation is required before device-mutating execution. A Camera
 capture command such as
-`python3 -m tools.leaf_author advance <run_id> --run-real --camera-capture --serial <serial> --hdc-path <hdc_path>`
+`python3 -m tools.leaf_author advance <run_id> --run-real --camera-capture --serial <serial> --approval-token approve_camera_capture_e2e --hdc-path <hdc_path>`
 must not run from the first confirmation. State clearly that the action will
 take a photo and create a new media file. Only run it after the user explicitly
-confirms the real-device capture step.
+confirms the real-device capture step. The approval token is the deterministic
+runtime gate; without it, `advance` must block before invoking the capture
+runtime.
 
 ## Multi-Case And Reporting Contract
 
@@ -197,7 +199,7 @@ The first implementation supports:
   reviewable experience recording, and team manifest export in one resumable
   workflow. The smoke must verify the real UiTest layout contains the Camera
   bundle and ability before it can pass.
-- Running `advance <run_id> --run-real --camera-capture --serial <serial>` for
+- Running `advance <run_id> --run-real --camera-capture --serial <serial> --approval-token approve_camera_capture_e2e` for
   confirmed Camera capture flows. This path verifies the photo-mode and shutter
   nodes from the real Camera layout, clicks the shutter through UiTest, records
   `camera_capture_e2e.json`, then writes experience and team manifest artifacts.

@@ -12,6 +12,7 @@ from tools.leaf_author.runtime_registry import (
     real_device_next_command,
     resolve_runtime_mode,
     runtime_artifact_keys,
+    runtime_safety_profile,
     run_domain_runtime,
 )
 
@@ -81,6 +82,17 @@ class RuntimeRegistryTests(unittest.TestCase):
             real_device_next_command("run-123", "display"),
             "python3 -m tools.leaf_author advance run-123 --run-real --serial <serial>",
         )
+
+    def test_runtime_registry_exposes_safety_profile_for_real_device_modes(self):
+        direct = runtime_safety_profile("camera", "direct_smoke")
+        capture = runtime_safety_profile("camera", "capture_e2e")
+
+        self.assertEqual(direct["risk_level"], "read_only_probe")
+        self.assertEqual(direct["mutates_device_state"], False)
+        self.assertEqual(direct["requires_approval_token"], None)
+        self.assertEqual(capture["risk_level"], "device_state_mutation")
+        self.assertEqual(capture["mutates_device_state"], True)
+        self.assertEqual(capture["requires_approval_token"], "approve_camera_capture_e2e")
 
     def test_advance_run_can_use_generic_runtime_mode_for_camera_direct(self):
         with tempfile.TemporaryDirectory() as tmp:

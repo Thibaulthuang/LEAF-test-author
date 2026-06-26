@@ -12,6 +12,7 @@ from tools.leaf_author.runtime_registry import (
     registered_runtime_modes,
     runtime_artifact_keys,
     runtime_quality_gates,
+    runtime_safety_profile,
 )
 
 
@@ -47,6 +48,7 @@ def build_extension_contract(domain: str) -> dict[str, object]:
             "artifact_keys": runtime_artifact_keys(domain),
             "quality_artifact_priority": quality_artifact_priority(domain),
             "quality_gates": runtime_quality_gates(domain),
+            "safety_profiles": {mode: runtime_safety_profile(domain, mode) for mode in runtime_modes},
         },
         "phase_contract": {
             "source": "docs/workflow-contract.json",

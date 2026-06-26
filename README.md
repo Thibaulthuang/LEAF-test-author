@@ -136,7 +136,7 @@ python3 -m tools.leaf_author advance run-demo --run-real --runtime-mode direct_s
 Run Camera capture E2E after explicit user approval:
 
 ```bash
-python3 -m tools.leaf_author advance run-demo --run-real --runtime-mode capture_e2e --serial <serial>
+python3 -m tools.leaf_author advance run-demo --run-real --runtime-mode capture_e2e --serial <serial> --approval-token approve_camera_capture_e2e
 ```
 
 ## Quality Gates
@@ -150,7 +150,8 @@ python3 -m tools.leaf_author advance run-demo --run-real --runtime-mode capture_
 
 - Do not generate executable drafts before plan confirmation.
 - Do not run state-changing device actions before plan confirmation.
-- Camera capture creates a media file and requires a second confirmation.
+- Camera capture creates a media file and requires a second confirmation plus
+  `--approval-token approve_camera_capture_e2e`.
 - GUI context collection is read-only by default.
 - Experience records are reviewable draft knowledge and must not auto-modify AW code.
 

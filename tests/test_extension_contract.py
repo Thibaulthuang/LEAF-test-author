@@ -19,6 +19,11 @@ class ExtensionContractTests(unittest.TestCase):
         self.assertEqual(contract["runtime_contract"]["default_real_device_mode"], "direct_smoke")
         self.assertIn("camera_direct_smoke", contract["runtime_contract"]["artifact_keys"])
         self.assertIn("CAMERA_DIRECT_SMOKE_PASS", contract["runtime_contract"]["quality_gates"])
+        self.assertEqual(contract["runtime_contract"]["safety_profiles"]["direct_smoke"]["mutates_device_state"], False)
+        self.assertEqual(
+            contract["runtime_contract"]["safety_profiles"]["capture_e2e"]["requires_approval_token"],
+            "approve_camera_capture_e2e",
+        )
         self.assertIn("e2e_ready", contract["phase_contract"]["real_device_checkpoint_phases"])
         self.assertEqual(contract["phase_contract"]["trigger_source"], "workflow.json")
         self.assertEqual(contract["phase_contract"]["phase_guard_status"], "stable")

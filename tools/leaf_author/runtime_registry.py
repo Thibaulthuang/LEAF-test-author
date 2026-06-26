@@ -36,6 +36,20 @@ _DEFAULT_REAL_DEVICE_RUNTIME_MODE = {
 _DOMAIN_RUNTIME_MODES = {
     "camera": ["direct_smoke", "capture_e2e"],
 }
+_DOMAIN_RUNTIME_SAFETY = {
+    ("camera", "direct_smoke"): {
+        "risk_level": "read_only_probe",
+        "mutates_device_state": False,
+        "requires_approval_token": None,
+        "operator_message": "Camera direct smoke starts the system Camera and collects UI/log evidence; it does not tap shutter or create media.",
+    },
+    ("camera", "capture_e2e"): {
+        "risk_level": "device_state_mutation",
+        "mutates_device_state": True,
+        "requires_approval_token": "approve_camera_capture_e2e",
+        "operator_message": "Camera capture E2E taps the shutter and creates a new media file; explicit approval is required for this run.",
+    },
+}
 _RUNTIME_EXPERIENCE_RULES = {
     "HYPIUM_REAL_PASS": {
         "status": "PASSED_REAL",
@@ -109,6 +123,18 @@ def real_device_next_command(run_id: str, domain: str) -> str:
 def runtime_quality_gates(domain: str) -> list[str]:
     gates_by_artifact = _DOMAIN_RUNTIME_QUALITY_GATES.get(domain, {})
     return [gate for key in quality_artifact_priority(domain) if (gate := gates_by_artifact.get(key))]
+
+
+def runtime_safety_profile(domain: str, runtime_mode: str) -> dict[str, object]:
+    profile = _DOMAIN_RUNTIME_SAFETY.get((domain, runtime_mode))
+    if profile:
+        return dict(profile)
+    return {
+        "risk_level": "unknown_real_device_action",
+        "mutates_device_state": True,
+        "requires_approval_token": "approve_real_device_action",
+        "operator_message": f"Runtime mode {runtime_mode} for domain {domain} has no safety profile; explicit approval is required.",
+    }
 
 
 def classify_experience_result(domain: str, run_result: dict[str, object]) -> dict[str, object]:

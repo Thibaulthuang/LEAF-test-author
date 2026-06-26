@@ -13,7 +13,7 @@ from tools.leaf_author.phase_contract import decide_next_step, write_context_man
 from tools.leaf_author.phase_guard import validate_phase_contract
 from tools.leaf_author.planner import build_plan
 from tools.leaf_author.runner import run_pytest_draft
-from tools.leaf_author.runtime_registry import resolve_runtime_mode, run_domain_runtime
+from tools.leaf_author.runtime_registry import resolve_runtime_mode, run_domain_runtime, runtime_safety_profile
 from tools.leaf_author.validator import validate_pytest_draft
 from tools.leaf_author.workflow import create_workflow, load_workflow, save_workflow
 
@@ -139,6 +139,7 @@ def advance_run(
     runtime_mode: str | None = None,
     camera_direct: bool = False,
     camera_capture: bool = False,
+    approval_token: str | None = None,
     hdc_path: str = "hdc",
 ) -> dict[str, object]:
     stages: list[str] = []
@@ -150,6 +151,34 @@ def advance_run(
         }
     workflow = load_workflow(root, run_id)
     selected_runtime_mode = resolve_runtime_mode(runtime_mode, camera_direct=camera_direct, camera_capture=camera_capture)
+    domain = str(workflow.get("domain", ""))
+    if run_real and selected_runtime_mode:
+        approval = _real_device_approval_decision(domain, selected_runtime_mode, approval_token)
+        if not approval["approved"]:
+            return {
+                "run_id": run_id,
+                "status": "blocked",
+                "block_reason": "real_device_approval_required",
+                "current_phase": workflow.get("current_phase"),
+                "stages": stages,
+                "next_action": "request_real_device_approval",
+                "required_approval_token": approval["required_approval_token"],
+                "runtime_safety": approval["runtime_safety"],
+                "resume_summary": {
+                    "requires_user_confirmation": True,
+                    "safe_to_auto_continue": False,
+                    "operator_message": approval["runtime_safety"].get("operator_message", "Explicit real-device approval is required."),
+                    "user_checkpoint": "real_device_confirmation",
+                    "agent_owner": "leaf-test-author",
+                    "context_slice": ["workflow", "runtime_safety"],
+                    "trigger_source": "workflow.json",
+                    "allowed_artifacts": ["workflow"],
+                    "user_loop": {
+                        "position": "approve_real_device",
+                        "required_input": str(approval["required_approval_token"]),
+                    },
+                },
+            }
     current_phase = str(workflow.get("current_phase", ""))
     if current_phase == "hypium_ran" and run_real:
         current_phase = "pytest_ran"
@@ -168,7 +197,7 @@ def advance_run(
             runtime_result = run_domain_runtime(
                 root,
                 run_id,
-                str(workflow.get("domain", "")),
+                domain,
                 selected_runtime_mode,
                 serial=serial or "",
                 hdc_path=hdc_path,
@@ -298,4 +327,15 @@ def _blocked_by_phase_guard(root: Path, run_id: str, guard: dict[str, object]) -
             },
         },
         "workflow_path": str(root / ".leaf" / "runs" / run_id / "workflow.json"),
+    }
+
+
+def _real_device_approval_decision(domain: str, runtime_mode: str, approval_token: str | None) -> dict[str, object]:
+    safety = runtime_safety_profile(domain, runtime_mode)
+    required = safety.get("requires_approval_token")
+    approved = required is None or approval_token == required
+    return {
+        "approved": approved,
+        "required_approval_token": required,
+        "runtime_safety": safety,
     }

@@ -46,7 +46,7 @@ Example:
    foregrounds Camera, verifies the real UiTest layout belongs to Camera,
    records `camera_direct_smoke.json`, writes the reviewable experience record,
    and exports the team manifest. For confirmed capture flows, run
-   `advance <run_id> --run-real --runtime-mode capture_e2e --serial <device_serial> --hdc-path <hdc_path>`;
+   `advance <run_id> --run-real --runtime-mode capture_e2e --serial <device_serial> --approval-token approve_camera_capture_e2e --hdc-path <hdc_path>`;
    this additionally verifies photo mode and the shutter node, snapshots media
    files under `/storage/media/100/local/files/Photo`, taps the shutter,
    verifies a new media file appears, and records `camera_capture_e2e.json`.
@@ -57,6 +57,7 @@ Example:
 - First confirmation: approve the plan, then run `confirm-plan` and
   `advance <run_id>` automatically for safe local artifacts and validation.
 - Second confirmation: required before `--run-real --camera-capture`; tell the
-  user this will take a photo and create a new media file.
+  user this will take a photo and create a new media file, then pass
+  `--approval-token approve_camera_capture_e2e`.
 
 The Python tool layer is not the user-facing entry point. It exists so the subagent can perform stable, testable file and device operations.

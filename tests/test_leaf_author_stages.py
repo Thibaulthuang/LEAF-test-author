@@ -237,7 +237,24 @@ class LeafAuthorStageTests(unittest.TestCase):
             self.assertEqual(manifest["artifacts"]["camera_direct_smoke"], ".leaf/runs/stage-camera-direct/camera_direct_smoke.json")
             self.assertEqual(load_workflow(root, "stage-camera-direct")["current_phase"], "complete")
 
-    def test_advance_camera_capture_real_e2e_records_capture_gate(self):
+    def test_advance_camera_capture_real_e2e_requires_approval_token_before_runtime(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._confirmed_case(root, run_id="stage-camera-capture-blocked")
+
+            from tools.leaf_author.authoring import advance_run
+
+            with patch("tools.leaf_author.camera_smoke.run_camera_capture_e2e") as capture:
+                result = advance_run(root, "stage-camera-capture-blocked", serial="SERIAL123", run_real=True, camera_capture=True, hdc_path="/sdk/hdc")
+
+            self.assertEqual(result["status"], "blocked")
+            self.assertEqual(result["block_reason"], "real_device_approval_required")
+            self.assertEqual(result["required_approval_token"], "approve_camera_capture_e2e")
+            self.assertEqual(result["runtime_safety"]["mutates_device_state"], True)
+            capture.assert_not_called()
+            self.assertEqual(load_workflow(root, "stage-camera-capture-blocked")["current_phase"], "hypium_draft")
+
+    def test_advance_camera_capture_real_e2e_records_capture_gate_after_approval(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             self._confirmed_case(root, run_id="stage-camera-capture")
@@ -271,7 +288,15 @@ class LeafAuthorStageTests(unittest.TestCase):
                 "tools.leaf_author.camera_smoke.run_camera_capture_e2e",
                 side_effect=fake_capture,
             ) as capture:
-                result = advance_run(root, "stage-camera-capture", serial="SERIAL123", run_real=True, camera_capture=True, hdc_path="/sdk/hdc")
+                result = advance_run(
+                    root,
+                    "stage-camera-capture",
+                    serial="SERIAL123",
+                    run_real=True,
+                    camera_capture=True,
+                    hdc_path="/sdk/hdc",
+                    approval_token="approve_camera_capture_e2e",
+                )
 
             self.assertEqual(result["status"], "complete")
             self.assertEqual(result["stages"], ["validation", "pytest_result", "camera_capture_e2e", "experience", "team_export_manifest"])
@@ -378,6 +403,8 @@ class LeafAuthorStageTests(unittest.TestCase):
                         "SERIAL123",
                         "--run-real",
                         "--camera-capture",
+                        "--approval-token",
+                        "approve_camera_capture_e2e",
                         "--hdc-path",
                         "/sdk/hdc",
                     ]
@@ -389,6 +416,7 @@ class LeafAuthorStageTests(unittest.TestCase):
             advance.assert_called_once()
             self.assertEqual(advance.call_args.kwargs["run_real"], True)
             self.assertEqual(advance.call_args.kwargs["camera_capture"], True)
+            self.assertEqual(advance.call_args.kwargs["approval_token"], "approve_camera_capture_e2e")
             self.assertEqual(advance.call_args.kwargs["hdc_path"], "/sdk/hdc")
 
     def test_resume_maps_later_phases_to_next_actions(self):

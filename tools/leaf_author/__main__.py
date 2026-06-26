@@ -113,6 +113,7 @@ def main(argv: list[str] | None = None) -> int:
     advance.add_argument("--runtime-mode", choices=["direct_smoke", "capture_e2e"], default=None)
     advance.add_argument("--camera-direct", action="store_true")
     advance.add_argument("--camera-capture", action="store_true")
+    advance.add_argument("--approval-token", default=None)
     advance.add_argument("--hdc-path", default="hdc")
 
     inspect = subparsers.add_parser("inspect-target")
@@ -300,6 +301,7 @@ def main(argv: list[str] | None = None) -> int:
                     runtime_mode=args.runtime_mode,
                     camera_direct=args.camera_direct,
                     camera_capture=args.camera_capture,
+                    approval_token=args.approval_token,
                     hdc_path=args.hdc_path,
                 ),
                 ensure_ascii=False,

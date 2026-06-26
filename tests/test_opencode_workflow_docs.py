@@ -14,6 +14,7 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
         self.assertIn("confirm-plan", combined)
         self.assertIn("advance <run_id>", combined)
         self.assertIn("--run-real --runtime-mode capture_e2e", combined)
+        self.assertIn("approve_camera_capture_e2e", combined)
         self.assertIn("second confirmation", combined)
         self.assertIn("must not run", combined)
 
@@ -131,6 +132,7 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
         self.assertIn("phase-guard", readme)
         self.assertIn("agent-handoff-contract", readme)
         self.assertIn("--runtime-mode direct_smoke", readme)
+        self.assertIn("approve_camera_capture_e2e", readme)
         self.assertIn("Report `next_command`", readme)
         self.assertNotIn("test HAP", readme)
         self.assertNotIn("test package", readme)
