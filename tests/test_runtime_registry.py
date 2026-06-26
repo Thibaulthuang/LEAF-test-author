@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from tools.leaf_author.authoring import advance_run
 from tools.leaf_author.runtime_registry import (
+    approved_real_device_next_command,
     classify_experience_result,
     experience_candidate_keys,
     quality_artifact_priority,
@@ -81,6 +82,16 @@ class RuntimeRegistryTests(unittest.TestCase):
         self.assertEqual(
             real_device_next_command("run-123", "display"),
             "python3 -m tools.leaf_author advance run-123 --run-real --serial <serial>",
+        )
+
+    def test_runtime_registry_builds_approved_real_device_next_command(self):
+        self.assertEqual(
+            approved_real_device_next_command("run-123", "capture_e2e", "approve_camera_capture_e2e"),
+            "python3 -m tools.leaf_author advance run-123 --run-real --runtime-mode capture_e2e --serial <serial> --approval-token approve_camera_capture_e2e",
+        )
+        self.assertEqual(
+            approved_real_device_next_command("run-123", "direct_smoke", None),
+            "python3 -m tools.leaf_author advance run-123 --run-real --runtime-mode direct_smoke --serial <serial>",
         )
 
     def test_runtime_registry_exposes_safety_profile_for_real_device_modes(self):

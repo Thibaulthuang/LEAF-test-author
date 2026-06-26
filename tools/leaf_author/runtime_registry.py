@@ -120,6 +120,13 @@ def real_device_next_command(run_id: str, domain: str) -> str:
     return f"python3 -m tools.leaf_author advance {run_id} --run-real --serial <serial>"
 
 
+def approved_real_device_next_command(run_id: str, runtime_mode: str, approval_token: str | None = None) -> str:
+    command = f"python3 -m tools.leaf_author advance {run_id} --run-real --runtime-mode {runtime_mode} --serial <serial>"
+    if approval_token:
+        command += f" --approval-token {approval_token}"
+    return command
+
+
 def runtime_quality_gates(domain: str) -> list[str]:
     gates_by_artifact = _DOMAIN_RUNTIME_QUALITY_GATES.get(domain, {})
     return [gate for key in quality_artifact_priority(domain) if (gate := gates_by_artifact.get(key))]
