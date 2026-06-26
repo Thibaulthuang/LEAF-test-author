@@ -84,6 +84,7 @@ def resume_batch(root: Path, batch_id: str, auto_safe: bool = False) -> dict[str
     batch = _load_batch(root, batch_id)
     runs = [_resume_batch_run(root, run_id, auto_safe=auto_safe) for run_id in batch["run_ids"]]
     statuses = Counter(str(run.get("status", "in_progress")) for run in runs)
+    focus_plan = _batch_resume_focus_plan(runs)
     return {
         "schema_version": "1.0",
         "batch_id": batch_id,
@@ -96,11 +97,13 @@ def resume_batch(root: Path, batch_id: str, auto_safe: bool = False) -> dict[str
             "in_progress": statuses.get("in_progress", 0),
             "failed": statuses.get("failed", 0),
         },
+        "focus_plan": focus_plan,
         "runs": runs,
         "context_policy": {
             "scope": "batch_resume",
             "load_strategy": "one_run_resume_summary_at_a_time",
             "artifact_loading": "on_demand",
+            "attention_boundary": "one_active_run",
         },
     }
 
@@ -198,6 +201,59 @@ def _resume_batch_run(root: Path, run_id: str, auto_safe: bool) -> dict[str, obj
         "resume_summary": resume_summary,
         "real_device_preflight": _real_device_preflight_summary(root, str(run_id)),
     }
+
+
+def _batch_resume_focus_plan(runs: list[dict[str, object]]) -> dict[str, object] | None:
+    active_runs = [run for run in runs if str(run.get("status")) != "complete"]
+    if not active_runs:
+        return None
+    candidates = sorted(active_runs, key=_resume_focus_sort_key)
+    selected = candidates[0]
+    summary = selected.get("resume_summary", {})
+    if not isinstance(summary, dict):
+        summary = {}
+    user_loop = summary.get("user_loop", {})
+    if not isinstance(user_loop, dict):
+        user_loop = {}
+    return {
+        "selected_run_id": selected.get("run_id"),
+        "selection_reason": _resume_focus_selection_reason(selected, summary),
+        "attention_boundary": "one_active_run",
+        "artifact_loading": "on_demand",
+        "agent_owner": summary.get("agent_owner"),
+        "current_phase": selected.get("current_phase"),
+        "next_action": selected.get("next_action"),
+        "context_slice": summary.get("context_slice", []),
+        "allowed_artifacts": summary.get("allowed_artifacts", []),
+        "user_checkpoint": summary.get("user_checkpoint"),
+        "user_loop": {
+            "position": str(user_loop.get("position", "")),
+            "required_input": str(user_loop.get("required_input", "")),
+        },
+        "safe_to_auto_continue": bool(summary.get("safe_to_auto_continue", False)),
+        "requires_user_confirmation": bool(summary.get("requires_user_confirmation", False)),
+    }
+
+
+def _resume_focus_sort_key(run: dict[str, object]) -> tuple[int, int]:
+    summary = run.get("resume_summary", {})
+    requires_user = bool(isinstance(summary, dict) and summary.get("requires_user_confirmation"))
+    status = str(run.get("status", "in_progress"))
+    if status == "failed":
+        return (0, batch_focus_priority_for_run(run))
+    if requires_user:
+        return (1, batch_focus_priority_for_run(run))
+    return (2, batch_focus_priority_for_run(run))
+
+
+def _resume_focus_selection_reason(run: dict[str, object], summary: dict[str, object]) -> str:
+    if str(run.get("status")) == "failed":
+        return "run_failed_or_unreadable"
+    if bool(summary.get("requires_user_confirmation")):
+        return "requires_user_confirmation"
+    if bool(summary.get("safe_to_auto_continue")):
+        return "safe_to_auto_continue"
+    return "in_progress"
 
 
 def _next_run_focus(runs: list[dict[str, object]]) -> dict[str, object] | None:

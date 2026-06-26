@@ -165,6 +165,26 @@ class BatchRegistryTests(unittest.TestCase):
             self.assertEqual(result["runs"][1]["auto_advanced"], True)
             self.assertEqual(result["runs"][1]["current_phase"], "complete")
 
+    def test_resume_batch_returns_single_run_focus_plan_for_agent_handoff(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "打开相机；点击拍照", run_id="batch-run-wait")
+            start_new_case(root, "camera", "打开相机；切拍照模式；点击拍照", run_id="batch-run-safe")
+            confirm_plan(root, "batch-run-safe")
+            create_batch(root, "camera-batch", ["batch-run-wait", "batch-run-safe"])
+
+            result = resume_batch(root, "camera-batch", auto_safe=True)
+
+            self.assertEqual(result["focus_plan"]["attention_boundary"], "one_active_run")
+            self.assertEqual(result["focus_plan"]["selected_run_id"], "batch-run-wait")
+            self.assertEqual(result["focus_plan"]["selection_reason"], "requires_user_confirmation")
+            self.assertEqual(result["focus_plan"]["agent_owner"], "leaf-test-author")
+            self.assertEqual(result["focus_plan"]["context_slice"], ["workflow", "plan"])
+            self.assertEqual(result["focus_plan"]["allowed_artifacts"], ["workflow", "plan", "device_probe"])
+            self.assertEqual(result["focus_plan"]["user_loop"]["position"], "approve_plan")
+            self.assertEqual(result["focus_plan"]["user_loop"]["required_input"], "confirm or revise plan")
+            self.assertEqual(result["focus_plan"]["safe_to_auto_continue"], False)
+
     def test_resume_batch_isolates_unreadable_run_and_continues_safe_runs(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -187,6 +207,11 @@ class BatchRegistryTests(unittest.TestCase):
             self.assertIn("error", bad)
             self.assertEqual(safe["status"], "complete")
             self.assertEqual(safe["auto_advanced"], True)
+            self.assertEqual(result["focus_plan"]["selected_run_id"], "batch-resume-bad")
+            self.assertEqual(result["focus_plan"]["selection_reason"], "run_failed_or_unreadable")
+            self.assertEqual(result["focus_plan"]["attention_boundary"], "one_active_run")
+            self.assertEqual(result["focus_plan"]["context_slice"], ["workflow"])
+            self.assertEqual(result["focus_plan"]["user_loop"]["position"], "manual_triage")
 
     def test_resume_batch_includes_lightweight_real_device_preflight_summary(self):
         with tempfile.TemporaryDirectory() as tmp:
