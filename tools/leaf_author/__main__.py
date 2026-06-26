@@ -15,6 +15,7 @@ from tools.leaf_author.e2e import run_e2e
 from tools.leaf_author.e2e_report import write_e2e_preflight_report
 from tools.leaf_author.extension_contract import build_extension_contract, export_extension_contract, validate_extension_contract
 from tools.leaf_author.hypium import sync_openharmony_export
+from tools.leaf_author.opencode_contract import validate_opencode_contract
 from tools.leaf_author.openharmony_discovery import discover_hap_artifacts
 from tools.leaf_author.openharmony_project import scaffold_openharmony_test_project
 from tools.leaf_author.phase_guard import build_agent_handoff_contract, validate_phase_contract
@@ -136,6 +137,9 @@ def main(argv: list[str] | None = None) -> int:
     validate_extension_contract_parser = subparsers.add_parser("validate-extension-contract")
     validate_extension_contract_parser.add_argument("domain")
     validate_extension_contract_parser.add_argument("--strict-real-device", action="store_true")
+
+    opencode_contract_parser = subparsers.add_parser("opencode-contract")
+    opencode_contract_parser.add_argument("--root", type=Path, default=Path("."))
 
     subparsers.add_parser("phase-guard")
     subparsers.add_parser("target-policy")
@@ -362,6 +366,10 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "validate-extension-contract":
         result = validate_extension_contract(args.domain, strict_real_device=args.strict_real_device)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return int(result["exit_code"])
+    if args.command == "opencode-contract":
+        result = validate_opencode_contract(args.root)
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return int(result["exit_code"])
     if args.command == "phase-guard":

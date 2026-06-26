@@ -128,6 +128,7 @@ domain plugin must satisfy for report and audit evidence checks.
 Validate the phase trigger, context, agent, and user-in-loop contract:
 
 ```bash
+python3 -m tools.leaf_author opencode-contract
 python3 -m tools.leaf_author phase-guard
 python3 -m tools.leaf_author target-policy
 python3 -m tools.leaf_author agent-handoff-contract
@@ -202,6 +203,11 @@ phase's `next_action`, `auto_safe` flag, `agent_owner`, `context_slice`, and
 `user_loop` position. `tools.leaf_author.phase_contract` reads that contract for
 `resume`, `inspect-run`, and `report-run`, so OpenCode does not need to infer the
 next step from conversation history.
+
+`opencode-contract` checks the OpenCode-facing command and skill layer. It fails
+if slash commands stop delegating to `leaf-test-author`, required skills are
+missing, or the skill documents stop referencing the machine contracts that keep
+phase triggers, context, target policy, and user checkpoints stable.
 
 `phase-guard` is the machine check for that design. It fails if a phase stops
 using `workflow.json` as the trigger source, omits the workflow from its context
