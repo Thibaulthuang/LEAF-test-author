@@ -99,6 +99,27 @@ class RunAuditTests(unittest.TestCase):
             failed = [run for run in result["runs"] if run["status"] == "failed"][0]
             self.assertIn("workflow_complete", failed["failed_checks"])
 
+    def test_audit_batch_isolates_unreadable_run_workflow(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _complete_direct_smoke(root, "audit-batch-good")
+            start_new_case(root, "camera", "坏 workflow", run_id="audit-batch-bad")
+            create_batch(root, "audit-batch-isolated", ["audit-batch-good", "audit-batch-bad"])
+            workflow_path = root / ".leaf" / "runs" / "audit-batch-bad" / "workflow.json"
+            workflow_path.write_text("", encoding="utf-8")
+
+            result = audit_batch(root, "audit-batch-isolated")
+
+            self.assertEqual(result["status"], "failed")
+            self.assertEqual(result["summary"]["total_runs"], 2)
+            self.assertEqual(result["summary"]["passed"], 1)
+            self.assertEqual(result["summary"]["failed"], 1)
+            bad = [run for run in result["runs"] if run["run_id"] == "audit-batch-bad"][0]
+            self.assertEqual(bad["status"], "failed")
+            self.assertIn("run_audit_exception", bad["failed_checks"])
+            self.assertIn("error", bad)
+            self.assertEqual(result["context_policy"]["load_strategy"], "summaries_first_then_audit_one_run")
+
     def test_cli_audit_batch_outputs_json_and_exit_code(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

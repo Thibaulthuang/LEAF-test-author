@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from tools.leaf_author.batch_registry import inspect_batch
 from tools.leaf_author.phase_guard import validate_phase_contract
 from tools.leaf_author.real_device_contract import validate_real_device_contract
 from tools.leaf_author.reports import report_run
@@ -54,8 +53,9 @@ def audit_run(root: Path, run_id: str) -> dict[str, object]:
 
 
 def audit_batch(root: Path, batch_id: str) -> dict[str, object]:
-    batch = inspect_batch(root, batch_id)
-    runs = [audit_run(root, str(run["run_id"])) for run in batch["runs"]]
+    batch = _load_batch_manifest(root, batch_id)
+    run_ids = [str(run_id) for run_id in batch.get("run_ids", [])] if isinstance(batch.get("run_ids"), list) else []
+    runs = [_audit_batch_run(root, run_id) for run_id in run_ids]
     passed_count = sum(1 for run in runs if run.get("status") == "passed")
     failed_count = len(runs) - passed_count
     payload = {
@@ -76,6 +76,7 @@ def audit_batch(root: Path, batch_id: str) -> dict[str, object]:
                 "status": run.get("status"),
                 "latest_quality_gate": run.get("latest_quality_gate"),
                 "failed_checks": [check["name"] for check in run.get("checks", []) if isinstance(check, dict) and not check.get("passed")],
+                **({"error": run["error"]} if isinstance(run.get("error"), dict) else {}),
             }
             for run in runs
         ],
@@ -144,6 +145,34 @@ def _context_manifest_checks(context_manifest: dict[str, object] | None, report:
         _check("handoff_ready", handoff_ready, "Context manifest handoff matches the report decision contract."),
         _check("user_loop_ready", user_loop_ready, "Context manifest user_loop matches report checkpoint and auto-continue state."),
     ]
+
+
+def _load_batch_manifest(root: Path, batch_id: str) -> dict[str, object]:
+    batch_path = root / ".leaf" / "batches" / batch_id / "batch.json"
+    return json.loads(batch_path.read_text(encoding="utf-8"))
+
+
+def _audit_batch_run(root: Path, run_id: str) -> dict[str, object]:
+    try:
+        return audit_run(root, run_id)
+    except Exception as exc:
+        return {
+            "schema_version": "1.0",
+            "manifest_kind": "leaf_run_audit",
+            "run_id": run_id,
+            "domain": None,
+            "platform": None,
+            "status": "failed",
+            "latest_quality_gate": "UNKNOWN",
+            "checks": [
+                _check("run_audit_exception", False, f"{type(exc).__name__}: {exc}"),
+            ],
+            "evidence": {},
+            "error": {
+                "type": type(exc).__name__,
+                "message": str(exc),
+            },
+        }
 
 
 def _check(name: str, passed: bool, message: str) -> dict[str, object]:
