@@ -103,6 +103,7 @@ Report one run or a batch without loading large artifacts into OpenCode context:
 ```bash
 python3 -m tools.leaf_author report-run run-demo
 python3 -m tools.leaf_author report-batch camera-suite
+python3 -m tools.leaf_author audit-run run-demo
 ```
 
 Export the framework extension contract for a domain:

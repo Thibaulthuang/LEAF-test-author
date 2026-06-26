@@ -120,6 +120,7 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
         self.assertIn("resume-batch", readme)
         self.assertIn("report-run", readme)
         self.assertIn("report-batch", readme)
+        self.assertIn("audit-run", readme)
         self.assertIn("/leaf-batch", readme)
         self.assertIn("/leaf-report", readme)
         self.assertIn("one run at a time", readme)
