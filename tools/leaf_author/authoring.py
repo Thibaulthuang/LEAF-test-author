@@ -9,6 +9,7 @@ from tools.leaf_author.experience import export_team_knowledge, record_experienc
 from tools.leaf_author.generator import generate_pytest_case
 from tools.leaf_author.gui_context import collect_gui_context
 from tools.leaf_author.hypium import export_openharmony_test_project, generate_hypium_case, run_hypium_case
+from tools.leaf_author.phase_contract import decide_next_step, write_context_manifest
 from tools.leaf_author.planner import build_plan
 from tools.leaf_author.runner import run_pytest_draft
 from tools.leaf_author.validator import validate_pytest_draft
@@ -85,40 +86,18 @@ def confirm_plan(root: Path, run_id: str) -> dict[str, object]:
 
 def resume_run(root: Path, run_id: str, auto_safe: bool = False) -> dict[str, object]:
     workflow = load_workflow(root, run_id)
-    current_phase = str(workflow.get("current_phase", ""))
-    confirmed = bool(workflow.get("confirmed_plan", False))
-    if current_phase == "plan" and not confirmed:
-        next_action = "present_plan_for_confirmation"
-    elif current_phase in {"pytest_draft", "hypium_draft"} and confirmed:
-        next_action = "validate_pytest_draft"
-    elif current_phase == "validated":
-        next_action = "run_pytest_draft"
-    elif current_phase == "pytest_ran":
-        next_action = "collect_gui_context"
-    elif current_phase == "gui_context_collected":
-        next_action = "record_experience"
-    elif current_phase == "experience_recorded":
-        next_action = "export_team_knowledge"
-    elif current_phase == "e2e_not_ready":
-        next_action = "prepare_haps_or_target_bundle"
-    elif current_phase == "e2e_ready":
-        next_action = "run_real_hypium"
-    elif current_phase == "openharmony_synced":
-        next_action = "build_app_and_test_haps"
-    elif current_phase == "openharmony_built":
-        next_action = "inspect_e2e_readiness"
-    elif current_phase == "openharmony_build_failed":
-        next_action = "inspect_openharmony_build"
-    elif current_phase == "complete":
-        next_action = "complete"
-    else:
-        next_action = "inspect_workflow_state"
+    decision = decide_next_step(workflow)
+    context_manifest = write_context_manifest(root, run_id, decision=decision)
+    current_phase = str(decision.get("current_phase", ""))
+    confirmed = bool(decision.get("confirmed_plan", False))
+    next_action = str(decision.get("next_action", "inspect_workflow_state"))
     payload = {
         "run_id": run_id,
         "current_phase": current_phase,
         "confirmed_plan": confirmed,
         "next_action": next_action,
-        "resume_summary": _resume_summary(current_phase, confirmed, next_action),
+        "resume_summary": _resume_summary(decision),
+        "context_manifest": context_manifest,
         "workflow_path": str(root / ".leaf" / "runs" / run_id / "workflow.json"),
     }
     if not auto_safe:
@@ -290,23 +269,15 @@ def _plan_summary(plan: dict[str, object]) -> dict[str, object]:
     return summary
 
 
-def _resume_summary(current_phase: str, confirmed: bool, next_action: str) -> dict[str, object]:
-    requires_confirmation = current_phase == "plan" and not confirmed
-    unsafe_real_actions = {"run_real_hypium"}
-    safe_to_auto_continue = confirmed and next_action not in unsafe_real_actions and current_phase not in {"complete", "e2e_ready"}
-    messages = {
-        "present_plan_for_confirmation": "Present plan.json for the first user confirmation before generating drafts.",
-        "validate_pytest_draft": "Continue safe local authoring: validate the generated draft.",
-        "run_pytest_draft": "Continue safe local authoring: run the draft quality gate.",
-        "collect_gui_context": "Collect read-only GUI context before writing reviewable experience.",
-        "record_experience": "Write reviewable experience from the latest quality gate.",
-        "export_team_knowledge": "Export the reviewable team manifest.",
-        "prepare_haps_or_target_bundle": "Prepare a test HAP or OpenHarmony project before real E2E.",
-        "run_real_hypium": "Real-device execution is ready; require explicit user approval before running it.",
-        "complete": "Workflow is complete.",
-    }
+def _resume_summary(decision: dict[str, object]) -> dict[str, object]:
     return {
-        "requires_user_confirmation": requires_confirmation or next_action == "run_real_hypium",
-        "safe_to_auto_continue": safe_to_auto_continue,
-        "operator_message": messages.get(next_action, "Inspect workflow state before continuing."),
+        "requires_user_confirmation": bool(decision.get("requires_user_confirmation", False)),
+        "safe_to_auto_continue": bool(decision.get("safe_to_auto_continue", False)),
+        "operator_message": str(decision.get("operator_message", "Inspect workflow state before continuing.")),
+        "user_checkpoint": decision.get("user_checkpoint"),
+        "agent_owner": decision.get("agent_owner"),
+        "context_slice": decision.get("context_slice", []),
+        "trigger_source": decision.get("trigger_source", "workflow.json"),
+        "allowed_artifacts": decision.get("allowed_artifacts", []),
+        "user_loop": decision.get("user_loop", {}),
     }

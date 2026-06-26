@@ -102,6 +102,12 @@ next action, load `workflow.json` through `resume`, `report-run`, or
 `report-batch`, then dispatch from `current_phase`, `confirmed_plan`,
 `next_action`, and `resume_summary`.
 
+The stable trigger table lives in `docs/workflow-contract.json` and is consumed
+by `tools.leaf_author.phase_contract`. Treat `resume_summary.trigger_source`,
+`resume_summary.agent_owner`, `resume_summary.context_slice`, and
+`resume_summary.user_loop` as the runtime decision contract. Do not duplicate a
+separate phase table in prompt text.
+
 - `plan` with `confirmed_plan=false`: present `plan.json` and must stop for
   `first_plan_confirmation`.
 - `hypium_draft` or `pytest_draft` with `confirmed_plan=true`: safe local
@@ -122,6 +128,13 @@ the focused run's report points to it. Do not load all layout dumps, device
 logs, generated drafts, or evidence files into one prompt. UI tree raw files are
 evidence; prefer their generated index files and summaries unless raw inspection
 is needed for a diagnosis.
+
+Each `resume`, `inspect-run`, or `report-run` refreshes
+`.leaf/runs/<run_id>/context_manifest.json`. Use that manifest as the handoff
+packet for subagents: it contains the active `agent_owner`, `context_slice`,
+`referenced_artifacts`, `user_checkpoint`, and `attention_boundary`. If the
+manifest says `leaf-gui-agent`, pass the UI snapshot index path and the specific
+question; do not pass the full run directory unless diagnosis requires it.
 
 ## Subagent Boundaries
 

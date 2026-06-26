@@ -26,8 +26,8 @@ def list_runs(root: Path, limit: int | None = None, domain: str | None = None) -
 
 def inspect_run(root: Path, run_id: str) -> dict[str, object]:
     workflow_path = root / ".leaf" / "runs" / run_id / "workflow.json"
-    workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
     resume = resume_run(root, run_id)
+    workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
     return {
         "schema_version": "1.0",
         "run_id": run_id,

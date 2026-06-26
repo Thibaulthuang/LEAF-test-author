@@ -17,12 +17,17 @@ Report the current LEAF workflow decision state for one run or one batch.
    argument matches a batch under `.leaf/batches/`.
 4. Present the report fields that determine the next operator decision:
    `current_phase`, `latest_quality_gate`, `user_action_required`,
-   `user_checkpoint`, `next_command`, and `evidence`.
+   `user_checkpoint`, `user_loop`, `decision_contract`, `next_command`, and
+   `evidence`.
 5. Do not open large artifacts unless the user asks or the report points to a
    specific evidence file that must be inspected.
 6. If `user_checkpoint` is present, stop and ask the user. If `next_command`
    is safe local work, run it only when it stays inside the workflow's
    auto-safe policy.
+7. Use `decision_contract.agent_owner` and `decision_contract.context_slice` to
+   decide whether the main author agent should continue or hand off to a domain
+   or GUI subagent. Use `.leaf/runs/<run_id>/context_manifest.json` as the
+   artifact handoff packet.
 
 This command is the lightweight status surface for interrupted work, multi-case
 execution, and handoff between OpenCode sessions.

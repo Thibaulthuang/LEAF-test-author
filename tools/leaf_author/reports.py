@@ -30,6 +30,13 @@ def report_run(root: Path, run_id: str) -> dict[str, object]:
     safe_to_auto_continue = bool(isinstance(resume_summary, dict) and resume_summary.get("safe_to_auto_continue"))
     user_action_required = bool(isinstance(resume_summary, dict) and resume_summary.get("requires_user_confirmation"))
     user_checkpoint = _user_checkpoint(run, user_action_required)
+    user_loop = resume_summary.get("user_loop", {}) if isinstance(resume_summary, dict) else {}
+    decision_contract = {
+        "trigger_source": resume_summary.get("trigger_source", "") if isinstance(resume_summary, dict) else "",
+        "agent_owner": resume_summary.get("agent_owner", "") if isinstance(resume_summary, dict) else "",
+        "context_slice": resume_summary.get("context_slice", []) if isinstance(resume_summary, dict) else [],
+        "allowed_artifacts": resume_summary.get("allowed_artifacts", []) if isinstance(resume_summary, dict) else [],
+    }
     return {
         "schema_version": "1.0",
         "run_id": run_id,
@@ -42,6 +49,8 @@ def report_run(root: Path, run_id: str) -> dict[str, object]:
         "safe_to_auto_continue": safe_to_auto_continue,
         "user_action_required": user_action_required,
         "user_checkpoint": user_checkpoint,
+        "user_loop": user_loop,
+        "decision_contract": decision_contract,
         "operator_message": resume_summary.get("operator_message", "") if isinstance(resume_summary, dict) else "",
         "next_command": _next_command(run_id, run, safe_to_auto_continue, user_checkpoint),
         "evidence": evidence,
@@ -108,6 +117,11 @@ def _latest_quality_gate(root: Path, artifacts: dict[str, object]) -> str:
 
 
 def _user_checkpoint(run: dict[str, object], user_action_required: bool) -> str | None:
+    resume_summary = run.get("resume_summary", {})
+    if isinstance(resume_summary, dict):
+        checkpoint = resume_summary.get("user_checkpoint")
+        if isinstance(checkpoint, str) and checkpoint:
+            return checkpoint
     if not user_action_required:
         return None
     if run.get("current_phase") == "plan" and not run.get("confirmed_plan"):

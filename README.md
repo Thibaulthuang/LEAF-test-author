@@ -151,6 +151,19 @@ command, and existing evidence paths. Use `resume-batch --auto-safe` to advance
 only confirmed safe local stages across multiple runs; it still stops at plan
 confirmation and real-device confirmation.
 
+Phase decisions are contract-driven. `docs/workflow-contract.json` defines each
+phase's `next_action`, `auto_safe` flag, `agent_owner`, `context_slice`, and
+`user_loop` position. `tools.leaf_author.phase_contract` reads that contract for
+`resume`, `inspect-run`, and `report-run`, so OpenCode does not need to infer the
+next step from conversation history.
+
+Each `resume` refreshes `.leaf/runs/<run_id>/context_manifest.json`. This file is
+the handoff boundary for multi-agent and multi-case work: it names the active
+agent, the context slice to load, existing artifact paths, the user checkpoint,
+and the attention boundary `one_active_run`. Domain and GUI agents should use
+this manifest plus specific evidence paths instead of loading the full run
+directory.
+
 This keeps attention scoped to the active run and makes multi-case authoring
 and execution resumable without relying on conversational memory.
 

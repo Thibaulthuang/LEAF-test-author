@@ -44,6 +44,17 @@
   "phases": {
     "plan": {
       "user_checkpoint": "first_plan_confirmation",
+      "auto_safe": false,
+      "agent_owner": "leaf-test-author",
+      "trigger_source": "workflow.json",
+      "context_slice": [
+        "workflow",
+        "plan"
+      ],
+      "user_loop": {
+        "position": "approve_plan",
+        "required_input": "confirm or revise plan"
+      },
       "allowed_artifacts": [
         "workflow",
         "plan",
@@ -51,16 +62,61 @@
       ],
       "next_action": "present_plan_for_confirmation"
     },
-    "hypium_draft": {
+    "pytest_draft": {
       "user_checkpoint": null,
+      "auto_safe": true,
+      "agent_owner": "tools.leaf_author",
+      "trigger_source": "workflow.json",
+      "context_slice": [
+        "workflow",
+        "case",
+        "pytest"
+      ],
+      "user_loop": {
+        "position": "observe_safe_local_progress",
+        "required_input": ""
+      },
       "allowed_artifacts": [
         "case",
         "pytest"
       ],
       "next_action": "validate_pytest_draft"
     },
+    "hypium_draft": {
+      "user_checkpoint": null,
+      "auto_safe": true,
+      "agent_owner": "tools.leaf_author",
+      "trigger_source": "workflow.json",
+      "context_slice": [
+        "workflow",
+        "case",
+        "pytest",
+        "hypium"
+      ],
+      "user_loop": {
+        "position": "observe_safe_local_progress",
+        "required_input": ""
+      },
+      "allowed_artifacts": [
+        "case",
+        "pytest",
+        "hypium"
+      ],
+      "next_action": "validate_pytest_draft"
+    },
     "validated": {
       "user_checkpoint": null,
+      "auto_safe": true,
+      "agent_owner": "tools.leaf_author",
+      "trigger_source": "workflow.json",
+      "context_slice": [
+        "workflow",
+        "validation"
+      ],
+      "user_loop": {
+        "position": "observe_safe_local_progress",
+        "required_input": ""
+      },
       "allowed_artifacts": [
         "validation"
       ],
@@ -68,13 +124,56 @@
     },
     "pytest_ran": {
       "user_checkpoint": null,
+      "auto_safe": true,
+      "agent_owner": "leaf-gui-agent",
+      "trigger_source": "workflow.json",
+      "context_slice": [
+        "workflow",
+        "pytest_result",
+        "ui_tree"
+      ],
+      "user_loop": {
+        "position": "observe_safe_local_progress",
+        "required_input": ""
+      },
       "allowed_artifacts": [
         "pytest_result"
       ],
       "next_action": "collect_gui_context"
     },
+    "hypium_ran": {
+      "user_checkpoint": null,
+      "auto_safe": true,
+      "agent_owner": "leaf-gui-agent",
+      "trigger_source": "workflow.json",
+      "context_slice": [
+        "workflow",
+        "hypium_result",
+        "ui_tree"
+      ],
+      "user_loop": {
+        "position": "observe_safe_local_progress",
+        "required_input": ""
+      },
+      "allowed_artifacts": [
+        "hypium_result"
+      ],
+      "next_action": "collect_gui_context"
+    },
     "gui_context_collected": {
       "user_checkpoint": null,
+      "auto_safe": true,
+      "agent_owner": "leaf-test-author",
+      "trigger_source": "workflow.json",
+      "context_slice": [
+        "workflow",
+        "gui_context",
+        "ui_tree"
+      ],
+      "user_loop": {
+        "position": "observe_safe_local_progress",
+        "required_input": ""
+      },
       "allowed_artifacts": [
         "gui_context"
       ],
@@ -82,6 +181,17 @@
     },
     "experience_recorded": {
       "user_checkpoint": null,
+      "auto_safe": true,
+      "agent_owner": "tools.leaf_author",
+      "trigger_source": "workflow.json",
+      "context_slice": [
+        "workflow",
+        "experience"
+      ],
+      "user_loop": {
+        "position": "observe_safe_local_progress",
+        "required_input": ""
+      },
       "allowed_artifacts": [
         "experience"
       ],
@@ -89,6 +199,18 @@
     },
     "e2e_not_ready": {
       "user_checkpoint": null,
+      "auto_safe": false,
+      "agent_owner": "leaf-test-author",
+      "trigger_source": "workflow.json",
+      "context_slice": [
+        "workflow",
+        "e2e_preflight_report",
+        "e2e_readiness"
+      ],
+      "user_loop": {
+        "position": "provide_target_inputs",
+        "required_input": "target system app bundle or readiness evidence"
+      },
       "allowed_artifacts": [
         "e2e_preflight_report",
         "e2e_readiness"
@@ -97,14 +219,93 @@
     },
     "e2e_ready": {
       "user_checkpoint": "real_device_confirmation",
+      "auto_safe": false,
+      "agent_owner": "leaf-test-author",
+      "trigger_source": "workflow.json",
+      "context_slice": [
+        "workflow",
+        "e2e_readiness",
+        "target_diagnostics"
+      ],
+      "user_loop": {
+        "position": "approve_real_device",
+        "required_input": "explicit real-device approval"
+      },
       "allowed_artifacts": [
         "e2e_preflight_report",
         "e2e_readiness"
       ],
       "next_action": "run_real_hypium"
     },
+    "openharmony_synced": {
+      "user_checkpoint": "manual_operator_decision",
+      "auto_safe": false,
+      "agent_owner": "leaf-test-author",
+      "trigger_source": "workflow.json",
+      "context_slice": [
+        "workflow",
+        "openharmony_test_project"
+      ],
+      "user_loop": {
+        "position": "manual_triage",
+        "required_input": "decide whether to use legacy project build path"
+      },
+      "allowed_artifacts": [
+        "openharmony_test_project"
+      ],
+      "next_action": "build_app_and_test_haps"
+    },
+    "openharmony_built": {
+      "user_checkpoint": "manual_operator_decision",
+      "auto_safe": false,
+      "agent_owner": "leaf-test-author",
+      "trigger_source": "workflow.json",
+      "context_slice": [
+        "workflow",
+        "openharmony_build",
+        "package_inventory"
+      ],
+      "user_loop": {
+        "position": "manual_triage",
+        "required_input": "inspect readiness before real-device execution"
+      },
+      "allowed_artifacts": [
+        "openharmony_build",
+        "package_inventory"
+      ],
+      "next_action": "inspect_e2e_readiness"
+    },
+    "openharmony_build_failed": {
+      "user_checkpoint": "manual_operator_decision",
+      "auto_safe": false,
+      "agent_owner": "leaf-test-author",
+      "trigger_source": "workflow.json",
+      "context_slice": [
+        "workflow",
+        "openharmony_build"
+      ],
+      "user_loop": {
+        "position": "manual_triage",
+        "required_input": "inspect build failure"
+      },
+      "allowed_artifacts": [
+        "openharmony_build"
+      ],
+      "next_action": "inspect_openharmony_build"
+    },
     "complete": {
       "user_checkpoint": null,
+      "auto_safe": false,
+      "agent_owner": "leaf-test-author",
+      "trigger_source": "workflow.json",
+      "context_slice": [
+        "workflow",
+        "team_export_manifest"
+      ],
+      "user_loop": {
+        "position": "done",
+        "required_input": ""
+      },
       "allowed_artifacts": [
         "team_export_manifest"
       ],
