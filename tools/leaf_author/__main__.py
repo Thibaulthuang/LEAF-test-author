@@ -23,6 +23,7 @@ from tools.leaf_author.reports import report_batch, report_run
 from tools.leaf_author.run_audit import audit_batch, audit_run
 from tools.leaf_author.run_registry import inspect_run, list_runs
 from tools.leaf_author.runtime_registry import build_runtime_registry_contract
+from tools.leaf_author.workflow_diagnostics import inspect_workflow_state
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -59,6 +60,10 @@ def main(argv: list[str] | None = None) -> int:
     inspect_run_parser = subparsers.add_parser("inspect-run")
     inspect_run_parser.add_argument("run_id")
     inspect_run_parser.add_argument("--root", type=Path, default=Path("."))
+
+    workflow_diagnostics_parser = subparsers.add_parser("workflow-diagnostics")
+    workflow_diagnostics_parser.add_argument("run_id")
+    workflow_diagnostics_parser.add_argument("--root", type=Path, default=Path("."))
 
     create_batch_parser = subparsers.add_parser("create-batch")
     create_batch_parser.add_argument("batch_id")
@@ -260,6 +265,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "inspect-run":
         print(json.dumps(inspect_run(args.root, args.run_id), ensure_ascii=False, indent=2))
         return 0
+    if args.command == "workflow-diagnostics":
+        result = inspect_workflow_state(args.root, args.run_id)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0 if result["status"] == "passed" else 1
     if args.command == "create-batch":
         print(json.dumps(create_batch(args.root, args.batch_id, args.run_id, title=args.title), ensure_ascii=False, indent=2))
         return 0

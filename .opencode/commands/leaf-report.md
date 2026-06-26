@@ -23,16 +23,20 @@ Report the current LEAF workflow decision state for one run or one batch.
    `current_phase`, `latest_quality_gate`, `user_action_required`,
    `user_checkpoint`, `user_loop`, `decision_contract`, `next_command`, and
    `evidence`.
-6. Do not open large artifacts unless the user asks or the report points to a
+6. If `next_action` is `repair_workflow`, run
+   `python3 -m tools.leaf_author workflow-diagnostics <run_id>` and present the
+   diagnostics path, failed checks, and parse error before any resume/audit
+   retry.
+7. Do not open large artifacts unless the user asks or the report points to a
    specific evidence file that must be inspected.
-7. If `user_checkpoint` is present, stop and ask the user. If `next_command`
+8. If `user_checkpoint` is present, stop and ask the user. If `next_command`
    is safe local work, run it only when it stays inside the workflow's
    auto-safe policy.
-8. Use `decision_contract.agent_owner` and `decision_contract.context_slice` to
+9. Use `decision_contract.agent_owner` and `decision_contract.context_slice` to
    decide whether the main author agent should continue or hand off to a domain
    or GUI subagent. Use `.leaf/runs/<run_id>/context_manifest.json` as the
    artifact handoff packet.
-9. Treat `next_command` as contract output. For real-device checkpoints it must
+10. Treat `next_command` as contract output. For real-device checkpoints it must
    come from the runtime registry and should use `--runtime-mode <mode>` when
    the domain has a registered runtime mode.
 

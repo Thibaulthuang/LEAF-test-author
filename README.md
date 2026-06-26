@@ -103,6 +103,7 @@ Report one run or a batch without loading large artifacts into OpenCode context:
 ```bash
 python3 -m tools.leaf_author report-run run-demo
 python3 -m tools.leaf_author report-batch camera-suite
+python3 -m tools.leaf_author workflow-diagnostics run-demo
 python3 -m tools.leaf_author audit-run run-demo
 python3 -m tools.leaf_author audit-batch camera-suite
 ```
@@ -180,6 +181,11 @@ decision summary: current phase, latest quality gate, user checkpoint, next safe
 command, and existing evidence paths. Use `resume-batch --auto-safe` to advance
 only confirmed safe local stages across multiple runs; it still stops at plan
 confirmation and real-device confirmation.
+
+If a report returns `next_action: repair_workflow`, run
+`workflow-diagnostics <run_id>` before retrying resume or audit. The diagnostics
+artifact checks whether `workflow.json` exists, is non-empty, parses as JSON,
+contains the expected run id, and names a current phase.
 
 Report `next_command` is generated from the phase/runtime contracts. For Camera
 real-device checkpoints it recommends the registered runtime mode, for example
