@@ -118,6 +118,14 @@ class PhaseContractTests(unittest.TestCase):
 
             self.assertEqual(payload["handoff"]["from_agent"], "tools.leaf_author")
             self.assertEqual(payload["handoff"]["to_agent"], "leaf-gui-agent")
+            self.assertEqual(payload["agent_mode"], "focused_subagent")
+            self.assertEqual(payload["handoff"]["agent_mode"], "focused_subagent")
+            self.assertEqual(payload["handoff"]["handoff_required"], True)
+            self.assertEqual(payload["handoff"]["subagent_boundary"], "read_only_gui_context")
+            self.assertEqual(
+                payload["handoff"]["required_inputs"],
+                ["run_id", "context_manifest", "referenced_artifacts", "specific_question"],
+            )
             self.assertEqual(payload["handoff"]["next_action"], "collect_gui_context")
             self.assertEqual(payload["handoff"]["attention_boundary"], "one_active_run")
             self.assertEqual(payload["handoff"]["artifact_loading"], "on_demand")

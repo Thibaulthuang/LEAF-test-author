@@ -215,7 +215,9 @@ slice, lets an auto-safe phase cross a user checkpoint, assigns `leaf-gui-agent`
 without UI-tree context, or leaves a user checkpoint without required operator
 input. `agent-handoff-contract` prints the stable handoff map: which phases each
 agent owns, which context slice each phase may load, which phases can auto-run,
-and where the user must re-enter the loop.
+and where the user must re-enter the loop. It also prints `agent_mode`,
+`handoff_required`, required handoff inputs such as `specific_question`, and the
+user-loop rule that the checkpoint owner is the user.
 
 `target-policy` prints the shared system-app-only boundary used by phase
 decisions, reports, real-device gates, and batch handoffs. Domain plugins and
@@ -237,8 +239,9 @@ for each registered real-device mode, such as Camera direct smoke requiring
 Each `resume` refreshes `.leaf/runs/<run_id>/context_manifest.json`. This file is
 the handoff boundary for multi-agent and multi-case work: it names the active
 agent, the context slice to load, existing artifact paths, the user checkpoint,
-the target policy, and the attention boundary `one_active_run`. It also includes
-a `handoff` snapshot with `from_agent`, `to_agent`, `next_action`,
+the target policy, `agent_mode`, and the attention boundary `one_active_run`. It
+also includes a `handoff` snapshot with `from_agent`, `to_agent`, `agent_mode`,
+`handoff_required`, `required_inputs`, `subagent_boundary`, `next_action`,
 `allowed_artifacts`, `target_policy`, and the referenced artifact paths for the
 next owner. The embedded `target_policy.scope` is `system_app_only`, so
 subagents and domain plugins must not ask users for application packages on the
@@ -246,7 +249,7 @@ OpenCode-facing path. The embedded `user_loop`
 snapshot carries `requires_user_confirmation` and `safe_to_auto_continue`, so
 subagents can return control to the user instead of crossing checkpoints.
 Domain and GUI agents should use this manifest plus specific evidence paths
-instead of loading the full run directory.
+and a `specific_question` instead of loading the full run directory.
 
 This keeps attention scoped to the active run and makes multi-case authoring
 and execution resumable without relying on conversational memory.

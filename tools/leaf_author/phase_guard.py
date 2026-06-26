@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 
+from tools.leaf_author.agent_handoff import AGENT_MODES, HANDOFF_RULES, USER_LOOP_RULES
 from tools.leaf_author.phase_contract import load_phase_contract
 from tools.leaf_author.real_device_contract import build_real_device_contract, validate_real_device_contract
 from tools.leaf_author.runtime_registry import build_runtime_registry_contract, validate_runtime_registry
@@ -121,6 +122,9 @@ def build_agent_handoff_contract(contract: dict[str, object] | None = None) -> d
         "context_policy": context_policy if isinstance(context_policy, dict) else {},
         "resume_policy": resume_policy if isinstance(resume_policy, dict) else {},
         "target_policy": target_policy,
+        "agent_modes": AGENT_MODES,
+        "handoff_rules": HANDOFF_RULES,
+        "user_loop_rules": USER_LOOP_RULES,
         "agents": {owner: phases for owner, phases in sorted(agent_phases.items())},
         "context_slices": context_slices,
         "user_checkpoints": {checkpoint: phases for checkpoint, phases in sorted(checkpoint_phases.items())},

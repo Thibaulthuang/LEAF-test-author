@@ -4,6 +4,7 @@ import json
 from collections import Counter
 from pathlib import Path
 
+from tools.leaf_author.agent_handoff import AGENT_MODES
 from tools.leaf_author.batch_registry import inspect_batch
 from tools.leaf_author.real_device_contract import real_device_decision_contract, real_device_runtime_evidence_schema, real_device_user_loop
 from tools.leaf_author.run_registry import inspect_run
@@ -19,6 +20,7 @@ def report_run(root: Path, run_id: str) -> dict[str, object]:
     artifacts = run.get("artifacts", {})
     evidence = _existing_artifacts(root, artifacts if isinstance(artifacts, dict) else {})
     _add_conventional_evidence(root, run_id, evidence)
+    context_manifest_summary = _context_manifest_summary(root, evidence)
     approval_required = None if run.get("current_phase") == "complete" else _real_device_approval(root, artifacts if isinstance(artifacts, dict) else {})
     input_required = None if run.get("current_phase") == "complete" else _real_device_input(root, artifacts if isinstance(artifacts, dict) else {})
     device_selection = _device_selection(root, artifacts if isinstance(artifacts, dict) else {})
@@ -51,6 +53,7 @@ def report_run(root: Path, run_id: str) -> dict[str, object]:
         "user_checkpoint": user_checkpoint,
         "user_loop": user_loop,
         "decision_contract": decision_contract,
+        "context_manifest": context_manifest_summary,
         "operator_message": operator_message,
         "next_command": _next_command(run_id, run, safe_to_auto_continue, user_checkpoint, approval_required, input_required),
         "approval_required": approval_required,
@@ -319,6 +322,29 @@ def _device_selection(root: Path, artifacts: dict[str, object]) -> dict[str, obj
     }
 
 
+def _context_manifest_summary(root: Path, evidence: dict[str, str]) -> dict[str, object] | None:
+    value = evidence.get("context_manifest")
+    if not isinstance(value, str) or not value:
+        return None
+    path = root / value
+    if not path.is_file():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    handoff = payload.get("handoff")
+    handoff = handoff if isinstance(handoff, dict) else {}
+    return {
+        "artifact": value,
+        "agent_owner": payload.get("agent_owner"),
+        "agent_mode": payload.get("agent_mode"),
+        "handoff_required": handoff.get("handoff_required"),
+        "subagent_boundary": handoff.get("subagent_boundary"),
+        "required_inputs": handoff.get("required_inputs") if isinstance(handoff.get("required_inputs"), list) else [],
+    }
+
+
 def _approval_user_loop(approval_required: dict[str, object]) -> dict[str, str]:
     required_input = approval_required.get("required_approval_token")
     return real_device_user_loop("approval", str(required_input) if isinstance(required_input, str) else "")
@@ -364,11 +390,19 @@ def _report_decision_contract(
     decision_contract = {
         "trigger_source": resume_summary.get("trigger_source", "") if isinstance(resume_summary, dict) else "",
         "agent_owner": resume_summary.get("agent_owner", "") if isinstance(resume_summary, dict) else "",
+        "agent_mode": _agent_mode_from_summary(resume_summary),
         "context_slice": resume_summary.get("context_slice", []) if isinstance(resume_summary, dict) else [],
         "allowed_artifacts": resume_summary.get("allowed_artifacts", []) if isinstance(resume_summary, dict) else [],
         "target_policy": resume_summary.get("target_policy", default_target_policy()) if isinstance(resume_summary, dict) else default_target_policy(),
     }
     return with_target_policy(decision_contract)
+
+
+def _agent_mode_from_summary(resume_summary: object) -> str:
+    if isinstance(resume_summary, dict) and isinstance(resume_summary.get("agent_mode"), str):
+        return str(resume_summary.get("agent_mode"))
+    owner = resume_summary.get("agent_owner", "") if isinstance(resume_summary, dict) else ""
+    return AGENT_MODES.get(str(owner), "orchestrator")
 
 
 def _report_operator_message(
@@ -470,6 +504,7 @@ def _unreadable_run_report(root: Path, run_summary: dict[str, object]) -> dict[s
         "decision_contract": {
             "trigger_source": "workflow.json",
             "agent_owner": "leaf-test-author",
+            "agent_mode": "orchestrator",
             "context_slice": ["workflow"],
             "allowed_artifacts": ["workflow"],
             "target_policy": default_target_policy(),

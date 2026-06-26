@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from tools.leaf_author.agent_handoff import AGENT_MODES, HANDOFF_RULES
 from tools.leaf_author.device_probe import HdcProbe, ProbeRunner
 from tools.leaf_author.phase_guard import validate_phase_contract
 from tools.leaf_author.real_device_contract import real_device_runtime_evidence_schema, validate_real_device_contract
@@ -741,6 +742,7 @@ def _context_manifest_checks(context_manifest: dict[str, object] | None, report:
             _check("context_manifest_matches_phase_contract", False, "Context manifest phase decision is missing."),
             _check("trigger_source_stable", False, "Context manifest trigger source is missing."),
             _check("target_policy_handoff_ready", False, "Context manifest target policy is missing."),
+            _check("agent_mode_handoff_ready", False, "Context manifest agent mode handoff rule is missing."),
             _check("user_checkpoint_auto_boundary", False, "Context manifest user checkpoint boundary is missing."),
             _check("gui_agent_ui_tree_context", False, "Context manifest GUI agent context is missing."),
         ]
@@ -766,7 +768,18 @@ def _context_manifest_checks(context_manifest: dict[str, object] | None, report:
     user_checkpoint = context_manifest.get("user_checkpoint")
     requires_user_confirmation = isinstance(user_loop, dict) and bool(user_loop.get("requires_user_confirmation"))
     safe_to_auto_continue = isinstance(user_loop, dict) and bool(user_loop.get("safe_to_auto_continue"))
-    agent_owner = context_manifest.get("agent_owner")
+    agent_owner = str(context_manifest.get("agent_owner", ""))
+    expected_agent_mode = AGENT_MODES.get(agent_owner)
+    expected_handoff_rule = HANDOFF_RULES.get(agent_owner, {})
+    agent_mode_handoff_ready = (
+        isinstance(handoff, dict)
+        and expected_agent_mode is not None
+        and context_manifest.get("agent_mode") == expected_agent_mode
+        and handoff.get("agent_mode") == expected_agent_mode
+        and handoff.get("handoff_required") == expected_handoff_rule.get("handoff_required")
+        and handoff.get("required_inputs") == expected_handoff_rule.get("required_inputs")
+        and handoff.get("subagent_boundary") == expected_handoff_rule.get("subagent_boundary")
+    )
     manifest_matches_phase_contract = (
         context_manifest.get("current_phase") == report.get("current_phase")
         and context_manifest.get("next_action") == report.get("next_action")
@@ -826,6 +839,11 @@ def _context_manifest_checks(context_manifest: dict[str, object] | None, report:
             "target_policy_handoff_ready",
             _target_policy_handoff_ready(target_policy, handoff_target_policy),
             "Context manifest and handoff keep the system-app-only target policy stable.",
+        ),
+        _check(
+            "agent_mode_handoff_ready",
+            agent_mode_handoff_ready,
+            "Context manifest and handoff keep the expected agent mode and subagent handoff rule stable.",
         ),
         _check(
             "user_checkpoint_auto_boundary",

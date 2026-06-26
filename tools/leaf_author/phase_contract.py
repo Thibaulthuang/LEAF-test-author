@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from tools.leaf_author.agent_handoff import AGENT_MODES, HANDOFF_RULES
 from tools.leaf_author.target_policy import default_target_policy, target_policy_from_contract
 
 
@@ -52,6 +53,7 @@ def decide_next_step(workflow: dict[str, object], contract: dict[str, object] | 
         "safe_to_auto_continue": safe_to_auto_continue,
         "operator_message": str(phase.get("operator_message") or _DEFAULT_MESSAGES.get(next_action, "Inspect workflow state before continuing.")),
         "agent_owner": str(phase.get("agent_owner", "leaf-test-author")),
+        "agent_mode": AGENT_MODES.get(str(phase.get("agent_owner", "leaf-test-author")), "orchestrator"),
         "context_slice": [str(item) for item in phase.get("context_slice", [])] if isinstance(phase.get("context_slice"), list) else [],
         "trigger_source": str(phase.get("trigger_source", "workflow.json")),
         "allowed_artifacts": [str(item) for item in phase.get("allowed_artifacts", [])] if isinstance(phase.get("allowed_artifacts"), list) else [],
@@ -104,9 +106,16 @@ def write_context_manifest(root: Path, run_id: str, decision: dict[str, object] 
         "requires_user_confirmation": bool(decision.get("requires_user_confirmation", False)),
         "safe_to_auto_continue": bool(decision.get("safe_to_auto_continue", False)),
     }
+    agent_owner = str(decision.get("agent_owner", "leaf-test-author"))
+    agent_mode = AGENT_MODES.get(agent_owner, "orchestrator")
+    handoff_rule = HANDOFF_RULES.get(agent_owner, HANDOFF_RULES["leaf-test-author"])
     handoff = {
         "from_agent": _previous_agent_for_phase(str(decision.get("current_phase", "")), contract=None),
-        "to_agent": decision.get("agent_owner"),
+        "to_agent": agent_owner,
+        "agent_mode": agent_mode,
+        "handoff_required": bool(handoff_rule.get("handoff_required", False)),
+        "required_inputs": list(handoff_rule.get("required_inputs", [])) if isinstance(handoff_rule.get("required_inputs"), list) else [],
+        "subagent_boundary": str(handoff_rule.get("subagent_boundary", "")),
         "trigger_source": decision.get("trigger_source"),
         "current_phase": decision.get("current_phase"),
         "next_action": decision.get("next_action"),
@@ -124,7 +133,8 @@ def write_context_manifest(root: Path, run_id: str, decision: dict[str, object] 
         "run_id": run_id,
         "current_phase": decision.get("current_phase"),
         "next_action": decision.get("next_action"),
-        "agent_owner": decision.get("agent_owner"),
+        "agent_owner": agent_owner,
+        "agent_mode": agent_mode,
         "trigger_source": decision.get("trigger_source"),
         "context_slice": decision.get("context_slice", []),
         "attention_boundary": "one_active_run",

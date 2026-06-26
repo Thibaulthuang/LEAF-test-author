@@ -36,6 +36,18 @@ class PhaseGuardTests(unittest.TestCase):
         self.assertEqual(contract["real_device_gates"]["approval"]["user_loop"]["required_input"], "<approval-token>")
         self.assertEqual(contract["real_device_gates"]["preflight"]["decision_contract"]["agent_owner"], "leaf-test-author")
         self.assertEqual(contract["runtime_registry"]["camera"]["default_real_device_runtime_mode"], "direct_smoke")
+        self.assertEqual(contract["agent_modes"]["leaf-test-author"], "orchestrator")
+        self.assertEqual(contract["agent_modes"]["tools.leaf_author"], "deterministic_tool")
+        self.assertEqual(contract["agent_modes"]["leaf-gui-agent"], "focused_subagent")
+        self.assertEqual(contract["handoff_rules"]["leaf-gui-agent"]["handoff_required"], True)
+        self.assertIn("run_id", contract["handoff_rules"]["leaf-gui-agent"]["required_inputs"])
+        self.assertIn("context_manifest", contract["handoff_rules"]["leaf-gui-agent"]["required_inputs"])
+        self.assertIn("specific_question", contract["handoff_rules"]["leaf-gui-agent"]["required_inputs"])
+        self.assertEqual(contract["handoff_rules"]["tools.leaf_author"]["handoff_required"], False)
+        self.assertIn("first_plan_confirmation", contract["user_loop_rules"]["blocking_checkpoints"])
+        self.assertIn("real_device_confirmation", contract["user_loop_rules"]["blocking_checkpoints"])
+        self.assertEqual(contract["user_loop_rules"]["checkpoint_owner"], "user")
+        self.assertEqual(contract["user_loop_rules"]["auto_continue_requires"], ["confirmed_plan", "auto_safe", "no_user_checkpoint"])
 
     def test_phase_guard_rejects_hap_or_install_oriented_contract_language(self):
         contract = {

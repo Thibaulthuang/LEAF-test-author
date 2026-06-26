@@ -404,6 +404,36 @@ class RunAuditTests(unittest.TestCase):
             failed_checks = [check["name"] for check in result["checks"] if not check["passed"]]
             self.assertIn("gui_agent_ui_tree_context", failed_checks)
 
+    def test_audit_run_fails_when_agent_mode_handoff_rule_drifts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "打开相机；点击拍照", run_id="audit-agent-mode")
+            confirm_plan(root, "audit-agent-mode")
+            advance_run(root, "audit-agent-mode")
+            manifest_path = root / ".leaf" / "runs" / "audit-agent-mode" / "context_manifest.json"
+            payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+            payload["agent_owner"] = "leaf-gui-agent"
+            payload["agent_mode"] = "orchestrator"
+            payload["current_phase"] = "pytest_ran"
+            payload["next_action"] = "collect_gui_context"
+            payload["context_slice"] = ["workflow", "pytest_result", "ui_tree"]
+            payload["handoff"]["to_agent"] = "leaf-gui-agent"
+            payload["handoff"]["agent_mode"] = "orchestrator"
+            payload["handoff"]["handoff_required"] = False
+            payload["handoff"]["required_inputs"] = ["run_id"]
+            payload["handoff"]["current_phase"] = "pytest_ran"
+            payload["handoff"]["next_action"] = "collect_gui_context"
+            payload["handoff"]["context_slice"] = ["workflow", "pytest_result", "ui_tree"]
+            payload["handoff"]["allowed_artifacts"] = ["pytest_result"]
+            manifest_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            with patch("tools.leaf_author.run_audit.report_run", return_value=_pytest_ran_report_for_gui_manifest()):
+                result = audit_run(root, "audit-agent-mode")
+
+            self.assertEqual(result["status"], "failed")
+            failed_checks = [check["name"] for check in result["checks"] if not check["passed"]]
+            self.assertIn("agent_mode_handoff_ready", failed_checks)
+
     def test_audit_run_fails_when_context_manifest_points_to_stale_phase_contract(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

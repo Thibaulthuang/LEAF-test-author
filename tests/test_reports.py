@@ -45,6 +45,7 @@ class ReportTests(unittest.TestCase):
             self.assertIn("confirm", result["operator_message"].lower())
             self.assertEqual(result["decision_contract"]["target_policy"]["scope"], "system_app_only")
             self.assertIn("test hap", result["decision_contract"]["target_policy"]["forbidden_terms"])
+            self.assertEqual(result["decision_contract"]["agent_mode"], "orchestrator")
 
     def test_report_run_includes_workflow_diagnostics_evidence_when_present(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -186,6 +187,26 @@ class ReportTests(unittest.TestCase):
             self.assertIn("real_device_input", result["evidence"])
             self.assertIn("--serial <serial>", result["next_command"])
             self.assertNotIn("--approval-token", result["next_command"])
+
+    def test_report_run_surfaces_gui_subagent_mode_for_gui_context_phase(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "打开相机；点击拍照", run_id="report-agent-mode")
+            confirm_plan(root, "report-agent-mode")
+            run_dir = root / ".leaf" / "runs" / "report-agent-mode"
+            (run_dir / "pytest_result.json").write_text(json.dumps({"quality_gate": "DRAFT_STATIC_PASS"}) + "\n", encoding="utf-8")
+            workflow = json.loads((run_dir / "workflow.json").read_text(encoding="utf-8"))
+            workflow["current_phase"] = "pytest_ran"
+            workflow["artifacts"]["pytest_result"] = ".leaf/runs/report-agent-mode/pytest_result.json"
+            (run_dir / "workflow.json").write_text(json.dumps(workflow, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            result = report_run(root, "report-agent-mode")
+
+            self.assertEqual(result["decision_contract"]["agent_owner"], "leaf-gui-agent")
+            self.assertEqual(result["decision_contract"]["agent_mode"], "focused_subagent")
+            self.assertEqual(result["context_manifest"]["agent_owner"], "leaf-gui-agent")
+            self.assertEqual(result["context_manifest"]["agent_mode"], "focused_subagent")
+            self.assertEqual(result["context_manifest"]["handoff_required"], True)
 
     def test_report_run_surfaces_real_device_preflight_after_runtime(self):
         with tempfile.TemporaryDirectory() as tmp:

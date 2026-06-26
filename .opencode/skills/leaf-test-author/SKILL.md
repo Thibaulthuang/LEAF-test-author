@@ -160,16 +160,19 @@ Each `resume`, `inspect-run`, or `report-run` refreshes
 `.leaf/runs/<run_id>/context_manifest.json`. Use that manifest as the handoff
 packet for subagents: it contains the active `agent_owner`, `context_slice`,
 `referenced_artifacts`, `user_checkpoint`, `target_policy`, and
-`attention_boundary`. It also contains a `handoff` object with `from_agent`,
-`to_agent`, `next_action`, `allowed_artifacts`, `target_policy`, and the bounded
-`context_slice` for the next owner. The manifest `target_policy.scope` is
+`attention_boundary`. It also contains `agent_mode`, and a `handoff` object with
+`from_agent`, `to_agent`, `agent_mode`, `handoff_required`, `required_inputs`,
+`subagent_boundary`, `next_action`, `allowed_artifacts`, `target_policy`, and
+the bounded `context_slice` for the next owner. The manifest `target_policy.scope` is
 `system_app_only`; subagents and domain plugins must not ask users for
 application packages on this OpenCode-facing path. The manifest `user_loop`
 snapshot records `requires_user_confirmation` and `safe_to_auto_continue`, so a
 subagent can tell whether it should act, observe, or return control to the user.
 If the manifest says `leaf-gui-agent`, pass the
-UI snapshot index path and the specific question; do not pass the full run
-directory unless diagnosis requires it.
+UI snapshot index path and the `specific_question`; do not pass the full run
+directory unless diagnosis requires it. `handoff_required=true` means OpenCode
+should use a focused subagent; `handoff_required=false` means the current
+orchestrator can call deterministic tools directly.
 For real-device execution gates, use `real-device-contract` plus
 `real_device_approval.json`, `real_device_input.json`, or
 `real_device_preflight.json` instead of reconstructing gate logic in prompt
@@ -200,7 +203,7 @@ handoffs can reference that artifact instead of replaying the query.
 Use a subagent when a task needs focused domain or GUI reasoning that would
 otherwise load too much context into `leaf-test-author`. Keep the handoff
 artifact-based: pass run id, report summary, UI snapshot index path, and the
-specific question. For GUI handoff, include the exact `inspect-ui-tree` command
+`specific_question`. For GUI handoff, include the exact `inspect-ui-tree` command
 that answers the current selector or layout question.
 
 ## User-In-Loop

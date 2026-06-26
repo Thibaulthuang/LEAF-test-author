@@ -116,6 +116,7 @@ def _unreadable_resume_summary() -> dict[str, object]:
         "operator_message": "Workflow state is unreadable; repair workflow.json before continuing this run.",
         "user_checkpoint": "manual_operator_decision",
         "agent_owner": "leaf-test-author",
+        "agent_mode": "orchestrator",
         "context_slice": ["workflow"],
         "trigger_source": "workflow.json",
         "allowed_artifacts": ["workflow"],
