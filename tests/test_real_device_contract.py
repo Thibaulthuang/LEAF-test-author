@@ -2,7 +2,7 @@ import unittest
 from contextlib import redirect_stdout
 from io import StringIO
 
-from tools.leaf_author.real_device_contract import build_real_device_contract, real_device_decision_contract, real_device_user_loop
+from tools.leaf_author.real_device_contract import build_real_device_contract, real_device_decision_contract, real_device_user_loop, validate_real_device_contract
 
 
 class RealDeviceContractTests(unittest.TestCase):
@@ -38,7 +38,25 @@ class RealDeviceContractTests(unittest.TestCase):
         self.assertEqual(manifest["trigger_stability"]["authoritative_source"], "workflow.json")
         self.assertEqual(manifest["execution_preflight"]["artifact"], "real_device_preflight")
         self.assertEqual(manifest["gates"]["approval"]["user_loop"]["position"], "approve_real_device")
+        self.assertEqual(manifest["gates"]["approval"]["user_loop"]["required_input"], "<approval-token>")
         self.assertEqual(manifest["gates"]["preflight"]["decision_contract"]["agent_owner"], "leaf-test-author")
+
+    def test_real_device_contract_guard_rejects_unstable_gate(self):
+        manifest = build_real_device_contract()
+        manifest["gates"]["preflight"]["decision_contract"]["context_slice"] = ["workflow"]
+
+        result = validate_real_device_contract(manifest)
+
+        self.assertEqual(result["status"], "unstable")
+        self.assertIn("real_device_gates.preflight: context_slice must include runtime_safety", result["issues"])
+        self.assertIn("real_device_gates.preflight: context_slice must include real_device_input", result["issues"])
+
+    def test_real_device_contract_guard_accepts_default_manifest(self):
+        result = validate_real_device_contract()
+
+        self.assertEqual(result["status"], "stable")
+        self.assertEqual(result["exit_code"], 0)
+        self.assertEqual(result["gate_count"], 3)
 
     def test_cli_real_device_contract_outputs_json(self):
         from tools.leaf_author.__main__ import main

@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 
 from tools.leaf_author.phase_contract import load_phase_contract
-from tools.leaf_author.real_device_contract import build_real_device_contract
+from tools.leaf_author.real_device_contract import build_real_device_contract, validate_real_device_contract
 
 
 REQUIRED_PHASE_FIELDS = {
@@ -55,6 +55,8 @@ def validate_phase_contract() -> dict[str, object]:
     _expect_phase_value(phases, "e2e_ready", "user_checkpoint", "real_device_confirmation", issues)
     _expect_phase_value(phases, "complete", "next_action", "complete", issues)
     _expect_phase_value(phases, "complete", "batch_focus_priority", 1000, issues)
+    real_device_guard = validate_real_device_contract()
+    issues.extend(str(issue) for issue in real_device_guard.get("issues", []) if isinstance(issue, str))
 
     summary = build_agent_handoff_contract(contract)
     return {
@@ -68,6 +70,7 @@ def validate_phase_contract() -> dict[str, object]:
         "attention_boundary": summary["context_policy"].get("attention_boundary"),
         "agent_owners": sorted(summary["agents"]),
         "user_checkpoints": summary["user_checkpoints"],
+        "real_device_gate_status": real_device_guard.get("status"),
     }
 
 

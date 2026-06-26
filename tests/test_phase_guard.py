@@ -14,6 +14,7 @@ class PhaseGuardTests(unittest.TestCase):
         self.assertEqual(result["exit_code"], 0)
         self.assertEqual(result["trigger_source"], "workflow.json")
         self.assertEqual(result["attention_boundary"], "one_active_run")
+        self.assertEqual(result["real_device_gate_status"], "stable")
         self.assertIn("leaf-test-author", result["agent_owners"])
         self.assertIn("leaf-gui-agent", result["agent_owners"])
         self.assertEqual(result["user_checkpoints"]["first_plan_confirmation"], ["plan"])
@@ -29,6 +30,7 @@ class PhaseGuardTests(unittest.TestCase):
         self.assertIn("hypium_draft", contract["auto_safe_phases"])
         self.assertIn("first_plan_confirmation", contract["resume_policy"]["never_auto_cross"])
         self.assertEqual(contract["real_device_gates"]["approval"]["user_loop"]["position"], "approve_real_device")
+        self.assertEqual(contract["real_device_gates"]["approval"]["user_loop"]["required_input"], "<approval-token>")
         self.assertEqual(contract["real_device_gates"]["preflight"]["decision_contract"]["agent_owner"], "leaf-test-author")
 
     def test_cli_phase_guard_and_agent_handoff_contract_output_json(self):
