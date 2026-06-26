@@ -29,9 +29,9 @@ def audit_run(root: Path, run_id: str) -> dict[str, object]:
     else:
         checks.append(_check("runtime_quality_gate", latest_quality_gate != "UNKNOWN", f"Latest quality gate {latest_quality_gate} is present."))
 
-    preflight = report.get("real_device_preflight")
-    checks.extend(_real_device_preflight_checks(preflight if isinstance(preflight, dict) else None))
     device_selection = report.get("device_selection")
+    preflight = report.get("real_device_preflight")
+    checks.extend(_real_device_preflight_checks(preflight if isinstance(preflight, dict) else None, device_selection if isinstance(device_selection, dict) else None))
     checks.extend(_device_selection_checks(device_selection if isinstance(device_selection, dict) else None, preflight if isinstance(preflight, dict) else None))
     evidence = report.get("evidence", {})
     real_device_input = _load_real_device_input(root, evidence if isinstance(evidence, dict) else {})
@@ -114,14 +114,24 @@ def audit_batch(root: Path, batch_id: str) -> dict[str, object]:
     return _write_batch_audit(root, batch_id, payload)
 
 
-def _real_device_preflight_checks(preflight: dict[str, object] | None) -> list[dict[str, object]]:
+def _real_device_preflight_checks(preflight: dict[str, object] | None, device_selection: dict[str, object] | None = None) -> list[dict[str, object]]:
     if not preflight:
         return [_check("real_device_preflight_ready", False, "Real-device preflight artifact is missing.")]
-    return [
+    checks = [
         _check("real_device_preflight_ready", preflight.get("status") == "ready", "Real-device preflight status is ready."),
         _check("real_device_input_ready", preflight.get("input_status") == "ready", "Real-device serial/input gate is ready."),
         _check("real_device_approval_ready", preflight.get("approval_status") in {"approved", "not_required"}, "Real-device approval gate is approved or not required."),
     ]
+    if device_selection and preflight.get("serial_source") == "device_selection":
+        checks.append(
+            _check(
+                "real_device_preflight_source_matches_selection",
+                preflight.get("device_selection_artifact") == device_selection.get("artifact")
+                and preflight.get("serial") == device_selection.get("serial"),
+                "Real-device preflight source points to the selected device artifact.",
+            )
+        )
+    return checks
 
 
 def _device_selection_checks(device_selection: dict[str, object] | None, preflight: dict[str, object] | None) -> list[dict[str, object]]:

@@ -182,6 +182,8 @@ def _real_device_preflight(root: Path, artifacts: dict[str, object]) -> dict[str
         "runtime_mode": payload.get("runtime_mode"),
         "status": payload.get("status"),
         "serial": payload.get("serial"),
+        "serial_source": payload.get("serial_source"),
+        "device_selection_artifact": payload.get("device_selection_artifact"),
         "risk_level": payload.get("risk_level"),
         "mutates_device_state": payload.get("mutates_device_state"),
         "approval_status": payload.get("approval_status"),

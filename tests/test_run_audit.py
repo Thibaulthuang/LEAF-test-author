@@ -89,6 +89,7 @@ class RunAuditTests(unittest.TestCase):
             self.assertIn("real_device_input_artifact_ready", passed_checks)
             self.assertIn("real_device_input_matches_preflight", passed_checks)
             self.assertIn("real_device_input_source_matches_selection", passed_checks)
+            self.assertIn("real_device_preflight_source_matches_selection", passed_checks)
 
     def test_audit_run_fails_incomplete_run(self):
         with tempfile.TemporaryDirectory() as tmp:
