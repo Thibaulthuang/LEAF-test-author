@@ -125,6 +125,7 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
         self.assertIn("resume-batch", readme)
         self.assertIn("report-run", readme)
         self.assertIn("report-batch", readme)
+        self.assertIn("inspect-ui-tree", readme)
         self.assertIn("audit-run", readme)
         self.assertIn("audit-batch", readme)
         self.assertIn("workflow-diagnostics", readme)
@@ -153,6 +154,8 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
         self.assertIn("matches that run's resume", readme)
         self.assertIn("never marks a user checkpoint safe", readme)
         self.assertIn("requires `ui_tree`", readme)
+        self.assertIn("targeted UI-tree diagnostics", readme)
+        self.assertIn("filters by `phase` or `action_id`", readme)
         self.assertNotIn("test HAP", readme)
         self.assertNotIn("test package", readme)
 

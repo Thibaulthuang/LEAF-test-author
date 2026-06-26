@@ -23,6 +23,7 @@ from tools.leaf_author.reports import report_batch, report_run
 from tools.leaf_author.run_audit import audit_batch, audit_run
 from tools.leaf_author.run_registry import inspect_run, list_runs
 from tools.leaf_author.runtime_registry import build_runtime_registry_contract
+from tools.leaf_author.ui_tree_diagnostics import inspect_ui_tree
 from tools.leaf_author.workflow_diagnostics import inspect_workflow_state
 
 
@@ -99,6 +100,20 @@ def main(argv: list[str] | None = None) -> int:
     report_batch_parser = subparsers.add_parser("report-batch")
     report_batch_parser.add_argument("batch_id")
     report_batch_parser.add_argument("--root", type=Path, default=Path("."))
+
+    inspect_ui_tree_parser = subparsers.add_parser("inspect-ui-tree")
+    inspect_ui_tree_parser.add_argument("run_id")
+    inspect_ui_tree_parser.add_argument("--root", type=Path, default=Path("."))
+    inspect_ui_tree_parser.add_argument("--phase", default=None)
+    inspect_ui_tree_parser.add_argument("--action-id", default=None)
+    inspect_ui_tree_parser.add_argument("--id", dest="node_id", default=None)
+    inspect_ui_tree_parser.add_argument("--text", default=None)
+    inspect_ui_tree_parser.add_argument("--type", dest="node_type", default=None)
+    clickable_group = inspect_ui_tree_parser.add_mutually_exclusive_group()
+    clickable_group.add_argument("--clickable", dest="clickable", action="store_true")
+    clickable_group.add_argument("--not-clickable", dest="clickable", action="store_false")
+    inspect_ui_tree_parser.set_defaults(clickable=None)
+    inspect_ui_tree_parser.add_argument("--limit", type=int, default=10)
 
     audit_run_parser = subparsers.add_parser("audit-run")
     audit_run_parser.add_argument("run_id")
@@ -305,6 +320,25 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "report-batch":
         print(json.dumps(report_batch(args.root, args.batch_id), ensure_ascii=False, indent=2))
+        return 0
+    if args.command == "inspect-ui-tree":
+        print(
+            json.dumps(
+                inspect_ui_tree(
+                    args.root,
+                    args.run_id,
+                    phase=args.phase,
+                    action_id=args.action_id,
+                    node_id=args.node_id,
+                    text=args.text,
+                    node_type=args.node_type,
+                    clickable=args.clickable,
+                    limit=args.limit,
+                ),
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
         return 0
     if args.command == "audit-run":
         result = audit_run(args.root, args.run_id)

@@ -103,6 +103,7 @@ Report one run or a batch without loading large artifacts into OpenCode context:
 ```bash
 python3 -m tools.leaf_author report-run run-demo
 python3 -m tools.leaf_author report-batch camera-suite
+python3 -m tools.leaf_author inspect-ui-tree run-demo --phase after_launch --text 拍照
 python3 -m tools.leaf_author workflow-diagnostics run-demo
 python3 -m tools.leaf_author audit-run run-demo
 python3 -m tools.leaf_author audit-batch camera-suite
@@ -240,6 +241,11 @@ the `focus_plan` selects at most one active run, matches that run's resume
 summary, preserves its `agent_owner`, `context_slice`, `allowed_artifacts`, and
 `user_loop`, never marks a user checkpoint safe for automatic continuation, and
 requires `ui_tree` whenever the focus owner is `leaf-gui-agent`.
+
+Use `inspect-ui-tree <run_id>` for targeted UI-tree diagnostics after runtime
+evidence exists. It reads the indexed snapshot paths exposed by `report-run`,
+filters by `phase` or `action_id`, and can search candidates by id, text, type,
+or clickability without loading the raw layout into the main agent context.
 
 ## Development
 
