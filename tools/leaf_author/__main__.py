@@ -17,6 +17,7 @@ from tools.leaf_author.extension_contract import build_extension_contract, expor
 from tools.leaf_author.hypium import sync_openharmony_export
 from tools.leaf_author.openharmony_discovery import discover_hap_artifacts
 from tools.leaf_author.openharmony_project import scaffold_openharmony_test_project
+from tools.leaf_author.phase_guard import build_agent_handoff_contract, validate_phase_contract
 from tools.leaf_author.reports import report_batch, report_run
 from tools.leaf_author.run_registry import inspect_run, list_runs
 
@@ -92,6 +93,9 @@ def main(argv: list[str] | None = None) -> int:
     validate_extension_contract_parser = subparsers.add_parser("validate-extension-contract")
     validate_extension_contract_parser.add_argument("domain")
     validate_extension_contract_parser.add_argument("--strict-real-device", action="store_true")
+
+    subparsers.add_parser("phase-guard")
+    subparsers.add_parser("agent-handoff-contract")
 
     advance = subparsers.add_parser("advance")
     advance.add_argument("run_id")
@@ -270,6 +274,13 @@ def main(argv: list[str] | None = None) -> int:
         result = validate_extension_contract(args.domain, strict_real_device=args.strict_real_device)
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return int(result["exit_code"])
+    if args.command == "phase-guard":
+        result = validate_phase_contract()
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return int(result["exit_code"])
+    if args.command == "agent-handoff-contract":
+        print(json.dumps(build_agent_handoff_contract(), ensure_ascii=False, indent=2))
+        return 0
     if args.command == "advance":
         print(
             json.dumps(

@@ -5,6 +5,7 @@ from pathlib import Path
 
 from tools.leaf_author.domain_registry import is_domain_registered
 from tools.leaf_author.phase_contract import load_phase_contract
+from tools.leaf_author.phase_guard import build_agent_handoff_contract, validate_phase_contract
 from tools.leaf_author.runtime_registry import (
     default_real_device_runtime_mode,
     quality_artifact_priority,
@@ -16,12 +17,16 @@ from tools.leaf_author.runtime_registry import (
 
 def build_extension_contract(domain: str) -> dict[str, object]:
     phase_contract = load_phase_contract()
+    handoff_contract = build_agent_handoff_contract(phase_contract)
+    phase_guard = validate_phase_contract()
     runtime_modes = registered_runtime_modes(domain)
     missing = []
     if not is_domain_registered(domain):
         missing.append("domain_registry: register target feature inference, semantic validation, and action mapping")
     if not runtime_modes:
         missing.append("runtime_registry: register runtime modes and quality gates when real-device evidence is required")
+    if phase_guard["status"] != "stable":
+        missing.append("phase_guard: workflow-contract.json must pass trigger, context, agent, and user-loop validation")
     status = "ready" if not missing else "incomplete"
     return {
         "schema_version": "1.0",
@@ -45,9 +50,19 @@ def build_extension_contract(domain: str) -> dict[str, object]:
         },
         "phase_contract": {
             "source": "docs/workflow-contract.json",
+            "trigger_source": "workflow.json",
+            "decision_function": "tools.leaf_author.phase_contract.decide_next_step",
+            "phase_guard_status": phase_guard["status"],
             "real_device_checkpoint_phases": _checkpoint_phases(phase_contract, "real_device_confirmation"),
             "user_loop_positions": _user_loop_positions(phase_contract),
             "batch_focus_priorities": _batch_focus_priorities(phase_contract),
+        },
+        "agent_handoff_contract": {
+            "attention_boundary": handoff_contract["context_policy"].get("attention_boundary"),
+            "artifact_loading": handoff_contract["context_policy"].get("artifact_loading"),
+            "agents": handoff_contract["agents"],
+            "auto_safe_phases": handoff_contract["auto_safe_phases"],
+            "user_checkpoints": handoff_contract["user_checkpoints"],
         },
         "readiness": {
             "status": status,

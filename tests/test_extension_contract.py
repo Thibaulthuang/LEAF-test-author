@@ -20,6 +20,11 @@ class ExtensionContractTests(unittest.TestCase):
         self.assertIn("camera_direct_smoke", contract["runtime_contract"]["artifact_keys"])
         self.assertIn("CAMERA_DIRECT_SMOKE_PASS", contract["runtime_contract"]["quality_gates"])
         self.assertIn("e2e_ready", contract["phase_contract"]["real_device_checkpoint_phases"])
+        self.assertEqual(contract["phase_contract"]["trigger_source"], "workflow.json")
+        self.assertEqual(contract["phase_contract"]["phase_guard_status"], "stable")
+        self.assertEqual(contract["agent_handoff_contract"]["attention_boundary"], "one_active_run")
+        self.assertIn("leaf-gui-agent", contract["agent_handoff_contract"]["agents"])
+        self.assertIn("real_device_confirmation", contract["agent_handoff_contract"]["user_checkpoints"])
         self.assertEqual(contract["readiness"]["status"], "ready")
 
     def test_unknown_domain_contract_marks_runtime_gaps(self):

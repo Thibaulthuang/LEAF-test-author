@@ -108,6 +108,14 @@ by `tools.leaf_author.phase_contract`. Treat `resume_summary.trigger_source`,
 `resume_summary.user_loop` as the runtime decision contract. Do not duplicate a
 separate phase table in prompt text.
 
+Use `python3 -m tools.leaf_author phase-guard` after changing phase definitions,
+resume behavior, user checkpoints, or agent ownership. It verifies that every
+phase still uses `workflow.json` as the trigger source, exposes a bounded
+context slice, respects auto-safe checkpoint rules, and gives GUI phases UI-tree
+context. Use `python3 -m tools.leaf_author agent-handoff-contract` when a
+domain, GUI, or execution subagent needs the current machine-readable handoff
+map.
+
 - `plan` with `confirmed_plan=false`: present `plan.json` and must stop for
   `first_plan_confirmation`.
 - `hypium_draft` or `pytest_draft` with `confirmed_plan=true`: safe local

@@ -114,6 +114,13 @@ python3 -m tools.leaf_author validate-extension-contract camera
 python3 -m tools.leaf_author validate-extension-contract camera --strict-real-device
 ```
 
+Validate the phase trigger, context, agent, and user-in-loop contract:
+
+```bash
+python3 -m tools.leaf_author phase-guard
+python3 -m tools.leaf_author agent-handoff-contract
+```
+
 Run safe local stages directly:
 
 ```bash
@@ -174,6 +181,14 @@ phase's `next_action`, `auto_safe` flag, `agent_owner`, `context_slice`, and
 `user_loop` position. `tools.leaf_author.phase_contract` reads that contract for
 `resume`, `inspect-run`, and `report-run`, so OpenCode does not need to infer the
 next step from conversation history.
+
+`phase-guard` is the machine check for that design. It fails if a phase stops
+using `workflow.json` as the trigger source, omits the workflow from its context
+slice, lets an auto-safe phase cross a user checkpoint, assigns `leaf-gui-agent`
+without UI-tree context, or leaves a user checkpoint without required operator
+input. `agent-handoff-contract` prints the stable handoff map: which phases each
+agent owns, which context slice each phase may load, which phases can auto-run,
+and where the user must re-enter the loop.
 
 Each `resume` refreshes `.leaf/runs/<run_id>/context_manifest.json`. This file is
 the handoff boundary for multi-agent and multi-case work: it names the active
