@@ -320,7 +320,43 @@ class ReportTests(unittest.TestCase):
             self.assertEqual(result["gui_handoff"]["context_slice"], ["workflow", "runtime_evidence", "ui_tree"])
             self.assertEqual(result["gui_handoff"]["snapshot_count"], 1)
             self.assertEqual(result["gui_handoff"]["target_policy"]["scope"], "system_app_only")
+            self.assertEqual(result["gui_handoff"]["contract_status"], "ready")
+            self.assertEqual(result["gui_handoff"]["contract_issues"], [])
             self.assertEqual(result["evidence"]["ui_tree_diagnostics"], ".leaf/runs/report-gui-handoff/ui_tree_diagnostics.json")
+
+    def test_report_run_marks_gui_handoff_drift(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "打开相机；点击拍照", run_id="report-gui-drift")
+            confirm_plan(root, "report-gui-drift")
+            layout_path = "/data/local/tmp/layout_123.json"
+
+            def runner(args, timeout_s):
+                if args == ["/sdk/hdc", "-t", "SERIAL123", "shell", "param", "get", "const.product.model"]:
+                    return ProbeCommandResult(0, "ohos\n", "")
+                if args == ["/sdk/hdc", "-t", "SERIAL123", "shell", "param", "get", "const.ohos.apiversion"]:
+                    return ProbeCommandResult(0, "26\n", "")
+                if args == ["/sdk/hdc", "-t", "SERIAL123", "shell", "bm", "dump", "-n", "com.huawei.hmos.camera"]:
+                    return ProbeCommandResult(0, '"bundleName": "com.huawei.hmos.camera",\n"moduleName": "phone",\n', "")
+                if args == ["/sdk/hdc", "-t", "SERIAL123", "shell", "aa", "start", "-a", "com.huawei.hmos.camera.MainAbility", "-b", "com.huawei.hmos.camera", "-m", "phone"]:
+                    return ProbeCommandResult(0, "start ability successfully\n", "")
+                if args == ["/sdk/hdc", "-t", "SERIAL123", "shell", "uitest", "dumpLayout"]:
+                    return ProbeCommandResult(0, f"DumpLayout saved to:{layout_path}\n", "")
+                if args == ["/sdk/hdc", "-t", "SERIAL123", "shell", "cat", layout_path]:
+                    return ProbeCommandResult(0, '{"attributes":{"bundleName":"com.huawei.hmos.camera","abilityName":"com.huawei.hmos.camera.MainAbility","text":"相机"},"children":[]}\n', "")
+                if args == ["/sdk/hdc", "-t", "SERIAL123", "shell", "hilog", "-x"]:
+                    return ProbeCommandResult(0, "camera foreground log\n", "")
+                return ProbeCommandResult(1, "", f"unexpected {args}")
+
+            advance_run(root, "report-gui-drift", hdc_runner=runner, serial="SERIAL123", run_real=True, runtime_mode="direct_smoke", hdc_path="/sdk/hdc")
+            diagnostics = inspect_ui_tree(root, "report-gui-drift")
+            diagnostics["handoff"]["context_slice"] = ["workflow"]
+            (root / diagnostics["artifact"]).write_text(json.dumps(diagnostics, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            result = report_run(root, "report-gui-drift")
+
+            self.assertEqual(result["gui_handoff"]["contract_status"], "drift")
+            self.assertIn("context_slice must include ui_tree", result["gui_handoff"]["contract_issues"])
 
     def test_report_run_surfaces_missing_runtime_evidence_fields(self):
         with tempfile.TemporaryDirectory() as tmp:

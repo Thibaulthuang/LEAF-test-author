@@ -4,7 +4,7 @@ import json
 from collections import Counter
 from pathlib import Path
 
-from tools.leaf_author.agent_handoff import AGENT_MODES
+from tools.leaf_author.agent_handoff import AGENT_MODES, HANDOFF_RULES
 from tools.leaf_author.batch_registry import inspect_batch
 from tools.leaf_author.real_device_contract import real_device_decision_contract, real_device_runtime_evidence_schema, real_device_user_loop
 from tools.leaf_author.run_registry import inspect_run
@@ -191,6 +191,7 @@ def _gui_handoff_summary(root: Path, evidence: dict[str, str]) -> dict[str, obje
     handoff = handoff if isinstance(handoff, dict) else {}
     user_loop = payload.get("user_loop")
     target_policy = payload.get("target_policy")
+    contract_issues = _gui_handoff_contract_issues(payload, handoff)
     return {
         "artifact": value,
         "agent_owner": payload.get("agent_owner"),
@@ -206,7 +207,39 @@ def _gui_handoff_summary(root: Path, evidence: dict[str, str]) -> dict[str, obje
         "target_policy": normalize_target_policy(target_policy),
         "snapshot_count": payload.get("snapshot_count"),
         "diff_count": payload.get("diff_count"),
+        "contract_status": "ready" if not contract_issues else "drift",
+        "contract_issues": contract_issues,
     }
+
+
+def _gui_handoff_contract_issues(payload: dict[str, object], handoff: dict[str, object]) -> list[str]:
+    issues: list[str] = []
+    rule = HANDOFF_RULES["leaf-gui-agent"]
+    if payload.get("agent_owner") != "leaf-gui-agent":
+        issues.append("agent_owner must be leaf-gui-agent")
+    if payload.get("agent_mode") != AGENT_MODES["leaf-gui-agent"]:
+        issues.append("agent_mode must be focused_subagent")
+    if handoff.get("handoff_required") != rule.get("handoff_required"):
+        issues.append("handoff_required must match leaf-gui-agent rule")
+    if handoff.get("required_inputs") != rule.get("required_inputs"):
+        issues.append("required_inputs must match leaf-gui-agent rule")
+    if handoff.get("subagent_boundary") != rule.get("subagent_boundary"):
+        issues.append("subagent_boundary must be read_only_gui_context")
+    if handoff.get("attention_boundary") != "one_active_run":
+        issues.append("attention_boundary must be one_active_run")
+    if handoff.get("artifact_loading") != "on_demand":
+        issues.append("artifact_loading must be on_demand")
+    context_slice = handoff.get("context_slice")
+    context_slice = context_slice if isinstance(context_slice, list) else []
+    if "ui_tree" not in context_slice:
+        issues.append("context_slice must include ui_tree")
+    if "runtime_evidence" not in context_slice:
+        issues.append("context_slice must include runtime_evidence")
+    target_policy = normalize_target_policy(payload.get("target_policy"))
+    handoff_target_policy = normalize_target_policy(handoff.get("target_policy"))
+    if target_policy.get("scope") != "system_app_only" or handoff_target_policy.get("scope") != "system_app_only":
+        issues.append("target_policy scope must be system_app_only")
+    return issues
 
 
 def _real_device_approval(root: Path, artifacts: dict[str, object]) -> dict[str, object] | None:
