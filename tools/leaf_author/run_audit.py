@@ -601,11 +601,61 @@ def _batch_resume_checks(resume_view: dict[str, object]) -> list[dict[str, objec
         and isinstance(focus_plan.get("allowed_artifacts"), list)
         and isinstance(focus_plan.get("user_loop"), dict)
     )
+    focus_matches_run = focus_present and _batch_focus_matches_selected_run(focus_plan, resume_view)
+    focus_user_boundary = focus_present and _batch_focus_respects_user_boundary(focus_plan)
+    focus_gui_context = focus_present and (
+        focus_plan.get("agent_owner") != "leaf-gui-agent" or "ui_tree" in _string_list(focus_plan.get("context_slice"))
+    )
     return [
         _check("batch_resume_attention_boundary", attention_boundary, "Batch resume context policy uses one active run boundary."),
         _check("batch_resume_focus_present", focus_present, "Incomplete batches expose one selected focus run."),
         _check("batch_resume_focus_handoff", focus_handoff, "Batch focus plan includes agent, context, artifacts, and user loop metadata."),
+        _check("batch_resume_focus_matches_run", focus_matches_run, "Batch focus plan matches the selected run resume contract."),
+        _check("batch_resume_focus_user_boundary", focus_user_boundary, "Batch focus plan never marks a user checkpoint safe for automatic continuation."),
+        _check("batch_resume_focus_gui_context", focus_gui_context, "Batch GUI-agent focus includes ui_tree in the bounded context slice."),
     ]
+
+
+def _batch_focus_matches_selected_run(focus_plan: object, resume_view: dict[str, object]) -> bool:
+    if not isinstance(focus_plan, dict):
+        return False
+    selected_run_id = focus_plan.get("selected_run_id")
+    runs = resume_view.get("runs")
+    if not isinstance(runs, list):
+        return False
+    selected = None
+    for run in runs:
+        if isinstance(run, dict) and run.get("run_id") == selected_run_id:
+            selected = run
+            break
+    if not isinstance(selected, dict):
+        return False
+    summary = selected.get("resume_summary")
+    if not isinstance(summary, dict):
+        return False
+    summary_user_loop = summary.get("user_loop")
+    focus_user_loop = focus_plan.get("user_loop")
+    if not isinstance(summary_user_loop, dict) or not isinstance(focus_user_loop, dict):
+        return False
+    return (
+        focus_plan.get("current_phase") == selected.get("current_phase")
+        and focus_plan.get("next_action") == selected.get("next_action")
+        and focus_plan.get("agent_owner") == summary.get("agent_owner")
+        and _string_list(focus_plan.get("context_slice")) == _string_list(summary.get("context_slice"))
+        and _string_list(focus_plan.get("allowed_artifacts")) == _string_list(summary.get("allowed_artifacts"))
+        and focus_plan.get("user_checkpoint") == summary.get("user_checkpoint")
+        and bool(focus_plan.get("requires_user_confirmation")) == bool(summary.get("requires_user_confirmation"))
+        and bool(focus_plan.get("safe_to_auto_continue")) == bool(summary.get("safe_to_auto_continue"))
+        and focus_user_loop.get("position") == summary_user_loop.get("position")
+        and focus_user_loop.get("required_input") == summary_user_loop.get("required_input")
+    )
+
+
+def _batch_focus_respects_user_boundary(focus_plan: object) -> bool:
+    if not isinstance(focus_plan, dict):
+        return False
+    has_user_checkpoint = bool(focus_plan.get("user_checkpoint")) or bool(focus_plan.get("requires_user_confirmation"))
+    return not (has_user_checkpoint and bool(focus_plan.get("safe_to_auto_continue")))
 
 
 def _batch_resume_attention_boundary(resume_view: dict[str, object]) -> object:

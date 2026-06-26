@@ -309,6 +309,48 @@ class RunAuditTests(unittest.TestCase):
             self.assertNotIn("batch_resume_focus_present", failed_checks)
             self.assertNotIn("batch_resume_attention_boundary", failed_checks)
             self.assertNotIn("batch_resume_focus_handoff", failed_checks)
+            self.assertNotIn("batch_resume_focus_matches_run", failed_checks)
+            self.assertNotIn("batch_resume_focus_user_boundary", failed_checks)
+            self.assertNotIn("batch_resume_focus_gui_context", failed_checks)
+
+    def test_audit_batch_fails_when_focus_plan_drifts_from_selected_run_summary(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "打开相机；点击拍照", run_id="audit-focus-drift")
+            create_batch(root, "audit-focus-drift-batch", ["audit-focus-drift"])
+
+            with patch("tools.leaf_author.run_audit.resume_batch", return_value=_batch_resume_view_with_focus_drift()):
+                result = audit_batch(root, "audit-focus-drift-batch")
+
+            self.assertEqual(result["status"], "failed")
+            failed_checks = [check["name"] for check in result["batch_checks"] if not check["passed"]]
+            self.assertIn("batch_resume_focus_matches_run", failed_checks)
+
+    def test_audit_batch_fails_when_focus_plan_auto_crosses_user_checkpoint(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "打开相机；点击拍照", run_id="audit-focus-user")
+            create_batch(root, "audit-focus-user-batch", ["audit-focus-user"])
+
+            with patch("tools.leaf_author.run_audit.resume_batch", return_value=_batch_resume_view_with_user_boundary_drift()):
+                result = audit_batch(root, "audit-focus-user-batch")
+
+            self.assertEqual(result["status"], "failed")
+            failed_checks = [check["name"] for check in result["batch_checks"] if not check["passed"]]
+            self.assertIn("batch_resume_focus_user_boundary", failed_checks)
+
+    def test_audit_batch_fails_when_gui_focus_plan_omits_ui_tree_context(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "打开相机；点击拍照", run_id="audit-focus-gui")
+            create_batch(root, "audit-focus-gui-batch", ["audit-focus-gui"])
+
+            with patch("tools.leaf_author.run_audit.resume_batch", return_value=_batch_resume_view_with_gui_context_drift()):
+                result = audit_batch(root, "audit-focus-gui-batch")
+
+            self.assertEqual(result["status"], "failed")
+            failed_checks = [check["name"] for check in result["batch_checks"] if not check["passed"]]
+            self.assertIn("batch_resume_focus_gui_context", failed_checks)
 
     def test_audit_batch_allows_empty_focus_plan_when_every_run_is_complete(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -450,6 +492,83 @@ def _pytest_ran_report_for_gui_manifest() -> dict[str, object]:
         "evidence": {
             "context_manifest": ".leaf/runs/audit-gui-context/context_manifest.json",
         },
+    }
+
+
+def _batch_resume_view_with_focus_drift() -> dict[str, object]:
+    view = _batch_resume_view_for_focus("audit-focus-drift")
+    view["focus_plan"]["next_action"] = "collect_gui_context"
+    return view
+
+
+def _batch_resume_view_with_user_boundary_drift() -> dict[str, object]:
+    view = _batch_resume_view_for_focus("audit-focus-user")
+    view["focus_plan"]["safe_to_auto_continue"] = True
+    return view
+
+
+def _batch_resume_view_with_gui_context_drift() -> dict[str, object]:
+    view = _batch_resume_view_for_focus("audit-focus-gui")
+    view["focus_plan"]["agent_owner"] = "leaf-gui-agent"
+    view["focus_plan"]["current_phase"] = "pytest_ran"
+    view["focus_plan"]["next_action"] = "collect_gui_context"
+    view["focus_plan"]["context_slice"] = ["workflow", "pytest_result"]
+    view["runs"][0]["current_phase"] = "pytest_ran"
+    view["runs"][0]["next_action"] = "collect_gui_context"
+    view["runs"][0]["resume_summary"]["agent_owner"] = "leaf-gui-agent"
+    view["runs"][0]["resume_summary"]["context_slice"] = ["workflow", "pytest_result"]
+    return view
+
+
+def _batch_resume_view_for_focus(run_id: str) -> dict[str, object]:
+    return {
+        "focus_plan": {
+            "selected_run_id": run_id,
+            "selection_reason": "requires_user_confirmation",
+            "attention_boundary": "one_active_run",
+            "artifact_loading": "on_demand",
+            "agent_owner": "leaf-test-author",
+            "current_phase": "plan",
+            "next_action": "present_plan_for_confirmation",
+            "context_slice": ["workflow", "plan"],
+            "allowed_artifacts": ["workflow", "plan", "device_probe"],
+            "user_checkpoint": "first_plan_confirmation",
+            "user_loop": {
+                "position": "approve_plan",
+                "required_input": "confirm or revise plan",
+            },
+            "safe_to_auto_continue": False,
+            "requires_user_confirmation": True,
+        },
+        "context_policy": {
+            "attention_boundary": "one_active_run",
+        },
+        "summary": {
+            "waiting_for_confirmation": 1,
+            "in_progress": 0,
+            "failed": 0,
+            "complete": 0,
+        },
+        "runs": [
+            {
+                "run_id": run_id,
+                "status": "waiting_for_confirmation",
+                "current_phase": "plan",
+                "next_action": "present_plan_for_confirmation",
+                "resume_summary": {
+                    "agent_owner": "leaf-test-author",
+                    "context_slice": ["workflow", "plan"],
+                    "allowed_artifacts": ["workflow", "plan", "device_probe"],
+                    "user_checkpoint": "first_plan_confirmation",
+                    "requires_user_confirmation": True,
+                    "safe_to_auto_continue": False,
+                    "user_loop": {
+                        "position": "approve_plan",
+                        "required_input": "confirm or revise plan",
+                    },
+                },
+            }
+        ],
     }
 
 
