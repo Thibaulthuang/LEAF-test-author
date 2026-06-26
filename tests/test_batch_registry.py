@@ -59,6 +59,39 @@ class BatchRegistryTests(unittest.TestCase):
             self.assertEqual(result["next_run_focus"]["run_id"], "batch-safe")
             self.assertEqual(result["next_run_focus"]["focus_source"], "workflow-contract")
 
+    def test_inspect_batch_isolates_unreadable_run_workflow(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "打开相机", run_id="batch-good")
+            start_new_case(root, "camera", "坏 workflow", run_id="batch-bad")
+            create_batch(root, "camera-batch", ["batch-good", "batch-bad"])
+            (root / ".leaf" / "runs" / "batch-bad" / "workflow.json").write_text("", encoding="utf-8")
+
+            result = inspect_batch(root, "camera-batch")
+
+            self.assertEqual(result["total_runs"], 2)
+            self.assertEqual(result["phase_counts"]["plan"], 1)
+            self.assertEqual(result["phase_counts"]["unreadable"], 1)
+            bad = [run for run in result["runs"] if run["run_id"] == "batch-bad"][0]
+            self.assertEqual(bad["current_phase"], "unreadable")
+            self.assertEqual(bad["next_action"], "repair_workflow")
+            self.assertIn("error", bad)
+            self.assertEqual(result["next_run_focus"]["run_id"], "batch-bad")
+            self.assertEqual(result["next_run_focus"]["focus_source"], "workflow-read-error")
+
+    def test_create_batch_returns_summary_even_when_member_workflow_is_unreadable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "坏 workflow", run_id="batch-create-bad")
+            (root / ".leaf" / "runs" / "batch-create-bad" / "workflow.json").write_text("", encoding="utf-8")
+
+            result = create_batch(root, "camera-batch", ["batch-create-bad"])
+
+            self.assertEqual(result["batch_id"], "camera-batch")
+            self.assertEqual(result["phase_counts"]["unreadable"], 1)
+            self.assertEqual(result["runs"][0]["next_action"], "repair_workflow")
+            self.assertIn("error", result["runs"][0])
+
     def test_list_batches_returns_lightweight_summaries(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

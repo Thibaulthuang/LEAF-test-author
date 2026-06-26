@@ -38,7 +38,7 @@ def create_batch(root: Path, batch_id: str, run_ids: list[str], title: str | Non
 
 def inspect_batch(root: Path, batch_id: str) -> dict[str, object]:
     batch = _load_batch(root, batch_id)
-    runs = [inspect_run(root, run_id) for run_id in batch["run_ids"]]
+    runs = [_inspect_batch_run(root, run_id) for run_id in batch["run_ids"]]
     phase_counts = Counter(str(run.get("current_phase", "unknown")) for run in runs)
     next_run_focus = _next_run_focus(runs)
     return {
@@ -118,7 +118,7 @@ def _batch_paths(root: Path) -> list[Path]:
 
 
 def _run_batch_summary(run: dict[str, object]) -> dict[str, object]:
-    return {
+    summary = {
         "run_id": run.get("run_id"),
         "domain": run.get("domain"),
         "platform": run.get("platform"),
@@ -127,6 +127,28 @@ def _run_batch_summary(run: dict[str, object]) -> dict[str, object]:
         "next_action": run.get("next_action"),
         "focus_source": "workflow-contract",
     }
+    if isinstance(run.get("error"), dict):
+        summary["focus_source"] = "workflow-read-error"
+        summary["error"] = run["error"]
+    return summary
+
+
+def _inspect_batch_run(root: Path, run_id: str) -> dict[str, object]:
+    try:
+        return inspect_run(root, run_id)
+    except Exception as exc:
+        return {
+            "run_id": run_id,
+            "domain": None,
+            "platform": None,
+            "current_phase": "unreadable",
+            "confirmed_plan": False,
+            "next_action": "repair_workflow",
+            "error": {
+                "type": type(exc).__name__,
+                "message": str(exc),
+            },
+        }
 
 
 def _resume_batch_run(root: Path, run_id: str, auto_safe: bool) -> dict[str, object]:
@@ -150,6 +172,9 @@ def _resume_batch_run(root: Path, run_id: str, auto_safe: bool) -> dict[str, obj
 
 
 def _next_run_focus(runs: list[dict[str, object]]) -> dict[str, object] | None:
+    unreadable = [_run_batch_summary(run) for run in runs if run.get("current_phase") == "unreadable"]
+    if unreadable:
+        return unreadable[0]
     candidates = [_run_batch_summary(run) for run in runs if run.get("next_action") != "complete"]
     if not candidates:
         return None
