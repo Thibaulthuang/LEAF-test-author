@@ -11,6 +11,7 @@ from tools.leaf_author.batch_registry import create_batch
 from tools.leaf_author.device_probe import ProbeCommandResult
 from tools.leaf_author.reports import report_run
 from tools.leaf_author.run_audit import audit_batch, audit_run
+from tools.leaf_author.workflow_diagnostics import inspect_workflow_state
 
 
 class RunAuditTests(unittest.TestCase):
@@ -36,6 +37,18 @@ class RunAuditTests(unittest.TestCase):
             self.assertIn("handoff_ready", passed_checks)
             self.assertIn("user_loop_ready", passed_checks)
             self.assertTrue(all(check["passed"] for check in result["checks"]))
+
+    def test_audit_run_includes_workflow_diagnostics_when_present(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _complete_direct_smoke(root, "audit-diag")
+            inspect_workflow_state(root, "audit-diag")
+
+            result = audit_run(root, "audit-diag")
+
+            self.assertEqual(result["evidence"]["workflow_diagnostics"], ".leaf/runs/audit-diag/workflow_diagnostics.json")
+            passed_checks = [check["name"] for check in result["checks"] if check["passed"]]
+            self.assertIn("workflow_diagnostics_ready", passed_checks)
 
     def test_audit_run_fails_incomplete_run(self):
         with tempfile.TemporaryDirectory() as tmp:

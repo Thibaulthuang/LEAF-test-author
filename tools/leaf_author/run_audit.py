@@ -33,6 +33,8 @@ def audit_run(root: Path, run_id: str) -> dict[str, object]:
     evidence = report.get("evidence", {})
     context_manifest = _load_context_manifest(root, evidence if isinstance(evidence, dict) else {})
     checks.extend(_context_manifest_checks(context_manifest, report))
+    workflow_diagnostics = _load_workflow_diagnostics(root, evidence if isinstance(evidence, dict) else {})
+    checks.extend(_workflow_diagnostics_checks(workflow_diagnostics))
 
     passed = all(bool(check["passed"]) for check in checks)
     payload = {
@@ -50,6 +52,7 @@ def audit_run(root: Path, run_id: str) -> dict[str, object]:
             "report": "report-run",
             "real_device_preflight": preflight.get("artifact") if isinstance(preflight, dict) else None,
             "context_manifest": context_manifest.get("artifact") if isinstance(context_manifest, dict) else None,
+            "workflow_diagnostics": workflow_diagnostics.get("artifact") if isinstance(workflow_diagnostics, dict) else None,
         },
     }
     return _write_run_audit(root, run_id, payload)
@@ -117,6 +120,33 @@ def _load_context_manifest(root: Path, evidence: dict[str, object]) -> dict[str,
         return None
     payload["artifact"] = value
     return payload
+
+
+def _load_workflow_diagnostics(root: Path, evidence: dict[str, object]) -> dict[str, object] | None:
+    value = evidence.get("workflow_diagnostics")
+    if not isinstance(value, str) or not value:
+        return None
+    path = root / value
+    if not path.is_file():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {"artifact": value, "status": "failed", "error": {"type": "JSONDecodeError", "message": "workflow diagnostics is not valid JSON"}}
+    if not isinstance(payload, dict):
+        return {"artifact": value, "status": "failed", "error": {"type": "TypeError", "message": "workflow diagnostics must be a JSON object"}}
+    payload["artifact"] = value
+    return payload
+
+
+def _workflow_diagnostics_checks(workflow_diagnostics: dict[str, object] | None) -> list[dict[str, object]]:
+    if not workflow_diagnostics:
+        return []
+    checks = workflow_diagnostics.get("checks", {})
+    return [
+        _check("workflow_diagnostics_ready", workflow_diagnostics.get("status") == "passed", "Workflow diagnostics artifact reports a readable workflow."),
+        _check("workflow_diagnostics_parseable", bool(isinstance(checks, dict) and checks.get("json_parseable")), "Workflow diagnostics confirms workflow.json parses as JSON."),
+    ]
 
 
 def _context_manifest_checks(context_manifest: dict[str, object] | None, report: dict[str, object]) -> list[dict[str, object]]:
