@@ -91,6 +91,7 @@ def report_batch(root: Path, batch_id: str) -> dict[str, object]:
         "real_device_summary": _batch_real_device_summary(runs),
         "runtime_evidence_summary": _batch_runtime_evidence_summary(runs),
         "gui_handoff_summary": batch_audit["gui_handoff_summary"],
+        "ui_tree_summary": _batch_ui_tree_summary(runs),
         "next_run_focus": _next_report_focus(runs),
         "runs": [_batch_report_summary(run) for run in runs],
         "evidence": batch_audit["evidence"],
@@ -696,6 +697,7 @@ def _next_report_focus(runs: list[dict[str, object]]) -> dict[str, object] | Non
 def _batch_report_summary(run: dict[str, object]) -> dict[str, object]:
     real_device_preflight = run.get("real_device_preflight")
     runtime_evidence = run.get("runtime_evidence_summary")
+    gui_handoff = run.get("gui_handoff")
     summary = {
         "run_id": run.get("run_id"),
         "domain": run.get("domain"),
@@ -710,6 +712,7 @@ def _batch_report_summary(run: dict[str, object]) -> dict[str, object]:
         "decision_contract": run.get("decision_contract") if isinstance(run.get("decision_contract"), dict) else {},
         "real_device_preflight": _batch_preflight_summary(real_device_preflight if isinstance(real_device_preflight, dict) else None),
         "runtime_evidence": _batch_runtime_evidence_detail(runtime_evidence if isinstance(runtime_evidence, dict) else None),
+        "gui_handoff": _batch_gui_handoff_detail(gui_handoff if isinstance(gui_handoff, dict) else None),
     }
     if isinstance(run.get("error"), dict):
         summary["error"] = run["error"]
@@ -766,6 +769,46 @@ def _batch_runtime_evidence_summary(runs: list[dict[str, object]]) -> dict[str, 
         "quality_gates": quality_gates,
         "missing_required_fields": missing_fields,
         "ui_snapshot_ref_count": ui_snapshot_ref_count,
+    }
+
+
+def _batch_ui_tree_summary(runs: list[dict[str, object]]) -> dict[str, object]:
+    summaries = []
+    for run in runs:
+        gui_handoff = run.get("gui_handoff")
+        if not isinstance(gui_handoff, dict):
+            continue
+        ui_tree = gui_handoff.get("ui_tree_summary")
+        if isinstance(ui_tree, dict):
+            summaries.append(ui_tree)
+    foreground_bundles = sorted(
+        {
+            str(foreground.get("bundle"))
+            for summary in summaries
+            for foreground in summary.get("foregrounds", [])
+            if isinstance(foreground, dict) and foreground.get("bundle")
+        }
+    )
+    index_statuses = sorted({status for summary in summaries for status in _string_list(summary.get("index_statuses"))})
+    return {
+        "total_runs_with_ui_tree": len(summaries),
+        "total_snapshots": sum(int(summary.get("snapshot_count") or 0) for summary in summaries),
+        "total_candidates": sum(int(summary.get("total_candidates") or 0) for summary in summaries),
+        "index_statuses": index_statuses,
+        "foreground_bundles": foreground_bundles,
+    }
+
+
+def _batch_gui_handoff_detail(gui_handoff: dict[str, object] | None) -> dict[str, object] | None:
+    if not gui_handoff:
+        return None
+    return {
+        "artifact": gui_handoff.get("artifact"),
+        "agent_owner": gui_handoff.get("agent_owner"),
+        "agent_mode": gui_handoff.get("agent_mode"),
+        "contract_status": gui_handoff.get("contract_status"),
+        "contract_issues": _string_list(gui_handoff.get("contract_issues")),
+        "ui_tree_summary": gui_handoff.get("ui_tree_summary") if isinstance(gui_handoff.get("ui_tree_summary"), dict) else {},
     }
 
 

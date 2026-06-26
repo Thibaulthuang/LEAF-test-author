@@ -576,6 +576,10 @@ class ReportTests(unittest.TestCase):
             self.assertEqual(result["gui_handoff_summary"]["ready"], 1)
             self.assertEqual(result["gui_handoff_summary"]["failed"], 0)
             self.assertEqual(result["gui_handoff_summary"]["attention_boundary"], "one_active_run")
+            self.assertEqual(result["ui_tree_summary"]["total_snapshots"], 1)
+            self.assertEqual(result["ui_tree_summary"]["total_candidates"], 0)
+            self.assertEqual(result["ui_tree_summary"]["index_statuses"], ["ready"])
+            self.assertEqual(result["ui_tree_summary"]["foreground_bundles"], ["com.huawei.hmos.camera"])
             self.assertEqual(result["evidence"]["batch_audit"], ".leaf/batches/report-batch-gui/batch_audit.json")
 
     def test_cli_report_commands_output_json(self):
