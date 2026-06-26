@@ -48,6 +48,13 @@ class ReportTests(unittest.TestCase):
             self.assertEqual(result["decision_contract"]["target_policy"]["scope"], "system_app_only")
             self.assertIn("test hap", result["decision_contract"]["target_policy"]["forbidden_terms"])
             self.assertEqual(result["decision_contract"]["agent_mode"], "orchestrator")
+            self.assertEqual(result["action_route"]["phase"], "plan")
+            self.assertEqual(result["action_route"]["next_action"], "present_plan_for_confirmation")
+            self.assertEqual(result["action_route"]["agent_owner"], "leaf-test-author")
+            self.assertEqual(result["action_route"]["agent_mode"], "orchestrator")
+            self.assertEqual(result["action_route"]["user_checkpoint"], "first_plan_confirmation")
+            self.assertEqual(result["action_route"]["user_loop"]["position"], "approve_plan")
+            self.assertEqual(result["action_route"]["command"], "python3 -m tools.leaf_author report-run <run_id>")
 
     def test_report_run_includes_workflow_diagnostics_evidence_when_present(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -524,6 +531,9 @@ class ReportTests(unittest.TestCase):
             self.assertEqual(result["runs"][0]["runtime_evidence"]["schema_status"], "complete")
             self.assertEqual(result["runs"][0]["runtime_evidence"]["ui_snapshot_ref_count"], 1)
             self.assertEqual(result["runs"][0]["runtime_evidence"]["ui_snapshots"][0]["phase"], "after_launch")
+            self.assertEqual(result["runs"][0]["action_route"]["phase"], "complete")
+            self.assertEqual(result["runs"][0]["action_route"]["next_action"], "complete")
+            self.assertEqual(result["runs"][0]["action_route"]["command"], "")
 
     def test_report_batch_summarizes_real_device_risk_and_approval_status(self):
         with tempfile.TemporaryDirectory() as tmp:

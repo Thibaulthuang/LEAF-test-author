@@ -6,6 +6,7 @@ from pathlib import Path
 
 from tools.leaf_author.agent_handoff import AGENT_MODES, HANDOFF_RULES
 from tools.leaf_author.batch_registry import inspect_batch
+from tools.leaf_author.phase_guard import build_agent_handoff_contract
 from tools.leaf_author.real_device_contract import real_device_decision_contract, real_device_runtime_evidence_schema, real_device_user_loop
 from tools.leaf_author.run_registry import inspect_run
 from tools.leaf_author.runtime_registry import approved_real_device_next_command, quality_artifact_priority, real_device_next_command
@@ -40,6 +41,7 @@ def report_run(root: Path, run_id: str) -> dict[str, object]:
     user_loop = _report_user_loop(resume_summary, approval_required, input_required)
     decision_contract = _report_decision_contract(resume_summary, approval_required, input_required)
     operator_message = _report_operator_message(resume_summary, approval_required, input_required)
+    action_route = _report_action_route(run)
     return {
         "schema_version": "1.0",
         "run_id": run_id,
@@ -54,6 +56,7 @@ def report_run(root: Path, run_id: str) -> dict[str, object]:
         "user_checkpoint": user_checkpoint,
         "user_loop": user_loop,
         "decision_contract": decision_contract,
+        "action_route": action_route,
         "context_manifest": context_manifest_summary,
         "operator_message": operator_message,
         "next_command": _next_command(run_id, run, safe_to_auto_continue, user_checkpoint, approval_required, input_required),
@@ -698,6 +701,7 @@ def _unreadable_run_report(root: Path, run_summary: dict[str, object]) -> dict[s
             "allowed_artifacts": ["workflow"],
             "target_policy": default_target_policy(),
         },
+        "action_route": _repair_action_route(),
         "operator_message": "Workflow state is unreadable; repair workflow.json before reporting or resuming this run.",
         "next_command": "",
         "approval_required": None,
@@ -740,6 +744,7 @@ def _batch_report_summary(run: dict[str, object]) -> dict[str, object]:
         "user_checkpoint": run.get("user_checkpoint"),
         "next_command": run.get("next_command"),
         "decision_contract": run.get("decision_contract") if isinstance(run.get("decision_contract"), dict) else {},
+        "action_route": run.get("action_route") if isinstance(run.get("action_route"), dict) else {},
         "real_device_preflight": _batch_preflight_summary(real_device_preflight if isinstance(real_device_preflight, dict) else None),
         "runtime_evidence": _batch_runtime_evidence_detail(runtime_evidence if isinstance(runtime_evidence, dict) else None),
         "gui_handoff": _batch_gui_handoff_detail(gui_handoff if isinstance(gui_handoff, dict) else None),
@@ -885,3 +890,34 @@ def _string_list(value: object) -> list[str]:
 
 def _with_target_policy(decision_contract: dict[str, object]) -> dict[str, object]:
     return with_target_policy(decision_contract, normalize_target_policy(decision_contract.get("target_policy")))
+
+
+def _report_action_route(run: dict[str, object]) -> dict[str, object]:
+    phase = str(run.get("current_phase", ""))
+    routes = build_agent_handoff_contract().get("action_routes")
+    if isinstance(routes, dict):
+        route = routes.get(phase)
+        if isinstance(route, dict):
+            return dict(route)
+    return _repair_action_route(phase)
+
+
+def _repair_action_route(phase: str = "unreadable") -> dict[str, object]:
+    return {
+        "phase": phase,
+        "next_action": "repair_workflow",
+        "trigger_source": "workflow.json",
+        "agent_owner": "leaf-test-author",
+        "agent_mode": "orchestrator",
+        "handoff_required": False,
+        "subagent_boundary": "workflow_orchestration",
+        "context_slice": ["workflow"],
+        "allowed_artifacts": ["workflow"],
+        "user_checkpoint": "manual_operator_decision",
+        "auto_safe": False,
+        "user_loop": {
+            "position": "manual_triage",
+            "required_input": "repair workflow.json",
+        },
+        "command": "python3 -m tools.leaf_author workflow-diagnostics <run_id>",
+    }
