@@ -60,6 +60,7 @@ def build_extension_contract(domain: str) -> dict[str, object]:
             "quality_artifact_priority": quality_artifact_priority(domain),
             "quality_gates": runtime_quality_gates(domain),
             "safety_profiles": {mode: runtime_safety_profile(domain, mode) for mode in runtime_modes},
+            "runtime_evidence": _runtime_evidence_for_domain(real_device_contract, domain),
             "runtime_registry_status": runtime_registry_guard["status"],
             "registry_manifest_kind": runtime_registry_contract["manifest_kind"],
         },
@@ -119,6 +120,14 @@ def validate_extension_contract(domain: str, strict_real_device: bool = False) -
             missing_items.append("runtime_registry: register real-device quality gates")
         if runtime_contract.get("runtime_registry_status") != "stable":
             missing_items.append("runtime_registry: runtime registry guard must be stable")
+        runtime_modes = runtime_contract.get("registered_modes", [])
+        runtime_evidence = runtime_contract.get("runtime_evidence", {})
+        if not isinstance(runtime_evidence, dict) or not runtime_evidence:
+            missing_items.append("real_device_contract: register runtime evidence schema")
+        elif isinstance(runtime_modes, list):
+            for mode in runtime_modes:
+                if str(mode) not in runtime_evidence:
+                    missing_items.append(f"real_device_contract: register runtime evidence schema for {mode}")
         if isinstance(real_device_contract, dict) and real_device_contract.get("status") != "stable":
             missing_items.append("real_device_contract: real-device gate guard must be stable")
     if missing_items:
@@ -137,6 +146,20 @@ def _checkpoint_phases(contract: dict[str, object], checkpoint: str) -> list[str
     if not isinstance(phases, dict):
         return []
     return [name for name, phase in phases.items() if isinstance(phase, dict) and phase.get("user_checkpoint") == checkpoint]
+
+
+def _runtime_evidence_for_domain(real_device_contract: dict[str, object], domain: str) -> dict[str, object]:
+    runtime_evidence = real_device_contract.get("runtime_evidence", {})
+    if not isinstance(runtime_evidence, dict):
+        return {}
+    domain_evidence = runtime_evidence.get(domain, {})
+    if not isinstance(domain_evidence, dict):
+        return {}
+    return {
+        str(mode): schema
+        for mode, schema in domain_evidence.items()
+        if isinstance(schema, dict)
+    }
 
 
 def _user_loop_positions(contract: dict[str, object]) -> dict[str, str]:

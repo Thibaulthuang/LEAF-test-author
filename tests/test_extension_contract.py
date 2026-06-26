@@ -22,6 +22,9 @@ class ExtensionContractTests(unittest.TestCase):
         self.assertEqual(contract["runtime_contract"]["safety_profiles"]["direct_smoke"]["mutates_device_state"], False)
         self.assertEqual(contract["runtime_contract"]["runtime_registry_status"], "stable")
         self.assertEqual(contract["runtime_contract"]["registry_manifest_kind"], "leaf_runtime_registry_contract")
+        self.assertEqual(contract["runtime_contract"]["runtime_evidence"]["direct_smoke"]["artifact"], "camera_direct_smoke")
+        self.assertIn("bundle_verified", contract["runtime_contract"]["runtime_evidence"]["direct_smoke"]["required_evidence_fields"])
+        self.assertEqual(contract["runtime_contract"]["runtime_evidence"]["capture_e2e"]["quality_gate"], "CAMERA_CAPTURE_E2E_PASS")
         self.assertEqual(
             contract["runtime_contract"]["safety_profiles"]["capture_e2e"]["requires_approval_token"],
             "approve_camera_capture_e2e",
@@ -86,6 +89,7 @@ class ExtensionContractTests(unittest.TestCase):
         self.assertEqual(strict_ready["strict_real_device"], True)
         self.assertEqual(strict_incomplete["status"], "incomplete")
         self.assertIn("default real-device runtime mode", " ".join(strict_incomplete["missing"]))
+        self.assertIn("runtime evidence schema", " ".join(strict_incomplete["missing"]))
 
     def test_cli_export_and_validate_extension_contract(self):
         from tools.leaf_author.__main__ import main
