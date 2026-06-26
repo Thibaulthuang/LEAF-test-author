@@ -223,6 +223,25 @@ class ReportTests(unittest.TestCase):
             self.assertEqual(result["next_run_focus"]["run_id"], "report-safe")
             self.assertEqual(result["runs"][0]["run_id"], "report-wait")
 
+    def test_report_batch_isolates_unreadable_run_workflow(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "打开相机", run_id="report-good")
+            start_new_case(root, "camera", "坏 workflow", run_id="report-bad")
+            create_batch(root, "report-batch-unreadable", ["report-good", "report-bad"])
+            (root / ".leaf" / "runs" / "report-bad" / "workflow.json").write_text("", encoding="utf-8")
+
+            result = report_batch(root, "report-batch-unreadable")
+
+            self.assertEqual(result["total_runs"], 2)
+            self.assertEqual(result["summary"]["blocked_or_inspect"], 1)
+            bad = [run for run in result["runs"] if run["run_id"] == "report-bad"][0]
+            self.assertEqual(bad["current_phase"], "unreadable")
+            self.assertEqual(bad["next_action"], "repair_workflow")
+            self.assertEqual(bad["user_checkpoint"], "manual_operator_decision")
+            self.assertIn("error", bad)
+            self.assertEqual(result["next_run_focus"]["run_id"], "report-bad")
+
     def test_report_batch_includes_lightweight_real_device_preflight_summary(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

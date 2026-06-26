@@ -55,7 +55,7 @@ def report_run(root: Path, run_id: str) -> dict[str, object]:
 
 def report_batch(root: Path, batch_id: str) -> dict[str, object]:
     batch = inspect_batch(root, batch_id)
-    runs = [report_run(root, str(run["run_id"])) for run in batch["runs"]]
+    runs = [_report_batch_run(root, run) for run in batch["runs"]]
     status_counts = Counter(_report_status(run) for run in runs)
     return {
         "schema_version": "1.0",
@@ -291,6 +291,8 @@ def _next_command(
 def _report_status(run: dict[str, object]) -> str:
     if run.get("current_phase") == "complete":
         return "complete"
+    if run.get("current_phase") == "unreadable" or run.get("next_action") == "repair_workflow":
+        return "blocked_or_inspect"
     if run.get("safe_to_auto_continue"):
         return "safe_to_auto_continue"
     if run.get("user_action_required"):
@@ -298,7 +300,54 @@ def _report_status(run: dict[str, object]) -> str:
     return "blocked_or_inspect"
 
 
+def _report_batch_run(root: Path, run_summary: dict[str, object]) -> dict[str, object]:
+    if run_summary.get("current_phase") == "unreadable" or isinstance(run_summary.get("error"), dict):
+        return _unreadable_run_report(run_summary)
+    return report_run(root, str(run_summary["run_id"]))
+
+
+def _unreadable_run_report(run_summary: dict[str, object]) -> dict[str, object]:
+    return {
+        "schema_version": "1.0",
+        "run_id": run_summary.get("run_id"),
+        "domain": run_summary.get("domain"),
+        "platform": run_summary.get("platform"),
+        "current_phase": "unreadable",
+        "confirmed_plan": False,
+        "next_action": "repair_workflow",
+        "latest_quality_gate": "UNKNOWN",
+        "safe_to_auto_continue": False,
+        "user_action_required": True,
+        "user_checkpoint": "manual_operator_decision",
+        "user_loop": {
+            "position": "manual_triage",
+            "required_input": "repair workflow.json",
+        },
+        "decision_contract": {
+            "trigger_source": "workflow.json",
+            "agent_owner": "leaf-test-author",
+            "context_slice": ["workflow"],
+            "allowed_artifacts": ["workflow"],
+        },
+        "operator_message": "Workflow state is unreadable; repair workflow.json before reporting or resuming this run.",
+        "next_command": "",
+        "approval_required": None,
+        "input_required": None,
+        "real_device_preflight": None,
+        "evidence": {},
+        "error": run_summary.get("error"),
+        "context_policy": {
+            "scope": "run_report",
+            "load_strategy": "summary_plus_existing_evidence_paths",
+            "artifact_loading": "on_demand",
+        },
+    }
+
+
 def _next_report_focus(runs: list[dict[str, object]]) -> dict[str, object] | None:
+    for run in runs:
+        if run.get("current_phase") == "unreadable" or run.get("next_action") == "repair_workflow":
+            return _batch_report_summary(run)
     for status in ("safe_to_auto_continue", "waiting_for_user", "blocked_or_inspect"):
         for run in runs:
             if _report_status(run) == status:
@@ -308,7 +357,7 @@ def _next_report_focus(runs: list[dict[str, object]]) -> dict[str, object] | Non
 
 def _batch_report_summary(run: dict[str, object]) -> dict[str, object]:
     real_device_preflight = run.get("real_device_preflight")
-    return {
+    summary = {
         "run_id": run.get("run_id"),
         "domain": run.get("domain"),
         "platform": run.get("platform"),
@@ -321,6 +370,9 @@ def _batch_report_summary(run: dict[str, object]) -> dict[str, object]:
         "next_command": run.get("next_command"),
         "real_device_preflight": _batch_preflight_summary(real_device_preflight if isinstance(real_device_preflight, dict) else None),
     }
+    if isinstance(run.get("error"), dict):
+        summary["error"] = run["error"]
+    return summary
 
 
 def _batch_preflight_summary(preflight: dict[str, object] | None) -> dict[str, object] | None:
