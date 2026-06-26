@@ -8,6 +8,8 @@ from tools.leaf_author.device_probe import ProbeRunner
 from tools.leaf_author.device_probe import HdcProbe
 from tools.leaf_author.e2e import run_e2e
 from tools.leaf_author.e2e_report import write_e2e_preflight_report
+from tools.leaf_author.runtime.evidence import write_ui_snapshot
+from tools.leaf_author.runtime.ui_tree import build_index, diff_indexes, find_candidates, parse_layout
 from tools.leaf_author.workflow import load_workflow, save_workflow
 
 
@@ -122,6 +124,7 @@ def run_camera_direct_smoke(
     layout_path = _layout_path(_command_text(ui_tree))
     layout_file = _run_hdc(probe, [probe.hdc_path, "-t", serial, "shell", "cat", layout_path], 10) if layout_path else None
     ui_tree_text = _command_text(layout_file) if layout_file and _command_succeeded(layout_file) else _command_text(ui_tree)
+    ui_snapshot = write_ui_snapshot(root, run_id, phase="after_launch", action_id="camera_direct", raw_layout=ui_tree_text)
     hilog = _run_hdc(probe, [probe.hdc_path, "-t", serial, "shell", "hilog", "-x"], 10)
     layout_verified = _layout_verified(ui_tree_text, bundle_name, ability_name)
     passed = _command_succeeded(launch) and _command_succeeded(ui_tree) and layout_verified
@@ -140,6 +143,9 @@ def run_camera_direct_smoke(
             "evidence": {
                 "layout_path": layout_path,
                 "layout_verified": layout_verified,
+                "ui_snapshots": {
+                    "after_launch": ui_snapshot,
+                },
                 "ui_tree_excerpt": ui_tree_text[:4000],
                 "hilog_excerpt": _command_text(hilog)[:4000],
             },
@@ -206,8 +212,12 @@ def run_camera_capture_e2e(
     )
     before = _dump_layout(probe, serial)
     before_text = _command_text(before["layout"])
-    photo_mode_node = _find_layout_node(before_text, node_id="COMPONENT_ID_CONTROL_PHOTO_2", text_value="拍照")
-    shutter_node = _find_layout_node(before_text, node_id="COMPONENT_ID_SHUTTER_PHOTO_1", clickable=True)
+    before_snapshot = write_ui_snapshot(root, run_id, phase="before_capture", action_id="camera_capture", raw_layout=before_text)
+    before_index = build_index(parse_layout(before_text))
+    photo_mode_candidates = find_candidates(before_index, selectors=[{"id": "COMPONENT_ID_CONTROL_PHOTO_2"}, {"text": "拍照"}])
+    shutter_candidates = find_candidates(before_index, selectors=[{"id": "COMPONENT_ID_SHUTTER_PHOTO_1"}, {"clickable": True}])
+    photo_mode_node = _first_candidate(photo_mode_candidates, required_id="COMPONENT_ID_CONTROL_PHOTO_2", required_text="拍照")
+    shutter_node = _first_candidate(shutter_candidates, required_id="COMPONENT_ID_SHUTTER_PHOTO_1", required_clickable=True)
     tap = _node_center(shutter_node) if shutter_node else None
     before_media = _list_camera_media(probe, serial) if tap else []
     capture = (
@@ -219,6 +229,8 @@ def run_camera_capture_e2e(
     after_media = _list_camera_media(probe, serial) if _command_succeeded(capture) else []
     new_media_files = _new_media_files(before_media, after_media)
     after_text = _command_text(after["layout"])
+    after_snapshot = write_ui_snapshot(root, run_id, phase="after_capture", action_id="camera_capture", raw_layout=after_text)
+    after_index = build_index(parse_layout(after_text))
     hilog = _run_hdc(probe, [probe.hdc_path, "-t", serial, "shell", "hilog", "-x"], 10)
     before_verified = _layout_verified(before_text, bundle_name, ability_name)
     after_verified = _layout_verified(after_text, bundle_name, ability_name)
@@ -265,6 +277,13 @@ def run_camera_capture_e2e(
                 "media_before": before_media,
                 "media_after": after_media,
                 "new_media_files": new_media_files,
+                "ui_snapshots": {
+                    "before_capture": before_snapshot,
+                    "after_capture": after_snapshot,
+                },
+                "ui_diff": diff_indexes(before_index, after_index),
+                "photo_mode_candidates": photo_mode_candidates[:5],
+                "shutter_candidates": shutter_candidates[:5],
                 "ui_tree_excerpt": before_text[:4000],
                 "after_ui_tree_excerpt": after_text[:4000],
                 "hilog_excerpt": _command_text(hilog)[:4000],
@@ -495,6 +514,23 @@ def _find_layout_node(text: str, node_id: str, text_value: str | None = None, cl
     return None
 
 
+def _first_candidate(
+    candidates: list[dict[str, object]],
+    required_id: str | None = None,
+    required_text: str | None = None,
+    required_clickable: bool | None = None,
+) -> dict[str, object] | None:
+    for candidate in candidates:
+        if required_id is not None and candidate.get("id") != required_id:
+            continue
+        if required_text is not None and candidate.get("text") != required_text:
+            continue
+        if required_clickable is not None and bool(candidate.get("clickable")) is not required_clickable:
+            continue
+        return candidate
+    return None
+
+
 def _iter_layout_attributes(node: object):
     if not isinstance(node, dict):
         return
@@ -510,6 +546,14 @@ def _iter_layout_attributes(node: object):
 def _node_center(node: dict[str, object] | None) -> dict[str, int] | None:
     if not node:
         return None
+    center = node.get("center")
+    if isinstance(center, dict) and isinstance(center.get("x"), int) and isinstance(center.get("y"), int):
+        return {"x": int(center["x"]), "y": int(center["y"])}
+    if isinstance(node.get("bounds"), list):
+        bounds_values = node["bounds"]
+        if len(bounds_values) == 4 and all(isinstance(value, int) for value in bounds_values):
+            x1, y1, x2, y2 = bounds_values
+            return {"x": (x1 + x2) // 2, "y": (y1 + y2) // 2}
     bounds = str(node.get("bounds") or "")
     parts = [int(value) for value in bounds.replace("[", ",").replace("]", ",").split(",") if value.strip().isdigit()]
     if len(parts) != 4:

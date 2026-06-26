@@ -270,6 +270,8 @@ class CameraSmokeTests(unittest.TestCase):
             self.assertEqual(result["quality_gate"], "CAMERA_DIRECT_SMOKE_PASS")
             self.assertEqual(result["target_app"]["bundle_name"], "com.huawei.hmos.camera")
             self.assertEqual(result["launch"]["exit_code"], 0)
+            self.assertEqual(result["evidence"]["ui_snapshots"]["after_launch"]["kind"], "ui_snapshot")
+            self.assertTrue((root / result["evidence"]["ui_snapshots"]["after_launch"]["index_path"]).is_file())
             self.assertIn("Camera", result["evidence"]["ui_tree_excerpt"])
             self.assertIn("camera foreground", result["evidence"]["hilog_excerpt"])
             self.assertIn(
@@ -339,6 +341,7 @@ class CameraSmokeTests(unittest.TestCase):
 
             self.assertEqual(result["quality_gate"], "CAMERA_DIRECT_SMOKE_PASS")
             self.assertEqual(result["evidence"]["layout_path"], layout_path)
+            self.assertTrue((root / result["evidence"]["ui_snapshots"]["after_launch"]["raw_path"]).is_file())
             self.assertIn("相机", result["evidence"]["ui_tree_excerpt"])
 
     def test_run_camera_direct_smoke_requires_camera_layout_evidence(self):
@@ -614,6 +617,11 @@ class CameraSmokeTests(unittest.TestCase):
             self.assertEqual(result["evidence"]["shutter_node"]["id"], "COMPONENT_ID_SHUTTER_PHOTO_1")
             self.assertEqual(result["evidence"]["shutter_tap"], {"x": 540, "y": 2066})
             self.assertEqual(result["evidence"]["new_media_files"], ["/storage/media/100/local/files/Photo/16/IMG_101.heic"])
+            self.assertEqual(result["evidence"]["ui_snapshots"]["before_capture"]["kind"], "ui_snapshot")
+            self.assertEqual(result["evidence"]["ui_snapshots"]["after_capture"]["kind"], "ui_snapshot")
+            self.assertTrue((root / result["evidence"]["ui_snapshots"]["before_capture"]["index_path"]).is_file())
+            self.assertTrue((root / result["evidence"]["ui_snapshots"]["after_capture"]["index_path"]).is_file())
+            self.assertEqual(result["evidence"]["ui_diff"]["node_count_delta"], 0)
             self.assertIn(["hdc", "-t", "SERIAL123", "shell", "uitest", "uiInput", "click", "540", "2066"], calls)
             workflow = load_workflow(root, "camera-capture")
             self.assertEqual(workflow["current_phase"], "camera_capture_e2e_complete")
