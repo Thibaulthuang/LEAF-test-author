@@ -73,7 +73,7 @@ def batch_focus_priority_for_run(run: dict[str, object], contract: dict[str, obj
 
 
 def write_context_manifest(root: Path, run_id: str, decision: dict[str, object] | None = None) -> dict[str, object]:
-    from tools.leaf_author.workflow import load_workflow, save_workflow
+    from tools.leaf_author.workflow import load_workflow, save_workflow, with_phase_state
 
     workflow = load_workflow(root, run_id)
     decision = decision or decide_next_step(workflow)
@@ -132,6 +132,7 @@ def write_context_manifest(root: Path, run_id: str, decision: dict[str, object] 
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     workflow["artifacts"] = artifacts
+    workflow = with_phase_state(workflow, decision=decision)
     save_workflow(root, workflow)
     return {
         "run_id": run_id,

@@ -95,6 +95,10 @@ class PhaseContractTests(unittest.TestCase):
             self.assertIn('"context_manifest"', payload)
             workflow = load_workflow(root, "manifest-run")
             self.assertEqual(workflow["artifacts"]["context_manifest"], ".leaf/runs/manifest-run/context_manifest.json")
+            self.assertEqual(workflow["phase_state"]["current_phase"], "hypium_draft")
+            self.assertEqual(workflow["phase_state"]["next_action"], "validate_pytest_draft")
+            self.assertEqual(workflow["phase_state"]["agent_owner"], "tools.leaf_author")
+            self.assertEqual(workflow["phase_state"]["safe_to_auto_continue"], True)
 
     def test_context_manifest_contains_agent_handoff_and_user_loop_snapshot(self):
         with tempfile.TemporaryDirectory() as tmp:

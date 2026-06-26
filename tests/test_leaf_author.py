@@ -25,6 +25,12 @@ class LeafAuthorWorkflowTests(unittest.TestCase):
             self.assertEqual(workflow["owner"], "leaf-test-author")
             self.assertEqual(workflow["confirmed_plan"], False)
             self.assertEqual(workflow["artifacts"]["run_dir"], ".leaf/runs/run-001")
+            self.assertEqual(workflow["phase_state"]["current_phase"], "plan")
+            self.assertEqual(workflow["phase_state"]["trigger_source"], "workflow.json")
+            self.assertEqual(workflow["phase_state"]["agent_owner"], "leaf-test-author")
+            self.assertEqual(workflow["phase_state"]["user_checkpoint"], "first_plan_confirmation")
+            self.assertEqual(workflow["phase_state"]["user_loop"]["position"], "approve_plan")
+            self.assertEqual(workflow["phase_state"]["safe_to_auto_continue"], False)
 
             loaded = load_workflow(root, "run-001")
             self.assertEqual(loaded, workflow)
@@ -552,6 +558,14 @@ class LeafAuthorWorkflowTests(unittest.TestCase):
             self.assertEqual(after["current_phase"], "hypium_draft")
             self.assertEqual(after["resume_summary"]["requires_user_confirmation"], False)
             self.assertEqual(after["resume_summary"]["safe_to_auto_continue"], True)
+            workflow = load_workflow(root, "run-007")
+            self.assertEqual(workflow["phase_state"]["current_phase"], "hypium_draft")
+            self.assertEqual(workflow["phase_state"]["next_action"], "validate_pytest_draft")
+            self.assertEqual(workflow["phase_state"]["agent_owner"], "tools.leaf_author")
+            self.assertEqual(workflow["phase_state"]["context_slice"], ["workflow", "case", "pytest", "hypium"])
+            self.assertEqual(workflow["phase_state"]["user_loop"]["position"], "observe_safe_local_progress")
+            self.assertEqual(workflow["phase_state"]["safe_to_auto_continue"], True)
+            self.assertEqual(workflow["artifacts"]["context_manifest"], ".leaf/runs/run-007/context_manifest.json")
 
     def test_resume_run_auto_safe_advances_confirmed_local_workflow(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -569,6 +583,10 @@ class LeafAuthorWorkflowTests(unittest.TestCase):
             self.assertEqual(result["current_phase"], "complete")
             self.assertEqual(result["advance_result"]["stages"], ["validation", "pytest_result", "gui_context", "experience", "team_export_manifest"])
             self.assertTrue((root / ".leaf" / "runs" / "run-auto-resume" / "team_export_manifest.json").exists())
+            workflow = load_workflow(root, "run-auto-resume")
+            self.assertEqual(workflow["phase_state"]["current_phase"], "complete")
+            self.assertEqual(workflow["phase_state"]["next_action"], "complete")
+            self.assertEqual(workflow["phase_state"]["safe_to_auto_continue"], False)
 
     def test_resume_run_auto_safe_does_not_cross_confirmation_boundary(self):
         with tempfile.TemporaryDirectory() as tmp:

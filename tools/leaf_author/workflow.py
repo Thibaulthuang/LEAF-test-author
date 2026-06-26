@@ -26,6 +26,7 @@ def create_workflow(root: Path, domain: str, teststep: str, run_id: str) -> dict
             "plan": (run_dir / "plan.json").as_posix(),
         },
     }
+    workflow = with_phase_state(workflow)
     workflow_path = root / run_dir / "workflow.json"
     _write_json_atomic(workflow_path, workflow)
     return workflow
@@ -39,7 +40,31 @@ def load_workflow(root: Path, run_id: str) -> dict[str, object]:
 def save_workflow(root: Path, workflow: dict[str, object]) -> None:
     run_id = str(workflow["run_id"])
     workflow_path = root / ".leaf" / "runs" / run_id / "workflow.json"
+    workflow = with_phase_state(workflow)
     _write_json_atomic(workflow_path, workflow)
+
+
+def with_phase_state(workflow: dict[str, object], decision: dict[str, object] | None = None) -> dict[str, object]:
+    from tools.leaf_author.phase_contract import decide_next_step
+
+    decision = decision or decide_next_step(workflow)
+    phase_state = {
+        "current_phase": str(decision.get("current_phase", "")),
+        "next_action": str(decision.get("next_action", "inspect_workflow_state")),
+        "trigger_source": str(decision.get("trigger_source", "workflow.json")),
+        "agent_owner": str(decision.get("agent_owner", "leaf-test-author")),
+        "context_slice": [str(item) for item in decision.get("context_slice", [])] if isinstance(decision.get("context_slice"), list) else [],
+        "allowed_artifacts": [str(item) for item in decision.get("allowed_artifacts", [])] if isinstance(decision.get("allowed_artifacts"), list) else [],
+        "user_checkpoint": decision.get("user_checkpoint"),
+        "requires_user_confirmation": bool(decision.get("requires_user_confirmation", False)),
+        "safe_to_auto_continue": bool(decision.get("safe_to_auto_continue", False)),
+        "user_loop": decision.get("user_loop", {}) if isinstance(decision.get("user_loop"), dict) else {},
+        "attention_boundary": "one_active_run",
+        "artifact_loading": "on_demand",
+    }
+    updated = dict(workflow)
+    updated["phase_state"] = phase_state
+    return updated
 
 
 def _write_json_atomic(path: Path, payload: dict[str, object]) -> None:

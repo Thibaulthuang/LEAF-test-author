@@ -48,6 +48,8 @@ def start_new_case(
         probe_path = run_dir / "device_probe.json"
         probe_path.write_text(json.dumps(probe, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         result["device_probe_path"] = str(probe_path)
+    context_manifest = write_context_manifest(root, run_id)
+    result["context_manifest"] = context_manifest
     return result
 
 
@@ -73,6 +75,7 @@ def confirm_plan(root: Path, run_id: str) -> dict[str, object]:
     artifacts["openharmony_test_project"] = str(export_dir.relative_to(root))
     workflow["artifacts"] = artifacts
     save_workflow(root, workflow)
+    context_manifest = write_context_manifest(root, run_id)
 
     return {
         "run_id": run_id,
@@ -84,6 +87,7 @@ def confirm_plan(root: Path, run_id: str) -> dict[str, object]:
         "openharmony_test_project": str(export_dir),
         "current_phase": "hypium_draft",
         "next_action": "validate_pytest_draft",
+        "context_manifest": context_manifest,
     }
 
 
@@ -164,6 +168,21 @@ def advance_run(
         if not approval["approved"]:
             approval_artifact = _write_real_device_approval_artifact(root, run_id, workflow, selected_runtime_mode, approval)
             approval_contract = real_device_decision_contract("approval")
+            decision = {
+                "current_phase": workflow.get("current_phase"),
+                "confirmed_plan": bool(workflow.get("confirmed_plan", False)),
+                "next_action": "request_real_device_approval",
+                "requires_user_confirmation": True,
+                "safe_to_auto_continue": False,
+                "operator_message": approval["runtime_safety"].get("operator_message", "Explicit real-device approval is required."),
+                "user_checkpoint": "real_device_confirmation",
+                "agent_owner": approval_contract["agent_owner"],
+                "context_slice": ["workflow", "real_device_approval"],
+                "trigger_source": approval_contract["trigger_source"],
+                "allowed_artifacts": ["workflow", "real_device_approval"],
+                "user_loop": real_device_user_loop("approval", str(approval["required_approval_token"])),
+            }
+            context_manifest = write_context_manifest(root, run_id, decision=decision)
             return {
                 "run_id": run_id,
                 "status": "blocked",
@@ -174,17 +193,8 @@ def advance_run(
                 "required_approval_token": approval["required_approval_token"],
                 "runtime_safety": approval["runtime_safety"],
                 "real_device_approval_path": approval_artifact["path"],
-                "resume_summary": {
-                    "requires_user_confirmation": True,
-                    "safe_to_auto_continue": False,
-                    "operator_message": approval["runtime_safety"].get("operator_message", "Explicit real-device approval is required."),
-                    "user_checkpoint": "real_device_confirmation",
-                    "agent_owner": approval_contract["agent_owner"],
-                    "context_slice": ["workflow", "runtime_safety"],
-                    "trigger_source": approval_contract["trigger_source"],
-                    "allowed_artifacts": ["workflow"],
-                    "user_loop": real_device_user_loop("approval", str(approval["required_approval_token"])),
-                },
+                "resume_summary": _resume_summary(decision),
+                "context_manifest": context_manifest,
             }
         if approval["required_approval_token"]:
             _write_real_device_approval_artifact(root, run_id, workflow, selected_runtime_mode, approval, approval_token=approval_token)
@@ -193,6 +203,21 @@ def advance_run(
         if not serial_decision["ready"]:
             input_artifact = _write_real_device_input_artifact(root, run_id, workflow, selected_runtime_mode, serial_decision)
             input_contract = real_device_decision_contract("input")
+            decision = {
+                "current_phase": workflow.get("current_phase"),
+                "confirmed_plan": bool(workflow.get("confirmed_plan", False)),
+                "next_action": "provide_real_device_serial",
+                "requires_user_confirmation": True,
+                "safe_to_auto_continue": False,
+                "operator_message": "Real-device runtime requires an explicit --serial value before local or device stages run.",
+                "user_checkpoint": "manual_operator_decision",
+                "agent_owner": input_contract["agent_owner"],
+                "context_slice": ["workflow", "real_device_input"],
+                "trigger_source": input_contract["trigger_source"],
+                "allowed_artifacts": ["workflow", "real_device_input"],
+                "user_loop": real_device_user_loop("input"),
+            }
+            context_manifest = write_context_manifest(root, run_id, decision=decision)
             return {
                 "run_id": run_id,
                 "status": "blocked",
@@ -201,17 +226,8 @@ def advance_run(
                 "stages": stages,
                 "next_action": "provide_real_device_serial",
                 "real_device_input_path": input_artifact["path"],
-                "resume_summary": {
-                    "requires_user_confirmation": True,
-                    "safe_to_auto_continue": False,
-                    "operator_message": "Real-device runtime requires an explicit --serial value before local or device stages run.",
-                    "user_checkpoint": "manual_operator_decision",
-                    "agent_owner": input_contract["agent_owner"],
-                    "context_slice": ["workflow"],
-                    "trigger_source": input_contract["trigger_source"],
-                    "allowed_artifacts": ["workflow"],
-                    "user_loop": real_device_user_loop("input"),
-                },
+                "resume_summary": _resume_summary(decision),
+                "context_manifest": context_manifest,
             }
         effective_serial = str(serial_decision["serial"]).strip()
         _write_real_device_input_artifact(root, run_id, workflow, selected_runtime_mode, serial_decision)
