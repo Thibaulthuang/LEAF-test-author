@@ -89,6 +89,29 @@ def write_context_manifest(root: Path, run_id: str, decision: dict[str, object] 
             continue
         if key in exposed_artifacts and (key == "context_manifest" or (root / value).exists()):
             referenced_artifacts[key] = value
+    user_loop = decision.get("user_loop", {})
+    if not isinstance(user_loop, dict):
+        user_loop = {}
+    user_loop_snapshot = {
+        "position": str(user_loop.get("position", "observe_safe_local_progress")),
+        "required_input": str(user_loop.get("required_input", "")),
+        "user_checkpoint": decision.get("user_checkpoint"),
+        "requires_user_confirmation": bool(decision.get("requires_user_confirmation", False)),
+        "safe_to_auto_continue": bool(decision.get("safe_to_auto_continue", False)),
+    }
+    handoff = {
+        "from_agent": _previous_agent_for_phase(str(decision.get("current_phase", "")), contract=None),
+        "to_agent": decision.get("agent_owner"),
+        "trigger_source": decision.get("trigger_source"),
+        "current_phase": decision.get("current_phase"),
+        "next_action": decision.get("next_action"),
+        "attention_boundary": "one_active_run",
+        "artifact_loading": "on_demand",
+        "context_slice": decision.get("context_slice", []),
+        "allowed_artifacts": decision.get("allowed_artifacts", []),
+        "referenced_artifacts": referenced_artifacts,
+        "user_loop": user_loop_snapshot,
+    }
     payload = {
         "schema_version": "1.0",
         "manifest_kind": "run_context_manifest",
@@ -101,9 +124,10 @@ def write_context_manifest(root: Path, run_id: str, decision: dict[str, object] 
         "attention_boundary": "one_active_run",
         "artifact_loading": "on_demand",
         "user_checkpoint": decision.get("user_checkpoint"),
-        "user_loop": decision.get("user_loop", {}),
+        "user_loop": user_loop_snapshot,
         "safe_to_auto_continue": decision.get("safe_to_auto_continue"),
         "referenced_artifacts": referenced_artifacts,
+        "handoff": handoff,
     }
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -124,6 +148,19 @@ def _effective_user_checkpoint(current_phase: str, confirmed: bool, phase: dict[
     if isinstance(checkpoint, str) and checkpoint:
         return checkpoint
     return None
+
+
+def _previous_agent_for_phase(current_phase: str, contract: dict[str, object] | None = None) -> str:
+    local_authoring_phases = {"pytest_draft", "hypium_draft", "validated", "pytest_ran", "hypium_ran"}
+    if current_phase in local_authoring_phases:
+        return "tools.leaf_author"
+    if current_phase in {"gui_context_collected", "experience_recorded"}:
+        return "leaf-gui-agent"
+    phases = (contract or load_phase_contract()).get("phases", {})
+    phase = phases.get(current_phase) if isinstance(phases, dict) else None
+    if isinstance(phase, dict):
+        return str(phase.get("agent_owner", "leaf-test-author"))
+    return "leaf-test-author"
 
 
 def _unknown_phase(current_phase: str) -> dict[str, object]:

@@ -211,9 +211,13 @@ keep complete before real-device execution can be considered stable.
 Each `resume` refreshes `.leaf/runs/<run_id>/context_manifest.json`. This file is
 the handoff boundary for multi-agent and multi-case work: it names the active
 agent, the context slice to load, existing artifact paths, the user checkpoint,
-and the attention boundary `one_active_run`. Domain and GUI agents should use
-this manifest plus specific evidence paths instead of loading the full run
-directory.
+and the attention boundary `one_active_run`. It also includes a `handoff`
+snapshot with `from_agent`, `to_agent`, `next_action`, `allowed_artifacts`, and
+the referenced artifact paths for the next owner. The embedded `user_loop`
+snapshot carries `requires_user_confirmation` and `safe_to_auto_continue`, so
+subagents can return control to the user instead of crossing checkpoints.
+Domain and GUI agents should use this manifest plus specific evidence paths
+instead of loading the full run directory.
 
 This keeps attention scoped to the active run and makes multi-case authoring
 and execution resumable without relying on conversational memory.

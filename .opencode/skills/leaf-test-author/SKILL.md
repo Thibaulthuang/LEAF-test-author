@@ -146,9 +146,14 @@ is needed for a diagnosis.
 Each `resume`, `inspect-run`, or `report-run` refreshes
 `.leaf/runs/<run_id>/context_manifest.json`. Use that manifest as the handoff
 packet for subagents: it contains the active `agent_owner`, `context_slice`,
-`referenced_artifacts`, `user_checkpoint`, and `attention_boundary`. If the
-manifest says `leaf-gui-agent`, pass the UI snapshot index path and the specific
-question; do not pass the full run directory unless diagnosis requires it.
+`referenced_artifacts`, `user_checkpoint`, and `attention_boundary`. It also
+contains a `handoff` object with `from_agent`, `to_agent`, `next_action`,
+`allowed_artifacts`, and the bounded `context_slice` for the next owner. The
+manifest `user_loop` snapshot records `requires_user_confirmation` and
+`safe_to_auto_continue`, so a subagent can tell whether it should act, observe,
+or return control to the user. If the manifest says `leaf-gui-agent`, pass the
+UI snapshot index path and the specific question; do not pass the full run
+directory unless diagnosis requires it.
 For real-device execution gates, use `real-device-contract` plus
 `real_device_approval.json`, `real_device_input.json`, or
 `real_device_preflight.json` instead of reconstructing gate logic in prompt

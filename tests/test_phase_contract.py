@@ -96,6 +96,35 @@ class PhaseContractTests(unittest.TestCase):
             workflow = load_workflow(root, "manifest-run")
             self.assertEqual(workflow["artifacts"]["context_manifest"], ".leaf/runs/manifest-run/context_manifest.json")
 
+    def test_context_manifest_contains_agent_handoff_and_user_loop_snapshot(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "打开相机", run_id="handoff-manifest")
+            confirm_plan(root, "handoff-manifest")
+            workflow = load_workflow(root, "handoff-manifest")
+            workflow["current_phase"] = "pytest_ran"
+            workflow["artifacts"]["pytest_result"] = ".leaf/runs/handoff-manifest/pytest_result.json"
+            result_path = root / ".leaf" / "runs" / "handoff-manifest" / "pytest_result.json"
+            result_path.write_text('{"quality_gate": "DRAFT_STATIC_PASS"}\n', encoding="utf-8")
+            save_workflow(root, workflow)
+
+            result = write_context_manifest(root, "handoff-manifest")
+            payload = json.loads((root / result["context_manifest_path"]).read_text(encoding="utf-8"))
+
+            self.assertEqual(payload["handoff"]["from_agent"], "tools.leaf_author")
+            self.assertEqual(payload["handoff"]["to_agent"], "leaf-gui-agent")
+            self.assertEqual(payload["handoff"]["next_action"], "collect_gui_context")
+            self.assertEqual(payload["handoff"]["attention_boundary"], "one_active_run")
+            self.assertEqual(payload["handoff"]["artifact_loading"], "on_demand")
+            self.assertEqual(payload["handoff"]["context_slice"], ["workflow", "pytest_result", "ui_tree"])
+            self.assertEqual(payload["handoff"]["allowed_artifacts"], ["pytest_result"])
+            self.assertEqual(payload["handoff"]["referenced_artifacts"]["pytest_result"], ".leaf/runs/handoff-manifest/pytest_result.json")
+            self.assertEqual(payload["user_loop"]["position"], "observe_safe_local_progress")
+            self.assertEqual(payload["user_loop"]["required_input"], "")
+            self.assertEqual(payload["user_loop"]["user_checkpoint"], None)
+            self.assertEqual(payload["user_loop"]["requires_user_confirmation"], False)
+            self.assertEqual(payload["user_loop"]["safe_to_auto_continue"], True)
+
     def test_context_manifest_only_exposes_current_phase_context_artifacts(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
