@@ -24,6 +24,9 @@ Current default platform is OpenHarmony. The most complete domain is `camera`.
 - `tools/leaf_author/`: deterministic Python tool layer for files, state, draft generation, validation, and device orchestration.
 - `tools/leaf_author/domain_registry.py`: domain plugin contract for target
   feature inference, semantic plan validation, and action mapping.
+- `tools/leaf_author/runtime_registry.py`: runtime plugin contract for
+  real-device modes, runtime artifacts, quality gates, experience confidence,
+  and review notes.
 - `tests/`: unit and orchestration tests.
 - `docs/workflow-contract.json`: machine-readable phase, quality-gate, and resume contract.
 - `leaf-workflow-architecture.html`: human-readable workflow architecture document.

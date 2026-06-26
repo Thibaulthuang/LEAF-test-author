@@ -117,6 +117,7 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
         self.assertIn("/leaf-report", readme)
         self.assertIn("one run at a time", readme)
         self.assertIn("tools/leaf_author/domain_registry.py", readme)
+        self.assertIn("tools/leaf_author/runtime_registry.py", readme)
         self.assertIn("--runtime-mode direct_smoke", readme)
         self.assertNotIn("test HAP", readme)
         self.assertNotIn("test package", readme)

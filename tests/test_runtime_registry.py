@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from tools.leaf_author.authoring import advance_run
-from tools.leaf_author.runtime_registry import resolve_runtime_mode, run_domain_runtime
+from tools.leaf_author.runtime_registry import classify_experience_result, experience_candidate_keys, resolve_runtime_mode, runtime_artifact_keys, run_domain_runtime
 
 
 class RuntimeRegistryTests(unittest.TestCase):
@@ -36,6 +36,25 @@ class RuntimeRegistryTests(unittest.TestCase):
     def test_run_domain_runtime_rejects_unknown_domain_mode_pair(self):
         with self.assertRaisesRegex(ValueError, "unsupported runtime mode"):
             run_domain_runtime(Path("."), "runtime-unknown", "display", "direct_smoke", serial="SERIAL123")
+
+    def test_runtime_registry_classifies_camera_experience_without_core_camera_branch(self):
+        direct = classify_experience_result("camera", {"status": "complete", "quality_gate": "CAMERA_DIRECT_SMOKE_PASS"})
+        capture = classify_experience_result("camera", {"status": "complete", "quality_gate": "CAMERA_CAPTURE_E2E_PASS"})
+        draft = classify_experience_result("camera", {"status": "draft_passed", "quality_gate": "DRAFT_STATIC_PASS"})
+
+        self.assertEqual(direct["confidence"], 0.5)
+        self.assertIn("direct smoke", direct["notes"][0])
+        self.assertEqual(capture["confidence"], 0.65)
+        self.assertIn("capture e2e", capture["notes"][0])
+        self.assertEqual(draft["confidence"], 0.0)
+
+    def test_runtime_registry_exposes_artifact_priority_for_experience_and_manifest(self):
+        self.assertEqual(
+            experience_candidate_keys("camera"),
+            ["hypium_result", "camera_capture_e2e", "camera_direct_smoke", "pytest_result"],
+        )
+        self.assertIn("camera_direct_smoke", runtime_artifact_keys("camera"))
+        self.assertEqual(experience_candidate_keys("display"), ["hypium_result", "pytest_result"])
 
     def test_advance_run_can_use_generic_runtime_mode_for_camera_direct(self):
         with tempfile.TemporaryDirectory() as tmp:
