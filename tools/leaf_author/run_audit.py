@@ -12,6 +12,7 @@ from tools.leaf_author.batch_registry import resume_batch
 
 
 def audit_run(root: Path, run_id: str) -> dict[str, object]:
+    initial_workflow_phase_state = _load_workflow_phase_state(root, run_id)
     report = report_run(root, run_id)
     domain = str(report.get("domain", ""))
     checks = [
@@ -44,6 +45,8 @@ def audit_run(root: Path, run_id: str) -> dict[str, object]:
     )
     context_manifest = _load_context_manifest(root, evidence if isinstance(evidence, dict) else {})
     checks.extend(_context_manifest_checks(context_manifest, report))
+    workflow_phase_state = initial_workflow_phase_state if _has_phase_state_snapshot(initial_workflow_phase_state) else _load_workflow_phase_state(root, run_id)
+    checks.extend(_workflow_phase_state_checks(workflow_phase_state, context_manifest, report))
     workflow_diagnostics = _load_workflow_diagnostics(root, evidence if isinstance(evidence, dict) else {})
     checks.extend(_workflow_diagnostics_checks(workflow_diagnostics))
     real_device_trace = _real_device_trace(
@@ -72,6 +75,7 @@ def audit_run(root: Path, run_id: str) -> dict[str, object]:
             "real_device_input": real_device_input.get("artifact") if isinstance(real_device_input, dict) else None,
             "real_device_preflight": preflight.get("artifact") if isinstance(preflight, dict) else None,
             "context_manifest": context_manifest.get("artifact") if isinstance(context_manifest, dict) else None,
+            "workflow_phase_state": workflow_phase_state.get("artifact") if isinstance(workflow_phase_state, dict) else None,
             "workflow_diagnostics": workflow_diagnostics.get("artifact") if isinstance(workflow_diagnostics, dict) else None,
         },
     }
@@ -316,6 +320,71 @@ def _context_manifest_checks(context_manifest: dict[str, object] | None, report:
         _check("handoff_ready", handoff_ready, "Context manifest handoff matches the report decision contract."),
         _check("user_loop_ready", user_loop_ready, "Context manifest user_loop matches report checkpoint and auto-continue state."),
     ]
+
+
+def _load_workflow_phase_state(root: Path, run_id: str) -> dict[str, object] | None:
+    workflow_path = root / ".leaf" / "runs" / run_id / "workflow.json"
+    if not workflow_path.is_file():
+        return None
+    try:
+        workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(workflow, dict):
+        return None
+    phase_state = workflow.get("phase_state")
+    if not isinstance(phase_state, dict):
+        return {"artifact": str(workflow_path.relative_to(root)), "phase_state": None}
+    return {"artifact": str(workflow_path.relative_to(root)), "phase_state": phase_state}
+
+
+def _has_phase_state_snapshot(workflow_phase_state: dict[str, object] | None) -> bool:
+    return isinstance(workflow_phase_state, dict) and isinstance(workflow_phase_state.get("phase_state"), dict)
+
+
+def _workflow_phase_state_checks(
+    workflow_phase_state: dict[str, object] | None,
+    context_manifest: dict[str, object] | None,
+    report: dict[str, object],
+) -> list[dict[str, object]]:
+    if not workflow_phase_state:
+        return [_check("workflow_phase_state_ready", False, "Workflow phase_state snapshot is missing or unreadable.")]
+    phase_state = workflow_phase_state.get("phase_state")
+    if not isinstance(phase_state, dict):
+        return [_check("workflow_phase_state_ready", False, "Workflow phase_state snapshot is missing or not an object.")]
+    ready = (
+        phase_state.get("current_phase") == report.get("current_phase")
+        and phase_state.get("next_action") == report.get("next_action")
+        and phase_state.get("agent_owner") == report.get("decision_contract", {}).get("agent_owner")
+        and phase_state.get("safe_to_auto_continue") == report.get("safe_to_auto_continue")
+        and isinstance(phase_state.get("user_loop"), dict)
+    )
+    manifest_match = _phase_state_matches_manifest(phase_state, context_manifest)
+    return [
+        _check("workflow_phase_state_ready", ready, "Workflow phase_state matches the report decision contract and user loop."),
+        _check("workflow_phase_state_matches_manifest", manifest_match, "Workflow phase_state matches context_manifest handoff and user_loop snapshot."),
+    ]
+
+
+def _phase_state_matches_manifest(phase_state: dict[str, object], context_manifest: dict[str, object] | None) -> bool:
+    if not isinstance(context_manifest, dict):
+        return False
+    handoff = context_manifest.get("handoff")
+    user_loop = context_manifest.get("user_loop")
+    if not isinstance(handoff, dict) or not isinstance(user_loop, dict):
+        return False
+    return (
+        phase_state.get("current_phase") == handoff.get("current_phase")
+        and phase_state.get("next_action") == handoff.get("next_action")
+        and phase_state.get("agent_owner") == handoff.get("to_agent")
+        and phase_state.get("context_slice") == handoff.get("context_slice")
+        and phase_state.get("allowed_artifacts") == handoff.get("allowed_artifacts")
+        and phase_state.get("user_loop") == {
+            "position": user_loop.get("position"),
+            "required_input": user_loop.get("required_input"),
+        }
+        and phase_state.get("safe_to_auto_continue") == user_loop.get("safe_to_auto_continue")
+    )
 
 
 def _load_batch_manifest(root: Path, batch_id: str) -> dict[str, object]:

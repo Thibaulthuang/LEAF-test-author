@@ -36,6 +36,8 @@ class RunAuditTests(unittest.TestCase):
             self.assertIn("context_manifest_ready", passed_checks)
             self.assertIn("handoff_ready", passed_checks)
             self.assertIn("user_loop_ready", passed_checks)
+            self.assertIn("workflow_phase_state_ready", passed_checks)
+            self.assertIn("workflow_phase_state_matches_manifest", passed_checks)
             self.assertTrue(all(check["passed"] for check in result["checks"]))
 
     def test_audit_run_includes_workflow_diagnostics_when_present(self):
@@ -144,6 +146,21 @@ class RunAuditTests(unittest.TestCase):
             self.assertEqual(result["status"], "failed")
             failed_checks = [check["name"] for check in result["checks"] if not check["passed"]]
             self.assertIn("handoff_ready", failed_checks)
+
+    def test_audit_run_fails_when_workflow_phase_state_drifts_from_manifest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _complete_direct_smoke(root, "audit-phase-drift")
+            workflow_path = root / ".leaf" / "runs" / "audit-phase-drift" / "workflow.json"
+            workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+            workflow["phase_state"]["agent_owner"] = "stale-agent"
+            workflow_path.write_text(json.dumps(workflow, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            result = audit_run(root, "audit-phase-drift")
+
+            self.assertEqual(result["status"], "failed")
+            failed_checks = [check["name"] for check in result["checks"] if not check["passed"]]
+            self.assertIn("workflow_phase_state_matches_manifest", failed_checks)
 
     def test_cli_audit_run_outputs_json_and_exit_code(self):
         with tempfile.TemporaryDirectory() as tmp:
