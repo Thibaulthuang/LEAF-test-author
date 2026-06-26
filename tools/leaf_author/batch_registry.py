@@ -152,7 +152,36 @@ def _inspect_batch_run(root: Path, run_id: str) -> dict[str, object]:
 
 
 def _resume_batch_run(root: Path, run_id: str, auto_safe: bool) -> dict[str, object]:
-    resume = resume_run(root, str(run_id), auto_safe=auto_safe)
+    try:
+        resume = resume_run(root, str(run_id), auto_safe=auto_safe)
+    except Exception as exc:
+        return {
+            "run_id": run_id,
+            "current_phase": "unreadable",
+            "confirmed_plan": False,
+            "next_action": "repair_workflow",
+            "auto_advanced": False,
+            "status": "failed",
+            "resume_summary": {
+                "requires_user_confirmation": True,
+                "safe_to_auto_continue": False,
+                "operator_message": "Workflow state is unreadable; repair workflow.json before resuming this run.",
+                "user_checkpoint": "manual_operator_decision",
+                "agent_owner": "leaf-test-author",
+                "context_slice": ["workflow"],
+                "trigger_source": "workflow.json",
+                "allowed_artifacts": ["workflow"],
+                "user_loop": {
+                    "position": "manual_triage",
+                    "required_input": "repair workflow.json",
+                },
+            },
+            "real_device_preflight": None,
+            "error": {
+                "type": type(exc).__name__,
+                "message": str(exc),
+            },
+        }
     resume_summary = resume.get("resume_summary", {})
     status = str(resume.get("status", "in_progress"))
     if status == "in_progress" and isinstance(resume_summary, dict) and resume_summary.get("requires_user_confirmation"):

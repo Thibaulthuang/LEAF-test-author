@@ -165,6 +165,29 @@ class BatchRegistryTests(unittest.TestCase):
             self.assertEqual(result["runs"][1]["auto_advanced"], True)
             self.assertEqual(result["runs"][1]["current_phase"], "complete")
 
+    def test_resume_batch_isolates_unreadable_run_and_continues_safe_runs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "坏 workflow", run_id="batch-resume-bad")
+            start_new_case(root, "camera", "打开相机；切拍照模式；点击拍照", run_id="batch-resume-safe")
+            confirm_plan(root, "batch-resume-safe")
+            create_batch(root, "camera-batch", ["batch-resume-bad", "batch-resume-safe"])
+            (root / ".leaf" / "runs" / "batch-resume-bad" / "workflow.json").write_text("", encoding="utf-8")
+
+            result = resume_batch(root, "camera-batch", auto_safe=True)
+
+            self.assertEqual(result["summary"]["failed"], 1)
+            self.assertEqual(result["summary"]["advanced"], 1)
+            bad = [run for run in result["runs"] if run["run_id"] == "batch-resume-bad"][0]
+            safe = [run for run in result["runs"] if run["run_id"] == "batch-resume-safe"][0]
+            self.assertEqual(bad["status"], "failed")
+            self.assertEqual(bad["current_phase"], "unreadable")
+            self.assertEqual(bad["next_action"], "repair_workflow")
+            self.assertEqual(bad["auto_advanced"], False)
+            self.assertIn("error", bad)
+            self.assertEqual(safe["status"], "complete")
+            self.assertEqual(safe["auto_advanced"], True)
+
     def test_resume_batch_includes_lightweight_real_device_preflight_summary(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
