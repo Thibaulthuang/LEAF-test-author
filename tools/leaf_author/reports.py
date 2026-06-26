@@ -5,7 +5,7 @@ from collections import Counter
 from pathlib import Path
 
 from tools.leaf_author.batch_registry import inspect_batch
-from tools.leaf_author.real_device_contract import real_device_decision_contract, real_device_user_loop
+from tools.leaf_author.real_device_contract import real_device_decision_contract, real_device_runtime_evidence_schema, real_device_user_loop
 from tools.leaf_author.run_registry import inspect_run
 from tools.leaf_author.runtime_registry import approved_real_device_next_command, quality_artifact_priority, real_device_next_command
 
@@ -23,6 +23,13 @@ def report_run(root: Path, run_id: str) -> dict[str, object]:
     device_selection = _device_selection(root, artifacts if isinstance(artifacts, dict) else {})
     real_device_preflight = _real_device_preflight(root, artifacts if isinstance(artifacts, dict) else {})
     latest_quality_gate = _latest_quality_gate(root, str(run.get("domain", "")), artifacts if isinstance(artifacts, dict) else {})
+    runtime_evidence_summary = _runtime_evidence_summary(
+        root,
+        str(run.get("domain", "")),
+        artifacts if isinstance(artifacts, dict) else {},
+        real_device_preflight,
+        latest_quality_gate,
+    )
     safe_to_auto_continue = bool(isinstance(resume_summary, dict) and resume_summary.get("safe_to_auto_continue")) and not approval_required and not input_required
     user_action_required = bool(isinstance(resume_summary, dict) and resume_summary.get("requires_user_confirmation")) or bool(approval_required) or bool(input_required)
     user_checkpoint = "real_device_confirmation" if approval_required else _user_checkpoint(run, user_action_required)
@@ -49,6 +56,7 @@ def report_run(root: Path, run_id: str) -> dict[str, object]:
         "input_required": input_required,
         "device_selection": device_selection,
         "real_device_preflight": real_device_preflight,
+        "runtime_evidence_summary": runtime_evidence_summary,
         "evidence": evidence,
         "context_policy": {
             "scope": "run_report",
@@ -192,6 +200,89 @@ def _real_device_preflight(root: Path, artifacts: dict[str, object]) -> dict[str
         "next_action": payload.get("next_action"),
         "decision_contract": decision_contract if isinstance(decision_contract, dict) else {},
         "user_loop": user_loop if isinstance(user_loop, dict) else {},
+    }
+
+
+def _runtime_evidence_summary(
+    root: Path,
+    domain: str,
+    artifacts: dict[str, object],
+    preflight: dict[str, object] | None,
+    latest_quality_gate: str,
+) -> dict[str, object] | None:
+    if not preflight:
+        return None
+    runtime_mode = preflight.get("runtime_mode")
+    if not isinstance(runtime_mode, str) or not runtime_mode:
+        return None
+    try:
+        schema = real_device_runtime_evidence_schema(domain, runtime_mode)
+    except ValueError:
+        return {
+            "schema_status": "missing_schema",
+            "domain": domain,
+            "runtime_mode": runtime_mode,
+            "artifact": None,
+            "quality_gate": latest_quality_gate,
+            "required_evidence_fields": [],
+            "missing_required_fields": [],
+        }
+    artifact_key = str(schema.get("artifact", ""))
+    artifact = artifacts.get(artifact_key)
+    required_fields = [str(field) for field in schema.get("required_evidence_fields", [])] if isinstance(schema.get("required_evidence_fields"), list) else []
+    if not isinstance(artifact, str) or not artifact:
+        return {
+            "schema_status": "missing_artifact",
+            "domain": domain,
+            "runtime_mode": runtime_mode,
+            "artifact": None,
+            "quality_gate": latest_quality_gate,
+            "expected_quality_gate": schema.get("quality_gate"),
+            "required_evidence_fields": required_fields,
+            "missing_required_fields": required_fields,
+        }
+    path = root / artifact
+    if not path.is_file():
+        return {
+            "schema_status": "missing_artifact",
+            "domain": domain,
+            "runtime_mode": runtime_mode,
+            "artifact": artifact,
+            "quality_gate": latest_quality_gate,
+            "expected_quality_gate": schema.get("quality_gate"),
+            "required_evidence_fields": required_fields,
+            "missing_required_fields": required_fields,
+        }
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {
+            "schema_status": "invalid_artifact",
+            "domain": domain,
+            "runtime_mode": runtime_mode,
+            "artifact": artifact,
+            "quality_gate": latest_quality_gate,
+            "expected_quality_gate": schema.get("quality_gate"),
+            "required_evidence_fields": required_fields,
+            "missing_required_fields": required_fields,
+        }
+    evidence = payload.get("evidence", {}) if isinstance(payload, dict) else {}
+    evidence = evidence if isinstance(evidence, dict) else {}
+    missing_fields = [field for field in required_fields if field not in evidence]
+    quality_gate = payload.get("quality_gate") if isinstance(payload, dict) else None
+    quality_matches = quality_gate == schema.get("quality_gate") == latest_quality_gate
+    schema_status = "complete" if not missing_fields and quality_matches else "missing_fields" if missing_fields else "quality_gate_mismatch"
+    return {
+        "schema_status": schema_status,
+        "domain": domain,
+        "runtime_mode": runtime_mode,
+        "artifact": artifact,
+        "artifact_key": artifact_key,
+        "quality_gate": quality_gate,
+        "expected_quality_gate": schema.get("quality_gate"),
+        "required_evidence_fields": required_fields,
+        "missing_required_fields": missing_fields,
+        "quality_gate_matches_report": quality_matches,
     }
 
 
