@@ -33,7 +33,7 @@ Current default platform is OpenHarmony. The most complete domain is `camera`.
 3. OpenCode writes `.leaf/runs/<run_id>/plan_input.json`.
 4. Python creates `.leaf/runs/<run_id>/workflow.json` and `plan.json`.
 5. User confirms the plan.
-6. Python generates `case.json`, pytest draft, Hypium draft, and OpenHarmony export.
+6. Python generates `case.json` and a local pytest draft.
 7. `advance <run_id>` runs safe local stages.
 8. Real-device execution requires a second confirmation.
 
@@ -124,11 +124,10 @@ python3 -m tools.leaf_author advance run-demo --run-real --camera-capture --seri
 - `DRAFT_STATIC_PASS`: host-side draft gate passed; not a real-device pass.
 - `CAMERA_DIRECT_SMOKE_PASS`: built-in Camera launched and UiTest layout evidence matched Camera.
 - `CAMERA_CAPTURE_E2E_PASS`: Camera shutter was clicked and a new media file was observed.
-- `HYPIUM_REAL_PASS`: installed Hypium test package passed on a real device.
 
 ## Safety Rules
 
-- Do not generate pytest/Hypium drafts before plan confirmation.
+- Do not generate executable drafts before plan confirmation.
 - Do not run state-changing device actions before plan confirmation.
 - Camera capture creates a media file and requires a second confirmation.
 - GUI context collection is read-only by default.
@@ -138,9 +137,8 @@ python3 -m tools.leaf_author advance run-demo --run-real --camera-capture --seri
 
 OpenCode should not load every `.leaf/runs/<run_id>/` artifact into one prompt.
 Use `list-runs` to get lightweight summaries, then `inspect-run <run_id>` to load
-one run at a time. Large artifacts such as Hypium sources, layout dumps, build
-logs, and result evidence should be opened only when the inspected run requires
-them.
+one run at a time. Large artifacts such as layout dumps, device logs, and result
+evidence should be opened only when the inspected run requires them.
 
 For multi-case work, group run ids with `create-batch`. Use `list-batches` and
 `inspect-batch` to decide which run needs attention next, then switch back to

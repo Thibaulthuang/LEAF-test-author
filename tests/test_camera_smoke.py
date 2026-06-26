@@ -37,17 +37,17 @@ class CameraSmokeTests(unittest.TestCase):
             self.assertEqual(result["target_app"]["kind"], "builtin")
             self.assertEqual(result["target_app"]["requires_app_hap"], False)
             self.assertEqual(result["target_app"]["bundle_name"], "com.huawei.hmos.camera")
-            self.assertEqual(result["runner"]["kind"], "hypium")
-            self.assertEqual(result["runner"]["requires_test_hap"], True)
-            self.assertEqual(result["missing"], ["TEST_RUNNER_HAP_MISSING"])
+            self.assertEqual(result["runner"]["kind"], "python_hdc_uitest")
+            self.assertEqual(result["runner"]["requires_test_hap"], False)
+            self.assertEqual(result["missing"], [])
             self.assertEqual(result["readiness_summary"]["device"], "unknown")
             self.assertEqual(result["readiness_summary"]["target_app"], "ready")
-            self.assertEqual(result["readiness_summary"]["test_runner"], "missing")
-            self.assertEqual(result["blocking_reason"], "TEST_RUNNER_HAP_MISSING")
-            self.assertEqual(result["quality_gate_description"], "Camera target is available, but no Hypium test-runner HAP or buildable OpenHarmony project was found.")
-            self.assertIn("Provide --test-hap", result["recommended_actions"][0])
-            self.assertIn("direct smoke", result["recommended_actions"][1])
-            self.assertIn("run-camera-smoke", result["next_command"])
+            self.assertEqual(result["readiness_summary"]["executor"], "ready")
+            self.assertEqual(result["blocking_reason"], None)
+            self.assertEqual(result["quality_gate"], "CAMERA_SMOKE_READY")
+            self.assertIn("system Camera", result["quality_gate_description"])
+            self.assertIn("camera-direct", result["recommended_actions"][0])
+            self.assertIn("camera-direct", result["next_command"])
             report.assert_called_once()
             self.assertEqual(report.call_args.kwargs["target_filter"], "camera")
             self.assertEqual(report.call_args.kwargs["app_hap"], None)
@@ -106,7 +106,7 @@ class CameraSmokeTests(unittest.TestCase):
             self.assertEqual(result["blocking_reason"], "HDC_DEVICE_UNAVAILABLE")
             self.assertIn("Connect an OpenHarmony device", result["recommended_actions"][0])
 
-    def test_camera_smoke_preflight_explains_project_missing(self):
+    def test_camera_smoke_preflight_ignores_project_missing_for_builtin_direct_path(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
 
@@ -128,9 +128,10 @@ class CameraSmokeTests(unittest.TestCase):
             ):
                 result = write_camera_smoke_preflight(root, "camera-smoke", serial="SERIAL123")
 
-            self.assertEqual(result["quality_gate"], "CAMERA_SMOKE_PROJECT_MISSING")
-            self.assertEqual(result["blocking_reason"], "OPENHARMONY_PROJECT_MISSING")
-            self.assertIn("Provide --project-dir", result["recommended_actions"][0])
+            self.assertEqual(result["quality_gate"], "CAMERA_SMOKE_READY")
+            self.assertEqual(result["blocking_reason"], None)
+            self.assertEqual(result["missing"], [])
+            self.assertIn("camera-direct", result["recommended_actions"][0])
 
     def test_run_camera_smoke_wraps_e2e_without_app_hap(self):
         with tempfile.TemporaryDirectory() as tmp:

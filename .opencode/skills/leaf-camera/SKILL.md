@@ -18,8 +18,8 @@ Use this skill when `/leaf-new-case` receives `domain=camera`.
 - The verified Camera launch element on the current real device is ability
   `com.huawei.hmos.camera.MainAbility` in module `phone`; direct smoke should
   use `aa start -a com.huawei.hmos.camera.MainAbility -b com.huawei.hmos.camera -m phone`.
-- Camera real-device execution must not require an app HAP for the target app.
-  A Hypium test HAP is only the test runner carrier.
+- Camera real-device execution must not require an app package for the target
+  app. The target is the system Camera already installed on the device.
 - Generated tests must stay as drafts until they are bound to real AW/fixture code.
 - A local pytest draft pass is only a static draft gate. It must not be counted
   as a real-device pass.
@@ -74,10 +74,9 @@ Example semantic input for `打开相机拍照`:
 
 ## Basic AW Operation Contract
 
-For first-stage real-device execution, generated Hypium drafts reference these
-camera AW operations. The export includes a configurable UiTest-based starter
-AW, but the target Harmony project must bind real selectors before the result
-can be treated as a business pass:
+For first-stage real-device execution, generated case specs map to these camera
+operations. The Python/HDC/UiTest executor must bind them to real device
+selectors before the result can be treated as a business pass:
 
 - `CameraAW.launch()`: start or foreground the camera application/page.
 - `CameraAW.switchToPhotoMode()`: make still-photo mode active.
@@ -89,8 +88,8 @@ can be treated as a business pass:
 
 ## Current Real-Device Framework Gate
 
-Until a built Hypium test HAP is available, the executable Camera framework gate
-is `advance <run_id> --run-real --camera-direct --serial <serial> --hdc-path <hdc_path>`.
+The executable Camera framework gate is
+`advance <run_id> --run-real --camera-direct --serial <serial> --hdc-path <hdc_path>`.
 This path validates the generated pytest draft, runs the local draft gate, starts
 the built-in Camera app, reads the real `uitest dumpLayout` output file, and
 passes only when the layout contains:
@@ -116,32 +115,12 @@ state by taking a photo and must only run after plan confirmation.
 
 - `打开相机`: implemented in the direct smoke path through `aa start -a com.huawei.hmos.camera.MainAbility -b com.huawei.hmos.camera -m phone`.
 - `切拍照模式`: direct capture e2e verifies the current photo-mode node
-  `COMPONENT_ID_CONTROL_PHOTO_2`; Hypium/AW keeps the operation as
-  `CameraAW.switchToPhotoMode()` for selector-bound projects.
+  `COMPONENT_ID_CONTROL_PHOTO_2`.
 - `点击拍照`: direct capture e2e clicks `COMPONENT_ID_SHUTTER_PHOTO_1` center;
-  Hypium/AW keeps the operation as `CameraAW.capture()`.
+  the case spec keeps the operation as `CameraAW.capture()`.
 - `检查相册出现新照片`: direct capture e2e proves a new file appears under
-  `/storage/media/100/local/files/Photo`; Hypium/AW keeps the richer UI/API
-  operation as `GalleryAW.assertLatestPhotoCreatedAfter(timestamp)`.
-
-## Starter AW Binding
-
-The export includes `CameraAW.ets` and `CameraAWConfig.ets`. The Hypium case
-loads `configureCameraAW()` automatically. The domain skill owns how the built-in
-Camera app is opened. Bind the target test project by editing
-`CameraAWConfig.ets` before building the test HAP:
-
-- `bundleName`, `moduleName`, `abilityName`: preferred launch binding for the
-  built-in Camera app. Defaults should be `com.huawei.hmos.camera`, `phone`,
-  and `com.huawei.hmos.camera.MainAbility`.
-- `launchText`: optional UI text fallback only when ability launch is not
-  available.
-- `photoModeText`: UI text that selects still-photo mode.
-- `captureText`: UI text for the capture control.
-- `latestPhotoText`: UI evidence used by gallery verification.
-
-Missing configuration must fail fast with `LEAF_CAMERA_AW_CONFIG_REQUIRED`; it
-must not produce a false pass.
+  `/storage/media/100/local/files/Photo`; richer gallery validation can be
+  added as Python executor evidence later.
 
 ## Required Safety
 
@@ -149,14 +128,12 @@ must not produce a false pass.
 - Read-only device context may include HDC target metadata, `uitest dumpLayout`, and `hilog -x`.
 - Any AW method change or device command expansion must become a review proposal first.
 - For the first Camera smoke path, use `camera-smoke-preflight` to verify the
-  device, built-in Camera target, export, and test-runner HAP/project inputs.
-- Use `run-camera-smoke` for confirmed real execution. It must pass no app HAP;
-  the only installable package is the Hypium test HAP when needed.
-- When no Hypium test HAP is available yet, `run-camera-direct-smoke` may be
-  used after plan confirmation as the first safe real-device framework check.
+  device and built-in Camera target.
+- `run-camera-direct-smoke` may be used after plan confirmation as the first
+  safe real-device framework check.
   It starts the built-in Camera app and records UiTest layout plus hilog
   evidence. It does not install packages, capture photos, clear data, or count
-  as a full Hypium business pass.
+  as a full capture business pass.
 
 ## First Draft Shape
 
@@ -169,14 +146,10 @@ The pytest draft should include:
 - Metadata assertions that make the draft executable without implying a
   real-device pass
 
-The Hypium draft should include:
+The Python executor draft should include:
 
-- `import { describe, it, expect } from '@ohos/hypium';`
 - `RUN_ID`, `DOMAIN`, and `TARGET_FEATURE`
 - Ordered step comments copied from the confirmed plan
-- Calls to the basic camera AW operations above for mapped steps
-- A real terminal assertion such as `GalleryAW.assertLatestPhotoCreatedAfter(...)`
-  instead of `expect(true).assertTrue()`
-- A matching OpenHarmony export tree with the test case under
-  `src/ohosTest/ets/test/` and a review-required configurable `CameraAW.ets`
-  starter AW plus `CameraAWConfig.ets` under `src/ohosTest/ets/aw/`
+- Calls to the basic camera operations above for mapped steps
+- Real terminal evidence such as layout verification and new-media-file
+  verification instead of a placeholder pass

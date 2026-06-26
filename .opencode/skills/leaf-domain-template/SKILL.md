@@ -11,7 +11,7 @@ Use this template when adding a new `leaf-<domain>` skill.
 
 - Platform default: `openharmony` unless the domain explicitly needs another platform.
 - Define the target app or target feature ownership.
-- State whether the target app is built in, installed by HAP, or provided by the user.
+- State whether the target app is built in or provided by the user.
 - State which actions are read-only and which actions mutate device state.
 
 ## Semantic Step Expansion
@@ -52,7 +52,7 @@ from real-device gates.
 
 - `<DOMAIN>_DIRECT_SMOKE_PASS`: framework/device control evidence.
 - `<DOMAIN>_E2E_PASS`: business behavior evidence.
-- `HYPIUM_REAL_PASS`: installed Hypium test package pass on a real device.
+- `<DOMAIN>_REAL_PASS`: real-device system-app execution evidence.
 
 ## Required Python Touchpoints
 
@@ -60,7 +60,6 @@ Adding a domain normally requires reviewing these files:
 
 - `tools/leaf_author/planner.py`: semantic plan validation.
 - `tools/leaf_author/case_spec.py`: domain action mapping.
-- `tools/leaf_author/hypium.py`: Hypium rendering and AW export if needed.
 - `tools/leaf_author/<domain>_smoke.py`: domain preflight/direct/e2e execution if needed.
 - `tests/`: unit tests for plan validation, generated drafts, quality gates, and CLI output.
 

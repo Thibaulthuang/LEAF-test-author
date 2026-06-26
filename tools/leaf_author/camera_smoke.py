@@ -295,11 +295,9 @@ def _camera_payload(payload: dict[str, object], next_command: str | None = None)
             "requires_app_hap": False,
         },
         "runner": {
-            "kind": "hypium",
-            "requires_test_hap": True,
-            "test_hap": payload.get("test_hap"),
-            "test_bundle_name": payload.get("test_bundle_name"),
-            "test_module_name": payload.get("test_module_name"),
+            "kind": "python_hdc_uitest",
+            "requires_test_hap": False,
+            "default_command": "advance --run-real --camera-direct",
         },
         "missing": missing,
         "readiness_summary": _camera_readiness_summary(payload, selected_target, missing),
@@ -329,7 +327,13 @@ def _field(value: object, key: str) -> str | None:
 
 def _camera_missing(missing: object) -> list[str]:
     values = [str(item) for item in missing] if isinstance(missing, list) else []
-    mapped = ["TEST_RUNNER_HAP_MISSING" if item in {"HAP_ARTIFACTS_MISSING", "HAP_PACKAGE_DIR_UNSPECIFIED"} else item for item in values]
+    ignored_for_builtin_direct = {
+        "HAP_ARTIFACTS_MISSING",
+        "HAP_PACKAGE_DIR_UNSPECIFIED",
+        "HAP_TEST_PACKAGE_MISSING",
+        "OPENHARMONY_PROJECT_MISSING",
+    }
+    mapped = [item for item in values if item not in ignored_for_builtin_direct]
     return list(dict.fromkeys(mapped))
 
 
@@ -340,10 +344,8 @@ def _camera_quality_gate(quality_gate: str, missing: list[str]) -> str:
         return "CAMERA_SMOKE_DEVICE_UNAVAILABLE"
     if "TARGET_CANDIDATES_EMPTY" in missing:
         return "CAMERA_SMOKE_TARGET_MISSING"
-    if "TEST_RUNNER_HAP_MISSING" in missing:
-        return "CAMERA_SMOKE_TEST_RUNNER_MISSING"
-    if "OPENHARMONY_PROJECT_MISSING" in missing:
-        return "CAMERA_SMOKE_PROJECT_MISSING"
+    if not missing and quality_gate == "E2E_PREFLIGHT_NOT_READY":
+        return "CAMERA_SMOKE_READY"
     return "CAMERA_SMOKE_READY" if quality_gate == "E2E_PREFLIGHT_READY" else quality_gate
 
 
@@ -357,17 +359,12 @@ def _camera_readiness_summary(payload: dict[str, object], selected_target: objec
     if any(item in missing for item in ("HDC_DEVICE_UNAVAILABLE", "DEVICE_UNAVAILABLE", "HDC_TARGET_UNAVAILABLE")):
         device = "missing"
     target_app = "missing" if "TARGET_CANDIDATES_EMPTY" in missing else "ready" if isinstance(selected_target, dict) and selected_target else "unknown"
-    if payload.get("test_hap") or payload.get("package_dir"):
-        test_runner = "ready"
-    elif "TEST_RUNNER_HAP_MISSING" in missing:
-        test_runner = "missing"
-    else:
-        test_runner = "unknown"
     return {
         "device": device,
         "target_app": target_app,
-        "test_runner": test_runner,
+        "executor": "ready" if target_app == "ready" else "unknown",
         "app_hap_required": False,
+        "test_hap_required": False,
     }
 
 
@@ -377,10 +374,6 @@ def _camera_blocking_reason(quality_gate: str, missing: list[str]) -> str | None
     preferred = [
         "HDC_DEVICE_UNAVAILABLE",
         "TARGET_CANDIDATES_EMPTY",
-        "TEST_RUNNER_HAP_MISSING",
-        "OPENHARMONY_PROJECT_MISSING",
-        "HAP_PACKAGE_INVALID",
-        "HAP_PACKAGE_MISSING",
     ]
     for item in preferred:
         if item in missing:
@@ -390,13 +383,11 @@ def _camera_blocking_reason(quality_gate: str, missing: list[str]) -> str | None
 
 def _camera_quality_gate_description(quality_gate: str) -> str:
     descriptions = {
-        "CAMERA_SMOKE_READY": "Camera target and Hypium runner inputs are ready for run-camera-smoke.",
+        "CAMERA_SMOKE_READY": "Built-in system Camera is ready for the Python/HDC/UiTest direct path.",
         "CAMERA_SMOKE_DEVICE_UNAVAILABLE": "No usable OpenHarmony device is available through HDC.",
-        "CAMERA_SMOKE_TEST_RUNNER_MISSING": "Camera target is available, but no Hypium test-runner HAP or buildable OpenHarmony project was found.",
         "CAMERA_SMOKE_TARGET_MISSING": "No Camera bundle candidate was found on the connected device.",
-        "CAMERA_SMOKE_PROJECT_MISSING": "No test HAP or buildable OpenHarmony project was found for the Camera Hypium runner.",
-        "E2E_REAL_PASS": "Camera Hypium E2E passed on a real device.",
-        "HYPIUM_REAL_PASS": "Hypium execution passed on a real device.",
+        "E2E_REAL_PASS": "Camera E2E passed on a real device.",
+        "HYPIUM_REAL_PASS": "Real-device execution passed.",
     }
     return descriptions.get(quality_gate, "Camera smoke preflight is not ready; inspect missing prerequisites.")
 
@@ -407,23 +398,13 @@ def _camera_recommended_actions(quality_gate: str) -> list[str]:
             "Connect an OpenHarmony device, verify HDC can list the serial, then rerun camera-smoke-preflight.",
             "If multiple devices are connected, pass the intended --serial explicitly.",
         ]
-    if quality_gate == "CAMERA_SMOKE_TEST_RUNNER_MISSING":
-        return [
-            "Provide --test-hap <path>, --package-dir <hap_output_dir>, or a buildable OpenHarmony project.",
-            "If no test HAP is available yet, run camera direct smoke as the safe real-device framework check.",
-        ]
-    if quality_gate == "CAMERA_SMOKE_PROJECT_MISSING":
-        return [
-            "Provide --project-dir <openharmony_project_dir> and --target-module-dir <module_dir>, or provide --test-hap <path>.",
-            "If the project exists elsewhere, pass --discover-root <path> so preflight can discover HAP artifacts.",
-        ]
     if quality_gate == "CAMERA_SMOKE_TARGET_MISSING":
         return [
             "Verify the device has the built-in Camera app and that the selected serial is correct.",
             "Run discover-targets with --bundle-filter camera to inspect available bundles.",
         ]
     if quality_gate == "CAMERA_SMOKE_READY":
-        return ["Run the provided next_command to execute Camera Hypium smoke."]
+        return ["Run the provided camera-direct next_command for the system Camera path."]
     return ["Inspect the preflight report and resolve listed missing prerequisites."]
 
 
@@ -432,21 +413,13 @@ def _camera_next_command(report: dict[str, object], project_dir: Path | None, ta
         ".venv/bin/python",
         "-m",
         "tools.leaf_author",
-        "run-camera-smoke",
+        "advance",
         str(report.get("run_id", "")),
+        "--run-real",
+        "--camera-direct",
         "--serial",
         str(report.get("serial", "")),
     ]
-    if report.get("test_hap"):
-        parts.extend(["--test-hap", str(report["test_hap"])])
-    if report.get("package_dir"):
-        parts.extend(["--package-dir", str(report["package_dir"])])
-    if report.get("discover_root"):
-        parts.extend(["--discover-root", str(report["discover_root"])])
-    if project_dir is not None:
-        parts.extend(["--project-dir", str(project_dir)])
-    if target_module_dir is not None:
-        parts.extend(["--target-module-dir", str(target_module_dir)])
     return " ".join(parts)
 
 

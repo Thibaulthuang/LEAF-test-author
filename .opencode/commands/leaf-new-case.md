@@ -28,10 +28,8 @@ Example:
 5. Present the generated plan for confirmation.
 6. If the user replies `yes` in this OpenCode conversation, call `confirm-plan`
    to create `.leaf/runs/<run_id>/case.json` as the final case spec, the
-   host-side pytest draft under `tests/generated/`, the Hypium `.ets` draft
-   under `.leaf/runs/<run_id>/hypium/`, and an OpenHarmony test-project export
-   under `.leaf/runs/<run_id>/openharmony_test_project/`. The Hypium and pytest
-   drafts must be generated from `case.json`.
+   host-side pytest draft under `tests/generated/`, and local workflow
+   artifacts. Generated drafts must be derived from `case.json`.
 7. Immediately call `advance <run_id>` to run the safe local stages: validation,
    draft run, read-only GUI context, reviewable experience record, and team
    export manifest. Do not stop after only printing `next_action`.
@@ -39,7 +37,20 @@ Example:
    capture run with `--run-real --camera-capture` mutates device state by taking
    a photo and creating a media file, so it must not run from the first
    confirmation.
-9. For Camera real-device execution after second confirmation, first run `camera-smoke-preflight <run_id> --serial <device_serial>` to verify the device, built-in Camera target, exported Hypium files, and available test-runner HAP/project inputs. Camera is a built-in device app; do not pass an app HAP for the target. If no Hypium test HAP is available yet, run `advance <run_id> --run-real --camera-direct --serial <device_serial> --hdc-path <hdc_path>` as the safe framework check: it validates the pytest draft, runs the draft gate, foregrounds Camera, verifies the real UiTest layout belongs to Camera, records `camera_direct_smoke.json`, writes the reviewable experience record, and exports the team manifest. For confirmed capture flows, run `advance <run_id> --run-real --camera-capture --serial <device_serial> --hdc-path <hdc_path>`; this additionally verifies photo mode and the shutter node, snapshots media files under `/storage/media/100/local/files/Photo`, taps the shutter, verifies a new media file appears, and records `camera_capture_e2e.json`. The standalone `run-camera-direct-smoke <run_id> --serial <device_serial>` and `run-camera-capture-e2e <run_id> --serial <device_serial>` commands remain available for focused debugging. When an OpenHarmony project is available, run `run-camera-smoke <run_id> --serial <device_serial> --project-dir <openharmony_project_dir> --target-module-dir <openharmony_module_dir> --build-command ./hvigorw assembleOhosTest`; the tool syncs the exported `src/ohosTest` files, builds, discovers the Hypium test HAP, installs the test package, runs HDC/`aa test`, and records `e2e_run.json` plus `hypium_result.json`. When a test HAP is already available, pass `--test-hap <path>` or `--package-dir <hap_output_dir>`. HDC operations must stay serial.
+9. For Camera real-device execution after second confirmation, first run
+   `camera-smoke-preflight <run_id> --serial <device_serial>` to verify the
+   device and built-in Camera target. Camera is a system app; do not require or
+   request an app package. Use
+   `advance <run_id> --run-real --camera-direct --serial <device_serial> --hdc-path <hdc_path>`
+   as the framework check: it validates the pytest draft, runs the draft gate,
+   foregrounds Camera, verifies the real UiTest layout belongs to Camera,
+   records `camera_direct_smoke.json`, writes the reviewable experience record,
+   and exports the team manifest. For confirmed capture flows, run
+   `advance <run_id> --run-real --camera-capture --serial <device_serial> --hdc-path <hdc_path>`;
+   this additionally verifies photo mode and the shutter node, snapshots media
+   files under `/storage/media/100/local/files/Photo`, taps the shutter,
+   verifies a new media file appears, and records `camera_capture_e2e.json`.
+   HDC operations must stay serial.
 
 ## Two-Stage Confirmation
 

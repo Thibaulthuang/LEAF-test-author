@@ -25,7 +25,7 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
 
         self.assertIn("case.json", combined)
         self.assertIn("final case spec", combined)
-        self.assertIn("Hypium", combined)
+        self.assertIn("system-app execution", combined)
 
     def test_leaf_resume_documents_auto_safe_resume(self):
         root = Path(__file__).resolve().parents[1]
@@ -79,6 +79,8 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
         self.assertIn("report_batch", contract["entrypoints"])
         self.assertEqual(contract["entrypoints"]["batch"], "/leaf-batch <batch_id> [--run-id <run_id>...]")
         self.assertEqual(contract["entrypoints"]["report"], "/leaf-report <run_id|batch_id>")
+        self.assertNotIn("test HAP", json.dumps(contract))
+        self.assertNotIn("test-runner HAP", json.dumps(contract))
 
     def test_domain_template_documents_required_extension_points(self):
         root = Path(__file__).resolve().parents[1]
@@ -104,6 +106,24 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
         self.assertIn("/leaf-batch", readme)
         self.assertIn("/leaf-report", readme)
         self.assertIn("one run at a time", readme)
+        self.assertNotIn("test HAP", readme)
+        self.assertNotIn("test package", readme)
+
+    def test_opencode_docs_do_not_suggest_test_hap_for_camera_main_path(self):
+        root = Path(__file__).resolve().parents[1]
+        paths = [
+            root / ".opencode" / "commands" / "leaf-new-case.md",
+            root / ".opencode" / "skills" / "leaf-test-author" / "SKILL.md",
+            root / ".opencode" / "skills" / "leaf-camera" / "SKILL.md",
+            root / ".opencode" / "skills" / "leaf-domain-template" / "SKILL.md",
+        ]
+        combined = "\n".join(path.read_text(encoding="utf-8") for path in paths)
+
+        self.assertIn("system Camera", combined)
+        self.assertIn("Python/HDC/UiTest", combined)
+        self.assertNotIn("test HAP", combined)
+        self.assertNotIn("test-runner HAP", combined)
+        self.assertNotIn("@ohos/hypium", combined)
 
 
 if __name__ == "__main__":

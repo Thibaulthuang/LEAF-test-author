@@ -55,9 +55,7 @@
       "user_checkpoint": null,
       "allowed_artifacts": [
         "case",
-        "pytest",
-        "hypium",
-        "openharmony_test_project"
+        "pytest"
       ],
       "next_action": "validate_pytest_draft"
     },
@@ -118,10 +116,7 @@
     "DRAFT_STATIC_PASS": "Host-side draft gate passed; this is not a real-device pass.",
     "CAMERA_DIRECT_SMOKE_PASS": "Built-in Camera foregrounded and UiTest layout evidence matched the Camera bundle and ability.",
     "CAMERA_CAPTURE_E2E_PASS": "Camera capture passed through UiTest shutter control and new media-file evidence.",
-    "HYPIUM_REAL_PASS": "Hypium test package executed successfully on a real OpenHarmony device.",
     "CAMERA_SMOKE_DEVICE_UNAVAILABLE": "HDC did not expose a usable OpenHarmony device.",
-    "CAMERA_SMOKE_TARGET_MISSING": "No built-in Camera target candidate was found.",
-    "CAMERA_SMOKE_TEST_RUNNER_MISSING": "Camera target is available but no Hypium test-runner HAP or buildable project was found.",
-    "CAMERA_SMOKE_PROJECT_MISSING": "No test HAP or buildable OpenHarmony project was found."
+    "CAMERA_SMOKE_TARGET_MISSING": "No built-in Camera target candidate was found."
   }
 }
