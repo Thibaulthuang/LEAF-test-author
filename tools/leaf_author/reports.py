@@ -13,10 +13,11 @@ from tools.leaf_author.runtime_registry import approved_real_device_next_command
 def report_run(root: Path, run_id: str) -> dict[str, object]:
     run = inspect_run(root, run_id)
     if run.get("current_phase") == "unreadable" or isinstance(run.get("error"), dict):
-        return _unreadable_run_report(run)
+        return _unreadable_run_report(root, run)
     resume_summary = run.get("resume_summary", {})
     artifacts = run.get("artifacts", {})
     evidence = _existing_artifacts(root, artifacts if isinstance(artifacts, dict) else {})
+    _add_conventional_evidence(root, run_id, evidence)
     approval_required = None if run.get("current_phase") == "complete" else _real_device_approval(root, artifacts if isinstance(artifacts, dict) else {})
     input_required = None if run.get("current_phase") == "complete" else _real_device_input(root, artifacts if isinstance(artifacts, dict) else {})
     real_device_preflight = _real_device_preflight(root, artifacts if isinstance(artifacts, dict) else {})
@@ -89,6 +90,12 @@ def _existing_artifacts(root: Path, artifacts: dict[str, object]) -> dict[str, s
         if path.exists():
             evidence[key] = value
     return evidence
+
+
+def _add_conventional_evidence(root: Path, run_id: str, evidence: dict[str, str]) -> None:
+    diagnostics = root / ".leaf" / "runs" / run_id / "workflow_diagnostics.json"
+    if diagnostics.is_file():
+        evidence["workflow_diagnostics"] = str(diagnostics.relative_to(root))
 
 
 def _latest_quality_gate(root: Path, domain: str, artifacts: dict[str, object]) -> str:
@@ -304,11 +311,15 @@ def _report_status(run: dict[str, object]) -> str:
 
 def _report_batch_run(root: Path, run_summary: dict[str, object]) -> dict[str, object]:
     if run_summary.get("current_phase") == "unreadable" or isinstance(run_summary.get("error"), dict):
-        return _unreadable_run_report(run_summary)
+        return _unreadable_run_report(root, run_summary)
     return report_run(root, str(run_summary["run_id"]))
 
 
-def _unreadable_run_report(run_summary: dict[str, object]) -> dict[str, object]:
+def _unreadable_run_report(root: Path, run_summary: dict[str, object]) -> dict[str, object]:
+    run_id = str(run_summary.get("run_id", ""))
+    evidence: dict[str, str] = {}
+    if run_id:
+        _add_conventional_evidence(root, run_id, evidence)
     return {
         "schema_version": "1.0",
         "run_id": run_summary.get("run_id"),
@@ -336,7 +347,7 @@ def _unreadable_run_report(run_summary: dict[str, object]) -> dict[str, object]:
         "approval_required": None,
         "input_required": None,
         "real_device_preflight": None,
-        "evidence": {},
+        "evidence": evidence,
         "error": run_summary.get("error"),
         "context_policy": {
             "scope": "run_report",

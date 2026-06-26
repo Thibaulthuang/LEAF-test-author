@@ -9,6 +9,7 @@ from tools.leaf_author.authoring import advance_run, confirm_plan, start_new_cas
 from tools.leaf_author.batch_registry import create_batch
 from tools.leaf_author.device_probe import ProbeCommandResult
 from tools.leaf_author.reports import report_batch, report_run
+from tools.leaf_author.workflow_diagnostics import inspect_workflow_state
 
 
 class ReportTests(unittest.TestCase):
@@ -42,11 +43,22 @@ class ReportTests(unittest.TestCase):
             self.assertEqual(result["user_checkpoint"], "first_plan_confirmation")
             self.assertIn("confirm", result["operator_message"].lower())
 
+    def test_report_run_includes_workflow_diagnostics_evidence_when_present(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "打开相机", run_id="report-diag")
+            inspect_workflow_state(root, "report-diag")
+
+            result = report_run(root, "report-diag")
+
+            self.assertEqual(result["evidence"]["workflow_diagnostics"], ".leaf/runs/report-diag/workflow_diagnostics.json")
+
     def test_report_run_returns_repair_prompt_for_unreadable_workflow(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             start_new_case(root, "camera", "坏 workflow", run_id="report-unreadable")
             (root / ".leaf" / "runs" / "report-unreadable" / "workflow.json").write_text("", encoding="utf-8")
+            inspect_workflow_state(root, "report-unreadable")
 
             result = report_run(root, "report-unreadable")
 
@@ -55,6 +67,7 @@ class ReportTests(unittest.TestCase):
             self.assertEqual(result["user_checkpoint"], "manual_operator_decision")
             self.assertEqual(result["user_loop"]["position"], "manual_triage")
             self.assertEqual(result["decision_contract"]["context_slice"], ["workflow"])
+            self.assertEqual(result["evidence"]["workflow_diagnostics"], ".leaf/runs/report-unreadable/workflow_diagnostics.json")
             self.assertIn("error", result)
 
     def test_report_run_uses_domain_runtime_quality_priority(self):
