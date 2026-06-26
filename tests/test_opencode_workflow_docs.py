@@ -35,6 +35,28 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
         self.assertIn("safe_to_auto_continue", command)
         self.assertIn("must still stop", command)
 
+    def test_leaf_batch_documents_multi_case_entrypoint(self):
+        root = Path(__file__).resolve().parents[1]
+        command = (root / ".opencode" / "commands" / "leaf-batch.md").read_text(encoding="utf-8")
+
+        self.assertIn("/leaf-batch", command)
+        self.assertIn("create-batch", command)
+        self.assertIn("resume-batch", command)
+        self.assertIn("report-batch", command)
+        self.assertIn("one run at a time", command)
+        self.assertIn("must still stop", command)
+
+    def test_leaf_report_documents_operator_decision_entrypoint(self):
+        root = Path(__file__).resolve().parents[1]
+        command = (root / ".opencode" / "commands" / "leaf-report.md").read_text(encoding="utf-8")
+
+        self.assertIn("/leaf-report", command)
+        self.assertIn("report-run", command)
+        self.assertIn("report-batch", command)
+        self.assertIn("user_checkpoint", command)
+        self.assertIn("latest_quality_gate", command)
+        self.assertIn("evidence", command)
+
     def test_workflow_contract_documents_phase_quality_gate_and_user_boundaries(self):
         root = Path(__file__).resolve().parents[1]
         contract = json.loads((root / "docs" / "workflow-contract.json").read_text(encoding="utf-8"))
@@ -55,6 +77,8 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
         self.assertIn("resume_batch", contract["entrypoints"])
         self.assertIn("report_run", contract["entrypoints"])
         self.assertIn("report_batch", contract["entrypoints"])
+        self.assertEqual(contract["entrypoints"]["batch"], "/leaf-batch <batch_id> [--run-id <run_id>...]")
+        self.assertEqual(contract["entrypoints"]["report"], "/leaf-report <run_id|batch_id>")
 
     def test_domain_template_documents_required_extension_points(self):
         root = Path(__file__).resolve().parents[1]
@@ -77,6 +101,8 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
         self.assertIn("resume-batch", readme)
         self.assertIn("report-run", readme)
         self.assertIn("report-batch", readme)
+        self.assertIn("/leaf-batch", readme)
+        self.assertIn("/leaf-report", readme)
         self.assertIn("one run at a time", readme)
 
 

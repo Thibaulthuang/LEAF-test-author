@@ -5,6 +5,8 @@
   "entrypoints": {
     "new_case": "/leaf-new-case <domain> \"<teststep>\"",
     "resume": "/leaf-resume <run_id>",
+    "batch": "/leaf-batch <batch_id> [--run-id <run_id>...]",
+    "report": "/leaf-report <run_id|batch_id>",
     "python_module": "python3 -m tools.leaf_author",
     "list_runs": "python3 -m tools.leaf_author list-runs",
     "inspect_run": "python3 -m tools.leaf_author inspect-run <run_id>",

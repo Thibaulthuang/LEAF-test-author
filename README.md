@@ -7,6 +7,14 @@ The user-facing entrypoint is the OpenCode command, not the Python module:
 /leaf-new-case <domain> "<teststep>"
 ```
 
+Related OpenCode workflow commands:
+
+```text
+/leaf-resume <run_id>
+/leaf-batch <batch_id> [--run-id <run_id>...]
+/leaf-report <run_id|batch_id>
+```
+
 Current default platform is OpenHarmony. The most complete domain is `camera`.
 
 ## Architecture
@@ -28,6 +36,12 @@ Current default platform is OpenHarmony. The most complete domain is `camera`.
 6. Python generates `case.json`, pytest draft, Hypium draft, and OpenHarmony export.
 7. `advance <run_id>` runs safe local stages.
 8. Real-device execution requires a second confirmation.
+
+For interrupted work, users run `/leaf-resume <run_id>`. For multi-case work,
+users run `/leaf-batch <batch_id> ...` to create or continue a batch and
+`/leaf-report <run_id|batch_id>` to get the current operator decision summary.
+These OpenCode commands delegate to the deterministic Python tools documented
+below.
 
 ## Common Commands
 

@@ -17,6 +17,8 @@ description: Main LEAF local test-case authoring skill. Use for /leaf-new-case a
 - Do not generate pytest drafts until the plan is confirmed.
 - Load domain-specific skills such as `leaf-camera` when domain behavior is needed.
 - After confirmation, continue through pytest/Hypium generation, validation, optional real-device Hypium execution, GUI context collection, rerun, and experience updates.
+- Own `/leaf-batch` and `/leaf-report` decisions by using deterministic batch
+  and report tools before opening large artifacts.
 
 ## Semantic Planning Contract
 
@@ -71,6 +73,27 @@ capture command such as
 must not run from the first confirmation. State clearly that the action will
 take a photo and create a new media file. Only run it after the user explicitly
 confirms the real-device capture step.
+
+## Multi-Case And Reporting Contract
+
+Use `/leaf-batch` for multi-case coordination and `/leaf-report` for lightweight
+operator status. These commands must use deterministic summaries first:
+
+1. `python3 -m tools.leaf_author report-run <run_id>` for one run.
+2. `python3 -m tools.leaf_author report-batch <batch_id>` for one batch.
+3. `python3 -m tools.leaf_author resume-batch <batch_id> --auto-safe` only
+   when the batch report shows safe local work.
+
+Keep the active reasoning scope to one run at a time. Batch reports may choose
+`next_run_focus`, but the agent should inspect or open artifacts only for that
+focused run. Reports expose `latest_quality_gate`, `user_checkpoint`,
+`next_command`, and evidence paths; they do not require loading Hypium sources,
+layout dumps, build logs, or result evidence into context unless the next
+decision specifically needs them.
+
+Batch auto-resume must obey the same confirmation rules as single-run resume.
+It must not confirm plans on behalf of the user and must not run real-device
+actions from `--auto-safe`.
 
 ## First MVP Scope
 
