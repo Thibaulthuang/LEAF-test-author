@@ -84,8 +84,8 @@ def list_batches(root: Path) -> dict[str, object]:
 
 def resume_batch(root: Path, batch_id: str, auto_safe: bool = False) -> dict[str, object]:
     batch = _load_batch(root, batch_id)
-    audit_guard = _batch_audit_guard(root, batch_id) if auto_safe else None
-    if audit_guard:
+    audit_summary = _batch_audit_summary(root, batch_id) if auto_safe else None
+    if audit_summary and audit_summary.get("failed_checks"):
         runs = [_resume_batch_run(root, run_id, auto_safe=False) for run_id in batch["run_ids"]]
         statuses = Counter(str(run.get("status", "in_progress")) for run in runs)
         return {
@@ -95,7 +95,7 @@ def resume_batch(root: Path, batch_id: str, auto_safe: bool = False) -> dict[str
             "auto_safe": auto_safe,
             "status": "blocked",
             "block_reason": "batch_audit_failed",
-            "batch_audit_summary": audit_guard,
+            "batch_audit_summary": audit_summary,
             "summary": {
                 "advanced": 0,
                 "waiting_for_confirmation": sum(1 for run in runs if run.get("status") == "waiting_for_confirmation"),
@@ -103,7 +103,7 @@ def resume_batch(root: Path, batch_id: str, auto_safe: bool = False) -> dict[str
                 "in_progress": statuses.get("in_progress", 0),
                 "failed": statuses.get("failed", 0),
             },
-            "focus_plan": audit_guard.get("focus_plan") if isinstance(audit_guard.get("focus_plan"), dict) else _batch_resume_focus_plan(runs),
+            "focus_plan": audit_summary.get("focus_plan") if isinstance(audit_summary.get("focus_plan"), dict) else _batch_resume_focus_plan(runs),
             "runs": runs,
             "context_policy": {
                 "scope": "batch_resume",
@@ -115,7 +115,7 @@ def resume_batch(root: Path, batch_id: str, auto_safe: bool = False) -> dict[str
     runs = [_resume_batch_run(root, run_id, auto_safe=auto_safe) for run_id in batch["run_ids"]]
     statuses = Counter(str(run.get("status", "in_progress")) for run in runs)
     focus_plan = _batch_resume_focus_plan(runs)
-    return {
+    payload = {
         "schema_version": "1.0",
         "batch_id": batch_id,
         "title": batch.get("title", batch_id),
@@ -136,6 +136,9 @@ def resume_batch(root: Path, batch_id: str, auto_safe: bool = False) -> dict[str
             "attention_boundary": "one_active_run",
         },
     }
+    if audit_summary:
+        payload["batch_audit_summary"] = audit_summary
+    return payload
 
 
 def _load_batch(root: Path, batch_id: str) -> dict[str, object]:
@@ -143,7 +146,7 @@ def _load_batch(root: Path, batch_id: str) -> dict[str, object]:
     return json.loads(batch_path.read_text(encoding="utf-8"))
 
 
-def _batch_audit_guard(root: Path, batch_id: str) -> dict[str, object] | None:
+def _batch_audit_summary(root: Path, batch_id: str) -> dict[str, object] | None:
     audit_path = root / ".leaf" / "batches" / batch_id / "batch_audit.json"
     if not audit_path.is_file():
         return None
@@ -158,8 +161,6 @@ def _batch_audit_guard(root: Path, batch_id: str) -> dict[str, object] | None:
         return None
     normalized_checks = [check for check in checks if isinstance(check, dict)]
     failed = [str(check.get("name")) for check in normalized_checks if check.get("name") and not check.get("passed")]
-    if not failed:
-        return None
     return {
         "artifact": str(audit_path.relative_to(root)),
         "total_checks": len(normalized_checks),

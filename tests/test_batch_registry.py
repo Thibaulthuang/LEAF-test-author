@@ -201,6 +201,38 @@ class BatchRegistryTests(unittest.TestCase):
             self.assertEqual(result["runs"][0]["auto_advanced"], False)
             self.assertEqual(result["runs"][0]["current_phase"], "hypium_draft")
 
+    def test_resume_batch_auto_safe_reports_passing_batch_audit_summary(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "打开相机；切拍照模式；点击拍照", run_id="batch-audit-pass")
+            confirm_plan(root, "batch-audit-pass")
+            create_batch(root, "camera-batch", ["batch-audit-pass"])
+            audit_dir = root / ".leaf" / "batches" / "camera-batch"
+            (audit_dir / "batch_audit.json").write_text(
+                json.dumps(
+                    {
+                        "status": "passed",
+                        "batch_checks": [
+                            {"name": "batch_resume_attention_boundary", "passed": True},
+                            {"name": "batch_resume_focus_action_route", "passed": True},
+                        ],
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = resume_batch(root, "camera-batch", auto_safe=True)
+
+            self.assertNotEqual(result.get("status"), "blocked")
+            self.assertEqual(result["summary"]["advanced"], 1)
+            self.assertEqual(result["batch_audit_summary"]["total_checks"], 2)
+            self.assertEqual(result["batch_audit_summary"]["passed_checks"], 2)
+            self.assertEqual(result["batch_audit_summary"]["failed_checks"], [])
+            self.assertEqual(result["batch_audit_summary"]["artifact"], ".leaf/batches/camera-batch/batch_audit.json")
+
     def test_resume_batch_returns_single_run_focus_plan_for_agent_handoff(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
