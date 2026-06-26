@@ -90,6 +90,41 @@ class RuntimeDeviceActionTests(unittest.TestCase):
         self.assertEqual(calls[0][0][-9:], ["shell", "aa", "start", "-a", "com.huawei.hmos.camera.MainAbility", "-b", "com.huawei.hmos.camera", "-m", "phone"])
         self.assertEqual(calls[1][0][-5:], ["uitest", "uiInput", "click", "10", "20"])
 
+    def test_action_runner_can_attach_before_after_ui_evidence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            dump_count = 0
+
+            def runner(args, timeout_s):
+                nonlocal dump_count
+                if args == ["hdc", "-t", "SERIAL123", "shell", "uitest", "dumpLayout"]:
+                    dump_count += 1
+                    if dump_count == 1:
+                        return ProbeCommandResult(0, '{"attributes":{"bundleName":"camera"},"children":[]}\n', "")
+                    return ProbeCommandResult(0, '{"attributes":{"bundleName":"camera"},"children":[{"attributes":{"id":"done"}}]}\n', "")
+                if args == ["hdc", "-t", "SERIAL123", "shell", "uitest", "uiInput", "click", "10", "20"]:
+                    return ProbeCommandResult(0, "click ok\n", "")
+                return ProbeCommandResult(1, "", f"unexpected {args}")
+
+            session = DeviceSession(root=root, run_id="run-evidence", serial="SERIAL123", runner=runner)
+            action_runner = ActionRunner(session)
+
+            result = action_runner.execute(
+                {
+                    "id": "tap_done",
+                    "action": "ui.click",
+                    "params": {"x": 10, "y": 20},
+                    "capture_ui": {"before": True, "after": True},
+                }
+            )
+
+            self.assertEqual(result["status"], "passed")
+            self.assertEqual(result["ui_snapshots"]["before"]["kind"], "ui_snapshot")
+            self.assertEqual(result["ui_snapshots"]["after"]["kind"], "ui_snapshot")
+            self.assertTrue((root / result["ui_snapshots"]["before"]["index_path"]).is_file())
+            self.assertEqual(result["ui_diff"]["node_count_delta"], 1)
+            self.assertIn("done", result["ui_diff"]["added_node_ids"])
+
 
 if __name__ == "__main__":
     unittest.main()

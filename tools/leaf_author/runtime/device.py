@@ -4,6 +4,7 @@ from pathlib import Path
 
 from tools.leaf_author.device_probe import HdcProbe, ProbeCommandResult, ProbeRunner
 from tools.leaf_author.runtime.evidence import write_ui_snapshot
+from tools.leaf_author.runtime.ui_tree import build_index, parse_layout
 
 
 class HdcClient:
@@ -59,8 +60,10 @@ class DeviceSession:
 
     def capture_ui_snapshot(self, phase: str, action_id: str) -> dict[str, object]:
         layout = self.client.dump_layout()
-        snapshot = write_ui_snapshot(self.root, self.run_id, phase=phase, action_id=action_id, raw_layout=str(layout["raw_layout"]))
-        return {**layout, "snapshot": snapshot}
+        raw_layout = str(layout["raw_layout"])
+        snapshot = write_ui_snapshot(self.root, self.run_id, phase=phase, action_id=action_id, raw_layout=raw_layout)
+        index = build_index(parse_layout(raw_layout))
+        return {**layout, "snapshot": snapshot, "index": index}
 
 
 def normalize_result(args: list[str], result: ProbeCommandResult) -> dict[str, object]:

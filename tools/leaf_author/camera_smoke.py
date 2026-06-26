@@ -232,17 +232,30 @@ def run_camera_capture_e2e(
     shutter_node = _first_candidate(shutter_candidates, required_id="COMPONENT_ID_SHUTTER_PHOTO_1", required_clickable=True)
     tap = _node_center(shutter_node) if shutter_node else None
     before_media = _list_camera_media(session) if tap else []
-    capture = (
-        actions.execute({"id": "camera_capture_tap_shutter", "action": "ui.click", "params": {"x": tap["x"], "y": tap["y"]}})["result"]
+    capture_action = (
+        actions.execute(
+            {
+                "id": "camera_capture_tap_shutter",
+                "action": "ui.click",
+                "params": {"x": tap["x"], "y": tap["y"]},
+                "capture_ui": {"after": True},
+            }
+        )
         if tap
-        else {"args": [], "exit_code": 1, "stdout": "", "stderr": "shutter node not found"}
+        else {"status": "failed", "result": {"args": [], "exit_code": 1, "stdout": "", "stderr": "shutter node not found"}}
     )
-    after = session.client.dump_layout() if command_succeeded(capture) else {"path": None, "layout": {"exit_code": 1, "stdout": "", "stderr": "capture failed"}, "raw_layout": "capture failed"}
+    capture = capture_action["result"]
+    after_snapshot = capture_action.get("ui_snapshots", {}).get("after") if command_succeeded(capture) else None
+    after = session.client.dump_layout() if command_succeeded(capture) and after_snapshot is None else {"path": None, "layout": {"exit_code": 0, "stdout": "", "stderr": ""}, "raw_layout": ""}
     after_media = _list_camera_media(session) if command_succeeded(capture) else []
     new_media_files = _new_media_files(before_media, after_media)
     after_text = str(after["raw_layout"])
-    after_snapshot = write_ui_snapshot(root, run_id, phase="after_capture", action_id="camera_capture", raw_layout=after_text)
-    after_index = build_index(parse_layout(after_text))
+    if after_snapshot is None:
+        after_snapshot = write_ui_snapshot(root, run_id, phase="after_capture", action_id="camera_capture", raw_layout=after_text)
+        after_index = build_index(parse_layout(after_text))
+    else:
+        after_index = build_index(parse_layout((root / str(after_snapshot["raw_path"])).read_text(encoding="utf-8")))
+        after_text = (root / str(after_snapshot["raw_path"])).read_text(encoding="utf-8")
     hilog = session.client.hilog()
     before_verified = _layout_verified(before_text, bundle_name, ability_name)
     after_verified = _layout_verified(after_text, bundle_name, ability_name)
@@ -293,7 +306,7 @@ def run_camera_capture_e2e(
                     "before_capture": before_snapshot,
                     "after_capture": after_snapshot,
                 },
-                "ui_diff": diff_indexes(before_index, after_index),
+                "ui_diff": capture_action.get("ui_diff") or diff_indexes(before_index, after_index),
                 "photo_mode_candidates": photo_mode_candidates[:5],
                 "shutter_candidates": shutter_candidates[:5],
                 "ui_tree_excerpt": before_text[:4000],
