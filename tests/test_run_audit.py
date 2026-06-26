@@ -650,6 +650,26 @@ class RunAuditTests(unittest.TestCase):
             self.assertEqual(result["real_device_summary"]["approval_approved"], 1)
             self.assertEqual(result["real_device_summary"]["approval_tokens"], ["approve_camera_capture_e2e"])
 
+    def test_audit_batch_summarizes_gui_handoff_diagnostics(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _complete_direct_smoke(root, "audit-batch-gui-ready")
+            inspect_ui_tree(root, "audit-batch-gui-ready", phase="after_launch", action_id="camera_direct")
+            _complete_direct_smoke(root, "audit-batch-gui-drift")
+            diagnostics = inspect_ui_tree(root, "audit-batch-gui-drift", phase="after_launch", action_id="camera_direct")
+            diagnostics["handoff"]["context_slice"] = ["workflow"]
+            (root / diagnostics["artifact"]).write_text(json.dumps(diagnostics, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            create_batch(root, "audit-batch-gui", ["audit-batch-gui-ready", "audit-batch-gui-drift"])
+
+            result = audit_batch(root, "audit-batch-gui")
+
+            self.assertEqual(result["status"], "failed")
+            self.assertEqual(result["gui_handoff_summary"]["total_artifacts"], 2)
+            self.assertEqual(result["gui_handoff_summary"]["ready"], 1)
+            self.assertEqual(result["gui_handoff_summary"]["failed"], 1)
+            self.assertEqual(result["gui_handoff_summary"]["failed_runs"], ["audit-batch-gui-drift"])
+            self.assertEqual(result["gui_handoff_summary"]["attention_boundary"], "one_active_run")
+
     def test_audit_batch_exposes_context_manifest_phase_contract_drift(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

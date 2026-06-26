@@ -139,6 +139,7 @@ def audit_batch(
         },
         "real_device_summary": _batch_real_device_summary(runs),
         "runtime_evidence_summary": _batch_runtime_evidence_summary(runs),
+        "gui_handoff_summary": _batch_gui_handoff_summary(runs),
         "batch_checks": batch_checks,
         "focus_plan": resume_view.get("focus_plan") if isinstance(resume_view, dict) else None,
         "runs": [
@@ -1184,6 +1185,36 @@ def _batch_runtime_evidence_summary(runs: list[dict[str, object]]) -> dict[str, 
         "quality_gates": quality_gates,
         "failed_checks": failed_checks,
         "missing_required_fields": missing_required_fields,
+    }
+
+
+def _batch_gui_handoff_summary(runs: list[dict[str, object]]) -> dict[str, object]:
+    artifacts: list[str] = []
+    ready_runs: list[str] = []
+    failed_runs: list[str] = []
+    for run in runs:
+        evidence = run.get("evidence")
+        if not isinstance(evidence, dict) or not evidence.get("ui_tree_diagnostics"):
+            continue
+        run_id = str(run.get("run_id", ""))
+        artifacts.append(str(evidence.get("ui_tree_diagnostics")))
+        failed_checks = [
+            str(check.get("name"))
+            for check in run.get("checks", [])
+            if isinstance(check, dict) and not check.get("passed")
+        ]
+        if "ui_tree_diagnostics_handoff_ready" in failed_checks:
+            failed_runs.append(run_id)
+        else:
+            ready_runs.append(run_id)
+    return {
+        "total_artifacts": len(artifacts),
+        "ready": len(ready_runs),
+        "failed": len(failed_runs),
+        "ready_runs": sorted(run for run in ready_runs if run),
+        "failed_runs": sorted(run for run in failed_runs if run),
+        "artifacts": sorted(artifacts),
+        "attention_boundary": "one_active_run",
     }
 
 
