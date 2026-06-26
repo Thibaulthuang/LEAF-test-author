@@ -14,6 +14,7 @@ class PhaseGuardTests(unittest.TestCase):
         self.assertEqual(result["exit_code"], 0)
         self.assertEqual(result["trigger_source"], "workflow.json")
         self.assertEqual(result["attention_boundary"], "one_active_run")
+        self.assertEqual(result["target_policy"], "system_app_only")
         self.assertEqual(result["real_device_gate_status"], "stable")
         self.assertEqual(result["runtime_registry_status"], "stable")
         self.assertIn("leaf-test-author", result["agent_owners"])
@@ -26,6 +27,7 @@ class PhaseGuardTests(unittest.TestCase):
 
         self.assertEqual(contract["manifest_kind"], "leaf_agent_handoff_contract")
         self.assertEqual(contract["trigger_stability"]["authoritative_source"], "workflow.json")
+        self.assertEqual(contract["target_policy"]["scope"], "system_app_only")
         self.assertIn("pytest_ran", contract["agents"]["leaf-gui-agent"])
         self.assertIn("ui_tree", contract["context_slices"]["pytest_ran"])
         self.assertIn("hypium_draft", contract["auto_safe_phases"])
@@ -34,6 +36,58 @@ class PhaseGuardTests(unittest.TestCase):
         self.assertEqual(contract["real_device_gates"]["approval"]["user_loop"]["required_input"], "<approval-token>")
         self.assertEqual(contract["real_device_gates"]["preflight"]["decision_contract"]["agent_owner"], "leaf-test-author")
         self.assertEqual(contract["runtime_registry"]["camera"]["default_real_device_runtime_mode"], "direct_smoke")
+
+    def test_phase_guard_rejects_hap_or_install_oriented_contract_language(self):
+        contract = {
+            "context_policy": {"attention_boundary": "one_active_run"},
+            "resume_policy": {},
+            "target_policy": {
+                "scope": "system_app_only",
+                "forbidden_terms": ["hap"],
+            },
+            "phases": {
+                "plan": {
+                    "user_checkpoint": "first_plan_confirmation",
+                    "auto_safe": False,
+                    "agent_owner": "leaf-test-author",
+                    "trigger_source": "workflow.json",
+                    "context_slice": ["workflow", "plan"],
+                    "user_loop": {"position": "approve_plan", "required_input": "confirm or revise plan"},
+                    "allowed_artifacts": ["workflow", "plan"],
+                    "next_action": "prepare_test_hap",
+                    "batch_focus_priority": 60,
+                },
+                "e2e_ready": {
+                    "user_checkpoint": "real_device_confirmation",
+                    "auto_safe": False,
+                    "agent_owner": "leaf-test-author",
+                    "trigger_source": "workflow.json",
+                    "context_slice": ["workflow", "target_diagnostics"],
+                    "user_loop": {"position": "approve_real_device", "required_input": "explicit real-device approval"},
+                    "allowed_artifacts": ["target_diagnostics"],
+                    "next_action": "install_hap_and_run",
+                    "batch_focus_priority": 80,
+                },
+                "complete": {
+                    "user_checkpoint": None,
+                    "auto_safe": False,
+                    "agent_owner": "leaf-test-author",
+                    "trigger_source": "workflow.json",
+                    "context_slice": ["workflow"],
+                    "user_loop": {"position": "done", "required_input": ""},
+                    "allowed_artifacts": [],
+                    "next_action": "complete",
+                    "batch_focus_priority": 1000,
+                },
+            },
+        }
+
+        result = validate_phase_contract(contract=contract, include_external_guards=False)
+
+        self.assertEqual(result["status"], "unstable")
+        self.assertIn("target_policy_forbidden_terms", result)
+        self.assertIn("hap", result["target_policy_forbidden_terms"])
+        self.assertTrue(any("forbidden system_app_only term" in issue for issue in result["issues"]))
 
     def test_cli_phase_guard_and_agent_handoff_contract_output_json(self):
         from tools.leaf_author.__main__ import main

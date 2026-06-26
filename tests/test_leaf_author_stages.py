@@ -634,7 +634,7 @@ class LeafAuthorStageTests(unittest.TestCase):
             workflow = load_workflow(root, "stage-e2e")
             workflow["current_phase"] = "e2e_not_ready"
             save_workflow(root, workflow)
-            self.assertEqual(resume_run(root, "stage-e2e")["next_action"], "prepare_haps_or_target_bundle")
+            self.assertEqual(resume_run(root, "stage-e2e")["next_action"], "provide_system_app_target")
 
             workflow["current_phase"] = "e2e_ready"
             save_workflow(root, workflow)
@@ -642,7 +642,7 @@ class LeafAuthorStageTests(unittest.TestCase):
 
             workflow["current_phase"] = "openharmony_synced"
             save_workflow(root, workflow)
-            self.assertEqual(resume_run(root, "stage-e2e")["next_action"], "build_app_and_test_haps")
+            self.assertEqual(resume_run(root, "stage-e2e")["next_action"], "inspect_system_app_target")
 
             workflow["current_phase"] = "openharmony_built"
             save_workflow(root, workflow)

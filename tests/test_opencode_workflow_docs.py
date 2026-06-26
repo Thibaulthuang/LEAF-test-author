@@ -73,6 +73,8 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
         contract = json.loads((root / "docs" / "workflow-contract.json").read_text(encoding="utf-8"))
 
         self.assertEqual(contract["schema_version"], "1.0")
+        self.assertEqual(contract["target_policy"]["scope"], "system_app_only")
+        self.assertIn("hap", contract["target_policy"]["forbidden_terms"])
         self.assertIn("plan", contract["phases"])
         self.assertEqual(contract["phases"]["plan"]["user_checkpoint"], "first_plan_confirmation")
         self.assertEqual(contract["phases"]["e2e_ready"]["user_checkpoint"], "real_device_confirmation")
@@ -100,8 +102,10 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
         self.assertEqual(contract["entrypoints"]["inspect_ui_tree"], "python3 -m tools.leaf_author inspect-ui-tree <run_id>")
         self.assertEqual(contract["entrypoints"]["batch"], "/leaf-batch <batch_id> [--run-id <run_id>...]")
         self.assertEqual(contract["entrypoints"]["report"], "/leaf-report <run_id|batch_id>")
-        self.assertNotIn("test HAP", json.dumps(contract))
-        self.assertNotIn("test-runner HAP", json.dumps(contract))
+        phase_json = json.dumps(contract["phases"])
+        self.assertNotIn("test HAP", phase_json)
+        self.assertNotIn("test-runner HAP", phase_json)
+        self.assertNotIn("HAP", phase_json)
 
     def test_domain_template_documents_required_extension_points(self):
         root = Path(__file__).resolve().parents[1]

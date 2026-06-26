@@ -20,8 +20,8 @@ REQUIRED_PHASE_FIELDS = {
 }
 
 
-def validate_phase_contract() -> dict[str, object]:
-    contract = load_phase_contract()
+def validate_phase_contract(contract: dict[str, object] | None = None, *, include_external_guards: bool = True) -> dict[str, object]:
+    contract = contract or load_phase_contract()
     phases = contract.get("phases", {})
     issues: list[str] = []
     if not isinstance(phases, dict) or not phases:
@@ -51,15 +51,20 @@ def validate_phase_contract() -> dict[str, object]:
         if not isinstance(phase.get("batch_focus_priority"), int):
             issues.append(f"{phase_name}: batch_focus_priority must be an integer")
 
+    target_policy = _target_policy(contract)
+    forbidden_terms = _target_policy_forbidden_terms(target_policy)
+    issues.extend(_target_policy_issues(phases, forbidden_terms))
     _expect_phase_value(phases, "plan", "user_checkpoint", "first_plan_confirmation", issues)
     _expect_phase_value(phases, "plan", "auto_safe", False, issues)
     _expect_phase_value(phases, "e2e_ready", "user_checkpoint", "real_device_confirmation", issues)
     _expect_phase_value(phases, "complete", "next_action", "complete", issues)
     _expect_phase_value(phases, "complete", "batch_focus_priority", 1000, issues)
-    real_device_guard = validate_real_device_contract()
-    issues.extend(str(issue) for issue in real_device_guard.get("issues", []) if isinstance(issue, str))
-    runtime_guard = validate_runtime_registry()
-    issues.extend(str(issue) for issue in runtime_guard.get("issues", []) if isinstance(issue, str))
+    real_device_guard = validate_real_device_contract() if include_external_guards else {"status": "skipped"}
+    if include_external_guards:
+        issues.extend(str(issue) for issue in real_device_guard.get("issues", []) if isinstance(issue, str))
+    runtime_guard = validate_runtime_registry() if include_external_guards else {"status": "skipped"}
+    if include_external_guards:
+        issues.extend(str(issue) for issue in runtime_guard.get("issues", []) if isinstance(issue, str))
 
     summary = build_agent_handoff_contract(contract)
     return {
@@ -71,6 +76,8 @@ def validate_phase_contract() -> dict[str, object]:
         "phase_count": len(phases),
         "trigger_source": "workflow.json",
         "attention_boundary": summary["context_policy"].get("attention_boundary"),
+        "target_policy": target_policy.get("scope"),
+        "target_policy_forbidden_terms": forbidden_terms,
         "agent_owners": sorted(summary["agents"]),
         "user_checkpoints": summary["user_checkpoints"],
         "real_device_gate_status": real_device_guard.get("status"),
@@ -101,6 +108,7 @@ def build_agent_handoff_contract(contract: dict[str, object] | None = None) -> d
 
     context_policy = contract.get("context_policy", {})
     resume_policy = contract.get("resume_policy", {})
+    target_policy = _target_policy(contract)
     return {
         "schema_version": "1.0",
         "manifest_kind": "leaf_agent_handoff_contract",
@@ -111,6 +119,7 @@ def build_agent_handoff_contract(contract: dict[str, object] | None = None) -> d
         },
         "context_policy": context_policy if isinstance(context_policy, dict) else {},
         "resume_policy": resume_policy if isinstance(resume_policy, dict) else {},
+        "target_policy": target_policy,
         "agents": {owner: phases for owner, phases in sorted(agent_phases.items())},
         "context_slices": context_slices,
         "user_checkpoints": {checkpoint: phases for checkpoint, phases in sorted(checkpoint_phases.items())},
@@ -127,6 +136,42 @@ def _expect_phase_value(phases: dict[str, object], phase_name: str, field: str, 
         return
     if phase.get(field) != expected:
         issues.append(f"{phase_name}: {field} must be {expected!r}")
+
+
+def _target_policy(contract: dict[str, object]) -> dict[str, object]:
+    policy = contract.get("target_policy")
+    if isinstance(policy, dict):
+        return policy
+    return {"scope": "system_app_only", "forbidden_terms": []}
+
+
+def _target_policy_forbidden_terms(target_policy: dict[str, object]) -> list[str]:
+    terms = target_policy.get("forbidden_terms")
+    if not isinstance(terms, list):
+        return []
+    return [str(term).lower() for term in terms if str(term)]
+
+
+def _target_policy_issues(phases: dict[str, object], forbidden_terms: list[str]) -> list[str]:
+    if not forbidden_terms:
+        return []
+    issues = []
+    for phase_name, phase in phases.items():
+        if not isinstance(phase, dict):
+            continue
+        fields = {
+            "next_action": phase.get("next_action"),
+            "user_loop.required_input": (phase.get("user_loop") or {}).get("required_input") if isinstance(phase.get("user_loop"), dict) else None,
+            "allowed_artifacts": phase.get("allowed_artifacts"),
+            "context_slice": phase.get("context_slice"),
+        }
+        for field, value in fields.items():
+            haystack = " ".join(str(item) for item in value) if isinstance(value, list) else str(value or "")
+            lowered = haystack.lower()
+            for term in forbidden_terms:
+                if term in lowered:
+                    issues.append(f"{phase_name}: {field} contains forbidden system_app_only term {term!r}")
+    return issues
 
 
 def _string_list(value: object) -> list[str]:

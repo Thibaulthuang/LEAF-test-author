@@ -18,6 +18,17 @@
     "report_batch": "python3 -m tools.leaf_author report-batch <batch_id>",
     "inspect_ui_tree": "python3 -m tools.leaf_author inspect-ui-tree <run_id>"
   },
+  "target_policy": {
+    "scope": "system_app_only",
+    "description": "Authoring and runtime checkpoints target installed OpenHarmony system applications. The OpenCode-facing workflow must not ask users to provide, build, install, or prepare HAP packages.",
+    "forbidden_terms": [
+      "hap",
+      "test hap",
+      "app hap",
+      "install_hap",
+      "build_app_and_test"
+    ]
+  },
   "context_policy": {
     "run_listing": "lightweight_summaries",
     "run_inspection": "single_run_context_slice",
@@ -225,7 +236,7 @@
         "e2e_preflight_report",
         "e2e_readiness"
       ],
-      "next_action": "prepare_haps_or_target_bundle",
+      "next_action": "provide_system_app_target",
       "batch_focus_priority": 70
     },
     "e2e_ready": {
@@ -265,7 +276,7 @@
       "allowed_artifacts": [
         "openharmony_test_project"
       ],
-      "next_action": "build_app_and_test_haps",
+      "next_action": "inspect_system_app_target",
       "batch_focus_priority": 85
     },
     "openharmony_built": {
