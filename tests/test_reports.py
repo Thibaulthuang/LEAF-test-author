@@ -235,6 +235,10 @@ class ReportTests(unittest.TestCase):
             self.assertEqual(result["runtime_evidence_summary"]["quality_gate"], "CAMERA_DIRECT_SMOKE_PASS")
             self.assertEqual(result["runtime_evidence_summary"]["schema_status"], "complete")
             self.assertEqual(result["runtime_evidence_summary"]["missing_required_fields"], [])
+            self.assertEqual(result["runtime_evidence_summary"]["ui_snapshot_ref_count"], 1)
+            self.assertEqual(result["runtime_evidence_summary"]["ui_snapshots"][0]["phase"], "after_launch")
+            self.assertTrue((root / result["runtime_evidence_summary"]["ui_snapshots"][0]["raw_path"]).is_file())
+            self.assertTrue((root / result["runtime_evidence_summary"]["ui_snapshots"][0]["index_path"]).is_file())
             self.assertIn("real_device_preflight", result["evidence"])
             self.assertIn("camera_direct_smoke", result["evidence"])
 
@@ -378,6 +382,7 @@ class ReportTests(unittest.TestCase):
             self.assertEqual(result["runtime_evidence_summary"]["total"], 1)
             self.assertEqual(result["runtime_evidence_summary"]["schema_statuses"], {"complete": 1})
             self.assertEqual(result["runtime_evidence_summary"]["quality_gates"], ["CAMERA_DIRECT_SMOKE_PASS"])
+            self.assertEqual(result["runtime_evidence_summary"]["ui_snapshot_ref_count"], 1)
             preflight = result["runs"][0]["real_device_preflight"]
             self.assertEqual(preflight["runtime_mode"], "direct_smoke")
             self.assertEqual(preflight["status"], "ready")
@@ -385,6 +390,8 @@ class ReportTests(unittest.TestCase):
             self.assertEqual(preflight["approval_status"], "not_required")
             self.assertEqual(preflight["input_status"], "ready")
             self.assertEqual(result["runs"][0]["runtime_evidence"]["schema_status"], "complete")
+            self.assertEqual(result["runs"][0]["runtime_evidence"]["ui_snapshot_ref_count"], 1)
+            self.assertEqual(result["runs"][0]["runtime_evidence"]["ui_snapshots"][0]["phase"], "after_launch")
 
     def test_cli_report_commands_output_json(self):
         with tempfile.TemporaryDirectory() as tmp:

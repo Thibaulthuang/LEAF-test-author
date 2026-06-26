@@ -270,6 +270,7 @@ def _runtime_evidence_summary(
     evidence = payload.get("evidence", {}) if isinstance(payload, dict) else {}
     evidence = evidence if isinstance(evidence, dict) else {}
     missing_fields = [field for field in required_fields if field not in evidence]
+    ui_snapshots = _ui_snapshot_summaries(evidence.get("ui_snapshot_refs"))
     quality_gate = payload.get("quality_gate") if isinstance(payload, dict) else None
     quality_matches = quality_gate == schema.get("quality_gate") == latest_quality_gate
     schema_status = "complete" if not missing_fields and quality_matches else "missing_fields" if missing_fields else "quality_gate_mismatch"
@@ -284,6 +285,8 @@ def _runtime_evidence_summary(
         "required_evidence_fields": required_fields,
         "missing_required_fields": missing_fields,
         "quality_gate_matches_report": quality_matches,
+        "ui_snapshot_ref_count": len(ui_snapshots),
+        "ui_snapshots": ui_snapshots,
     }
 
 
@@ -545,11 +548,13 @@ def _batch_runtime_evidence_summary(runs: list[dict[str, object]]) -> dict[str, 
     schema_statuses = Counter(str(summary.get("schema_status")) for summary in summaries if summary.get("schema_status"))
     quality_gates = sorted({str(summary.get("quality_gate")) for summary in summaries if summary.get("quality_gate")})
     missing_fields = sorted({field for summary in summaries for field in _string_list(summary.get("missing_required_fields"))})
+    ui_snapshot_ref_count = sum(int(summary.get("ui_snapshot_ref_count") or 0) for summary in summaries)
     return {
         "total": len(summaries),
         "schema_statuses": dict(schema_statuses),
         "quality_gates": quality_gates,
         "missing_required_fields": missing_fields,
+        "ui_snapshot_ref_count": ui_snapshot_ref_count,
     }
 
 
@@ -562,7 +567,30 @@ def _batch_runtime_evidence_detail(summary: dict[str, object] | None) -> dict[st
         "artifact": summary.get("artifact"),
         "quality_gate": summary.get("quality_gate"),
         "missing_required_fields": _string_list(summary.get("missing_required_fields")),
+        "ui_snapshot_ref_count": int(summary.get("ui_snapshot_ref_count") or 0),
+        "ui_snapshots": summary.get("ui_snapshots", []) if isinstance(summary.get("ui_snapshots"), list) else [],
     }
+
+
+def _ui_snapshot_summaries(value: object) -> list[dict[str, object]]:
+    if not isinstance(value, list):
+        return []
+    snapshots = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        snapshots.append(
+            {
+                "phase": item.get("phase"),
+                "action_id": item.get("action_id"),
+                "raw_path": item.get("raw_path"),
+                "index_path": item.get("index_path"),
+                "foreground": item.get("foreground") if isinstance(item.get("foreground"), dict) else {},
+                "node_count": item.get("node_count"),
+                "clickable_count": item.get("clickable_count"),
+            }
+        )
+    return snapshots
 
 
 def _string_list(value: object) -> list[str]:
