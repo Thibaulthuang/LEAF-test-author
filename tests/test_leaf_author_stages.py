@@ -262,6 +262,26 @@ class LeafAuthorStageTests(unittest.TestCase):
             self.assertEqual(workflow["current_phase"], "hypium_draft")
             self.assertEqual(workflow["artifacts"]["real_device_approval"], ".leaf/runs/stage-camera-capture-blocked/real_device_approval.json")
 
+    def test_advance_real_runtime_requires_serial_before_local_or_device_stages(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._confirmed_case(root, run_id="stage-runtime-missing-serial")
+
+            from tools.leaf_author.authoring import advance_run
+
+            with patch("tools.leaf_author.authoring.run_domain_runtime") as runtime:
+                result = advance_run(root, "stage-runtime-missing-serial", run_real=True, runtime_mode="direct_smoke")
+
+            self.assertEqual(result["status"], "blocked")
+            self.assertEqual(result["block_reason"], "real_device_serial_required")
+            self.assertEqual(result["next_action"], "provide_real_device_serial")
+            self.assertEqual(result["stages"], [])
+            self.assertEqual(result["resume_summary"]["user_loop"]["position"], "provide_target_inputs")
+            runtime.assert_not_called()
+            run_dir = root / ".leaf" / "runs" / "stage-runtime-missing-serial"
+            self.assertFalse((run_dir / "validation.json").exists())
+            self.assertEqual(load_workflow(root, "stage-runtime-missing-serial")["current_phase"], "hypium_draft")
+
     def test_advance_camera_capture_real_e2e_records_capture_gate_after_approval(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -181,6 +181,30 @@ def advance_run(
         if approval["required_approval_token"]:
             _write_real_device_approval_artifact(root, run_id, workflow, selected_runtime_mode, approval, approval_token=approval_token)
             workflow = load_workflow(root, run_id)
+        serial_decision = _real_device_serial_decision(serial)
+        if not serial_decision["ready"]:
+            return {
+                "run_id": run_id,
+                "status": "blocked",
+                "block_reason": "real_device_serial_required",
+                "current_phase": workflow.get("current_phase"),
+                "stages": stages,
+                "next_action": "provide_real_device_serial",
+                "resume_summary": {
+                    "requires_user_confirmation": True,
+                    "safe_to_auto_continue": False,
+                    "operator_message": "Real-device runtime requires an explicit --serial value before local or device stages run.",
+                    "user_checkpoint": "manual_operator_decision",
+                    "agent_owner": "leaf-test-author",
+                    "context_slice": ["workflow"],
+                    "trigger_source": "workflow.json",
+                    "allowed_artifacts": ["workflow"],
+                    "user_loop": {
+                        "position": "provide_target_inputs",
+                        "required_input": "--serial <serial>",
+                    },
+                },
+            }
     current_phase = str(workflow.get("current_phase", ""))
     if current_phase == "hypium_ran" and run_real:
         current_phase = "pytest_ran"
@@ -352,6 +376,13 @@ def _real_device_approval_decision(domain: str, runtime_mode: str, approval_toke
         "approved": approved,
         "required_approval_token": required,
         "runtime_safety": safety,
+    }
+
+
+def _real_device_serial_decision(serial: str | None) -> dict[str, object]:
+    return {
+        "ready": bool(serial and serial.strip()),
+        "serial": serial,
     }
 
 
