@@ -316,6 +316,45 @@ class BatchRegistryTests(unittest.TestCase):
             self.assertEqual(payload["summary"]["advanced"], 1)
             self.assertEqual(payload["runs"][0]["current_phase"], "complete")
 
+    def test_cli_resume_batch_auto_safe_outputs_audit_guard_block(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "打开相机；切拍照模式；点击拍照", run_id="batch-cli-audit-safe")
+            confirm_plan(root, "batch-cli-audit-safe")
+            create_batch(root, "camera-batch", ["batch-cli-audit-safe"])
+            audit_path = root / ".leaf" / "batches" / "camera-batch" / "batch_audit.json"
+            audit_path.write_text(
+                json.dumps(
+                    {
+                        "batch_checks": [
+                            {"name": "batch_resume_focus_action_route", "passed": False},
+                        ],
+                        "focus_plan": {
+                            "selected_run_id": "batch-cli-audit-safe",
+                        },
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            from tools.leaf_author.__main__ import main
+
+            output = StringIO()
+            with redirect_stdout(output):
+                exit_code = main(["resume-batch", "camera-batch", "--root", str(root), "--auto-safe"])
+            payload = json.loads(output.getvalue())
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(payload["status"], "blocked")
+            self.assertEqual(payload["block_reason"], "batch_audit_failed")
+            self.assertEqual(payload["summary"]["advanced"], 0)
+            self.assertEqual(payload["batch_audit_summary"]["failed_checks"], ["batch_resume_focus_action_route"])
+            self.assertEqual(payload["focus_plan"]["selected_run_id"], "batch-cli-audit-safe")
+            self.assertEqual(payload["runs"][0]["current_phase"], "hypium_draft")
+
 
 if __name__ == "__main__":
     unittest.main()
