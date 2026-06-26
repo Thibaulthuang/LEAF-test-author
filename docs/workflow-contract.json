@@ -7,11 +7,16 @@
     "resume": "/leaf-resume <run_id>",
     "python_module": "python3 -m tools.leaf_author",
     "list_runs": "python3 -m tools.leaf_author list-runs",
-    "inspect_run": "python3 -m tools.leaf_author inspect-run <run_id>"
+    "inspect_run": "python3 -m tools.leaf_author inspect-run <run_id>",
+    "create_batch": "python3 -m tools.leaf_author create-batch <batch_id> --run-id <run_id>",
+    "list_batches": "python3 -m tools.leaf_author list-batches",
+    "inspect_batch": "python3 -m tools.leaf_author inspect-batch <batch_id>"
   },
   "context_policy": {
     "run_listing": "lightweight_summaries",
     "run_inspection": "single_run_context_slice",
+    "batch_listing": "lightweight_batch_summaries",
+    "batch_inspection": "batch_summary_without_artifact_duplication",
     "artifact_loading": "on_demand",
     "attention_boundary": "one_active_run"
   },

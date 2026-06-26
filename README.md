@@ -61,6 +61,18 @@ Inspect one run when OpenCode needs details:
 python3 -m tools.leaf_author inspect-run run-demo
 ```
 
+Create a batch for multi-case authoring:
+
+```bash
+python3 -m tools.leaf_author create-batch camera-suite --run-id run-a --run-id run-b --title "Camera suite"
+```
+
+Inspect a batch summary before focusing on a single run:
+
+```bash
+python3 -m tools.leaf_author inspect-batch camera-suite
+```
+
 Run safe local stages directly:
 
 ```bash
@@ -102,6 +114,11 @@ Use `list-runs` to get lightweight summaries, then `inspect-run <run_id>` to loa
 one run at a time. Large artifacts such as Hypium sources, layout dumps, build
 logs, and result evidence should be opened only when the inspected run requires
 them.
+
+For multi-case work, group run ids with `create-batch`. Use `list-batches` and
+`inspect-batch` to decide which run needs attention next, then switch back to
+`inspect-run <run_id>` for details. Batch manifests store membership and phase
+counts only; they do not duplicate run artifacts.
 
 This keeps attention scoped to the active run and makes multi-case authoring
 and execution resumable without relying on conversational memory.
