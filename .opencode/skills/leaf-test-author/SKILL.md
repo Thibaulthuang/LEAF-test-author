@@ -163,6 +163,10 @@ For real-device execution gates, use `real-device-contract` plus
 text. For runtime pass/fail evidence, use `runtime-evidence-contract <domain>`
 and the concrete runtime artifact such as `camera_direct_smoke.json` instead of
 guessing which evidence fields are sufficient.
+When a report includes UI snapshot references, prefer
+`python3 -m tools.leaf_author inspect-ui-tree <run_id>` with `--phase`,
+`--action-id`, and selector filters before opening raw layout files. This keeps
+GUI diagnosis on indexed evidence and preserves the one-run attention boundary.
 
 ## Subagent Boundaries
 
@@ -179,7 +183,8 @@ guessing which evidence fields are sufficient.
 Use a subagent when a task needs focused domain or GUI reasoning that would
 otherwise load too much context into `leaf-test-author`. Keep the handoff
 artifact-based: pass run id, report summary, UI snapshot index path, and the
-specific question.
+specific question. For GUI handoff, include the exact `inspect-ui-tree` command
+that answers the current selector or layout question.
 
 ## User-In-Loop
 

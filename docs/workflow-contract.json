@@ -15,12 +15,14 @@
     "inspect_batch": "python3 -m tools.leaf_author inspect-batch <batch_id>",
     "resume_batch": "python3 -m tools.leaf_author resume-batch <batch_id> --auto-safe",
     "report_run": "python3 -m tools.leaf_author report-run <run_id>",
-    "report_batch": "python3 -m tools.leaf_author report-batch <batch_id>"
+    "report_batch": "python3 -m tools.leaf_author report-batch <batch_id>",
+    "inspect_ui_tree": "python3 -m tools.leaf_author inspect-ui-tree <run_id>"
   },
   "context_policy": {
     "run_listing": "lightweight_summaries",
     "run_inspection": "single_run_context_slice",
     "run_report": "summary_plus_existing_evidence_paths",
+    "ui_tree_inspection": "runtime_evidence_summary_then_selected_indexes",
     "batch_listing": "lightweight_batch_summaries",
     "batch_inspection": "batch_summary_without_artifact_duplication",
     "batch_report": "batch_summary_then_one_run_report",
