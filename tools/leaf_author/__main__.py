@@ -43,6 +43,9 @@ def main(argv: list[str] | None = None) -> int:
     probe = subparsers.add_parser("probe-device")
     probe.add_argument("--serial", default=None)
 
+    select_device = subparsers.add_parser("select-device")
+    select_device.add_argument("--serial", default=None)
+
     confirm = subparsers.add_parser("confirm-plan")
     confirm.add_argument("run_id")
     confirm.add_argument("--root", type=Path, default=Path("."))
@@ -253,6 +256,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "probe-device":
         print(json.dumps(HdcProbe().probe(serial=args.serial), ensure_ascii=False, indent=2))
         return 0
+    if args.command == "select-device":
+        result = HdcProbe().select_device(serial=args.serial)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0 if result["status"] == "selected" else 1
     if args.command == "confirm-plan":
         print(json.dumps(confirm_plan(args.root, args.run_id), ensure_ascii=False, indent=2))
         return 0

@@ -190,6 +190,95 @@ class LeafAuthorWorkflowTests(unittest.TestCase):
         self.assertEqual(result["status"], "unavailable")
         self.assertEqual(result["reason"], "Connect server failed")
 
+    def test_hdc_probe_selects_single_connected_device(self):
+        def runner(args, timeout_s):
+            if args == ["hdc", "list", "targets"]:
+                return ProbeCommandResult(0, "SERIAL123\n", "")
+            if args == ["hdc", "-t", "SERIAL123", "shell", "param", "get", "const.product.model"]:
+                return ProbeCommandResult(0, "MateTest\n", "")
+            if args == ["hdc", "-t", "SERIAL123", "shell", "param", "get", "const.ohos.apiversion"]:
+                return ProbeCommandResult(0, "14\n", "")
+            return ProbeCommandResult(1, "", f"unexpected {args}")
+
+        result = HdcProbe(runner=runner).select_device()
+
+        self.assertEqual(result["status"], "selected")
+        self.assertEqual(result["selection_reason"], "single_connected_target")
+        self.assertEqual(result["serial"], "SERIAL123")
+        self.assertEqual(result["targets"], ["SERIAL123"])
+        self.assertEqual(result["device"]["model"], "MateTest")
+        self.assertEqual(result["device"]["os_version"], "14")
+        self.assertEqual(result["user_loop"]["required_input"], "")
+
+    def test_hdc_probe_requires_serial_when_multiple_devices_are_connected(self):
+        def runner(args, timeout_s):
+            if args == ["hdc", "list", "targets"]:
+                return ProbeCommandResult(0, "SERIAL123\nSERIAL456\n", "")
+            return ProbeCommandResult(1, "", f"unexpected {args}")
+
+        result = HdcProbe(runner=runner).select_device()
+
+        self.assertEqual(result["status"], "needs_user_input")
+        self.assertEqual(result["selection_reason"], "multiple_connected_targets")
+        self.assertEqual(result["targets"], ["SERIAL123", "SERIAL456"])
+        self.assertEqual(result["user_loop"]["position"], "provide_target_inputs")
+        self.assertEqual(result["user_loop"]["required_input"], "--serial <serial>")
+
+    def test_hdc_probe_selects_requested_serial_from_multiple_devices(self):
+        def runner(args, timeout_s):
+            if args == ["hdc", "list", "targets"]:
+                return ProbeCommandResult(0, "SERIAL123\nSERIAL456\n", "")
+            if args == ["hdc", "-t", "SERIAL456", "shell", "param", "get", "const.product.model"]:
+                return ProbeCommandResult(0, "MateOther\n", "")
+            if args == ["hdc", "-t", "SERIAL456", "shell", "param", "get", "const.ohos.apiversion"]:
+                return ProbeCommandResult(0, "15\n", "")
+            return ProbeCommandResult(1, "", f"unexpected {args}")
+
+        result = HdcProbe(runner=runner).select_device(serial="SERIAL456")
+
+        self.assertEqual(result["status"], "selected")
+        self.assertEqual(result["selection_reason"], "requested_serial")
+        self.assertEqual(result["serial"], "SERIAL456")
+        self.assertEqual(result["device"]["model"], "MateOther")
+
+    def test_hdc_probe_reports_requested_serial_not_connected(self):
+        def runner(args, timeout_s):
+            if args == ["hdc", "list", "targets"]:
+                return ProbeCommandResult(0, "SERIAL123\n", "")
+            return ProbeCommandResult(1, "", f"unexpected {args}")
+
+        result = HdcProbe(runner=runner).select_device(serial="SERIAL456")
+
+        self.assertEqual(result["status"], "unavailable")
+        self.assertEqual(result["selection_reason"], "requested_serial_not_connected")
+        self.assertEqual(result["targets"], ["SERIAL123"])
+        self.assertIn("SERIAL456", result["reason"])
+
+    def test_cli_select_device_outputs_selection_json(self):
+        from contextlib import redirect_stdout
+        from io import StringIO
+        from unittest.mock import patch
+
+        from tools.leaf_author.__main__ import main
+
+        output = StringIO()
+        with patch(
+            "tools.leaf_author.__main__.HdcProbe",
+        ) as probe_cls, redirect_stdout(output):
+            probe_cls.return_value.select_device.return_value = {
+                "status": "selected",
+                "serial": "SERIAL123",
+                "targets": ["SERIAL123"],
+                "selection_reason": "single_connected_target",
+            }
+            exit_code = main(["select-device", "--serial", "SERIAL123"])
+
+        payload = json.loads(output.getvalue())
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(payload["status"], "selected")
+        self.assertEqual(payload["serial"], "SERIAL123")
+        probe_cls.return_value.select_device.assert_called_once_with(serial="SERIAL123")
+
     def test_authoring_tool_creates_plan_case_and_probe_artifacts(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -37,6 +37,60 @@ class HdcProbe:
             "os_version": self._shell_text(target, ["param", "get", "const.ohos.apiversion"]),
         }
 
+    def select_device(self, serial: str | None = None) -> dict[str, object]:
+        targets_result = self.runner([self.hdc_path, "list", "targets"], 5)
+        targets = _parse_targets(targets_result.stdout)
+        transport_error = _hdc_transport_error(targets_result)
+        if targets_result.exit_code != 0 or transport_error:
+            reason = (targets_result.stderr or targets_result.stdout).strip()
+            return _device_selection_result(
+                status="unavailable",
+                reason=reason or "hdc list targets failed",
+                targets=targets,
+                selection_reason="hdc_unavailable",
+            )
+        requested = serial.strip() if isinstance(serial, str) else ""
+        if requested:
+            if requested not in targets:
+                return _device_selection_result(
+                    status="unavailable",
+                    reason=f"requested serial is not connected: {requested}",
+                    targets=targets,
+                    selection_reason="requested_serial_not_connected",
+                    serial=requested,
+                )
+            return _device_selection_result(
+                status="selected",
+                reason="",
+                targets=targets,
+                selection_reason="requested_serial",
+                serial=requested,
+                device=self.probe(serial=requested),
+            )
+        if not targets:
+            return _device_selection_result(
+                status="unavailable",
+                reason="no hdc target is available",
+                targets=[],
+                selection_reason="no_connected_targets",
+            )
+        if len(targets) > 1:
+            return _device_selection_result(
+                status="needs_user_input",
+                reason="multiple hdc targets are connected; provide --serial to select one",
+                targets=targets,
+                selection_reason="multiple_connected_targets",
+            )
+        selected = targets[0]
+        return _device_selection_result(
+            status="selected",
+            reason="",
+            targets=targets,
+            selection_reason="single_connected_target",
+            serial=selected,
+            device=self.probe(serial=selected),
+        )
+
     def _first_target(self) -> str:
         result = self.runner([self.hdc_path, "list", "targets"], 5)
         transport_error = _hdc_transport_error(result)
@@ -73,6 +127,52 @@ def _decode_bytes(value: bytes | str | None) -> str:
     if isinstance(value, str):
         return value
     return value.decode("utf-8", errors="replace")
+
+
+def _parse_targets(output: str) -> list[str]:
+    targets: list[str] = []
+    for line in output.splitlines():
+        target = line.strip()
+        if not target:
+            continue
+        if target.lower().startswith("[empty]"):
+            continue
+        targets.append(target.split()[0])
+    return targets
+
+
+def _device_selection_result(
+    *,
+    status: str,
+    reason: str,
+    targets: list[str],
+    selection_reason: str,
+    serial: str | None = None,
+    device: dict[str, object] | None = None,
+) -> dict[str, object]:
+    needs_input = status == "needs_user_input"
+    payload: dict[str, object] = {
+        "status": status,
+        "tool": "hdc",
+        "targets": targets,
+        "serial": serial,
+        "selection_reason": selection_reason,
+        "reason": reason,
+        "trigger_source": "hdc list targets",
+        "context_policy": {
+            "scope": "real_device_input",
+            "load_strategy": "target_list_then_single_device_probe",
+            "artifact_loading": "on_demand",
+            "attention_boundary": "one_active_run",
+        },
+        "user_loop": {
+            "position": "provide_target_inputs" if needs_input else "observe_real_device_execution",
+            "required_input": "--serial <serial>" if needs_input else "",
+        },
+    }
+    if device is not None:
+        payload["device"] = device
+    return payload
 
 
 def _hdc_transport_error(result: ProbeCommandResult) -> bool:
