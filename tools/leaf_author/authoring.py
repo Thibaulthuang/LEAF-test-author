@@ -12,6 +12,7 @@ from tools.leaf_author.hypium import export_openharmony_test_project, generate_h
 from tools.leaf_author.phase_contract import decide_next_step, write_context_manifest
 from tools.leaf_author.planner import build_plan
 from tools.leaf_author.runner import run_pytest_draft
+from tools.leaf_author.runtime_registry import resolve_runtime_mode, run_domain_runtime
 from tools.leaf_author.validator import validate_pytest_draft
 from tools.leaf_author.workflow import create_workflow, load_workflow, save_workflow
 
@@ -131,12 +132,14 @@ def advance_run(
     app_hap: Path | None = None,
     test_hap: Path | None = None,
     package_dir: Path | None = None,
+    runtime_mode: str | None = None,
     camera_direct: bool = False,
     camera_capture: bool = False,
     hdc_path: str = "hdc",
 ) -> dict[str, object]:
     stages: list[str] = []
     workflow = load_workflow(root, run_id)
+    selected_runtime_mode = resolve_runtime_mode(runtime_mode, camera_direct=camera_direct, camera_capture=camera_capture)
     current_phase = str(workflow.get("current_phase", ""))
     if current_phase == "hypium_ran" and run_real:
         current_phase = "pytest_ran"
@@ -151,50 +154,27 @@ def advance_run(
         stages.append("pytest_result")
         current_phase = "pytest_ran"
     if current_phase == "pytest_ran":
-        if run_real and camera_capture:
-            from tools.leaf_author.camera_smoke import run_camera_capture_e2e
-
-            capture_result = run_camera_capture_e2e(
+        if run_real and selected_runtime_mode:
+            runtime_result = run_domain_runtime(
                 root,
                 run_id,
+                str(workflow.get("domain", "")),
+                selected_runtime_mode,
                 serial=serial or "",
                 hdc_path=hdc_path,
                 hdc_runner=hdc_runner,
             )
-            stages.append("camera_capture_e2e")
+            domain_result = runtime_result["result"]
+            stages.append(str(runtime_result["stage"]))
             current_phase = str(load_workflow(root, run_id).get("current_phase"))
-            if capture_result.get("quality_gate") != "CAMERA_CAPTURE_E2E_PASS":
+            if domain_result.get("quality_gate") != runtime_result["pass_quality_gate"]:
                 final = load_workflow(root, run_id)
                 return {
                     "run_id": run_id,
                     "status": "failed",
                     "current_phase": final.get("current_phase"),
                     "stages": stages,
-                    "next_action": "inspect_camera_capture_e2e",
-                }
-            record_experience(root, run_id)
-            stages.append("experience")
-            current_phase = "experience_recorded"
-        elif run_real and camera_direct:
-            from tools.leaf_author.camera_smoke import run_camera_direct_smoke
-
-            direct_result = run_camera_direct_smoke(
-                root,
-                run_id,
-                serial=serial or "",
-                hdc_path=hdc_path,
-                hdc_runner=hdc_runner,
-            )
-            stages.append("camera_direct_smoke")
-            current_phase = str(load_workflow(root, run_id).get("current_phase"))
-            if direct_result.get("quality_gate") != "CAMERA_DIRECT_SMOKE_PASS":
-                final = load_workflow(root, run_id)
-                return {
-                    "run_id": run_id,
-                    "status": "failed",
-                    "current_phase": final.get("current_phase"),
-                    "stages": stages,
-                    "next_action": "inspect_camera_direct_smoke",
+                    "next_action": runtime_result["inspect_action"],
                 }
             record_experience(root, run_id)
             stages.append("experience")

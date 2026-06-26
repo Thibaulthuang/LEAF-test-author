@@ -320,6 +320,42 @@ class LeafAuthorStageTests(unittest.TestCase):
             self.assertEqual(advance.call_args.kwargs["camera_direct"], True)
             self.assertEqual(advance.call_args.kwargs["hdc_path"], "/sdk/hdc")
 
+    def test_cli_advance_accepts_generic_runtime_mode(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output = StringIO()
+
+            from contextlib import redirect_stdout
+            from tools.leaf_author.__main__ import main
+
+            with patch(
+                "tools.leaf_author.__main__.advance_run",
+                return_value={"run_id": "stage-runtime-mode-cli", "status": "complete", "stages": ["camera_direct_smoke"]},
+            ) as advance, redirect_stdout(output):
+                exit_code = main(
+                    [
+                        "advance",
+                        "stage-runtime-mode-cli",
+                        "--root",
+                        str(root),
+                        "--serial",
+                        "SERIAL123",
+                        "--run-real",
+                        "--runtime-mode",
+                        "direct_smoke",
+                        "--hdc-path",
+                        "/sdk/hdc",
+                    ]
+                )
+
+            self.assertEqual(exit_code, 0)
+            payload = json.loads(output.getvalue())
+            self.assertEqual(payload["stages"], ["camera_direct_smoke"])
+            advance.assert_called_once()
+            self.assertEqual(advance.call_args.kwargs["run_real"], True)
+            self.assertEqual(advance.call_args.kwargs["runtime_mode"], "direct_smoke")
+            self.assertEqual(advance.call_args.kwargs["hdc_path"], "/sdk/hdc")
+
     def test_cli_advance_accepts_camera_capture_real_options(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

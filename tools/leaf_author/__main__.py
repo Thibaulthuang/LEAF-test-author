@@ -94,6 +94,7 @@ def main(argv: list[str] | None = None) -> int:
     advance.add_argument("--app-hap", type=Path, default=None)
     advance.add_argument("--test-hap", type=Path, default=None)
     advance.add_argument("--package-dir", type=Path, default=None)
+    advance.add_argument("--runtime-mode", choices=["direct_smoke", "capture_e2e"], default=None)
     advance.add_argument("--camera-direct", action="store_true")
     advance.add_argument("--camera-capture", action="store_true")
     advance.add_argument("--hdc-path", default="hdc")
@@ -263,6 +264,7 @@ def main(argv: list[str] | None = None) -> int:
                     app_hap=args.app_hap,
                     test_hap=args.test_hap,
                     package_dir=args.package_dir,
+                    runtime_mode=args.runtime_mode,
                     camera_direct=args.camera_direct,
                     camera_capture=args.camera_capture,
                     hdc_path=args.hdc_path,

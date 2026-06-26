@@ -111,13 +111,13 @@ python3 -m tools.leaf_author advance run-demo
 Run Camera direct smoke after explicit user approval:
 
 ```bash
-python3 -m tools.leaf_author advance run-demo --run-real --camera-direct --serial <serial>
+python3 -m tools.leaf_author advance run-demo --run-real --runtime-mode direct_smoke --serial <serial>
 ```
 
 Run Camera capture E2E after explicit user approval:
 
 ```bash
-python3 -m tools.leaf_author advance run-demo --run-real --camera-capture --serial <serial>
+python3 -m tools.leaf_author advance run-demo --run-real --runtime-mode capture_e2e --serial <serial>
 ```
 
 ## Quality Gates

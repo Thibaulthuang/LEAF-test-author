@@ -34,19 +34,19 @@ Example:
    draft run, read-only GUI context, reviewable experience record, and team
    export manifest. Do not stop after only printing `next_action`.
 8. Stop before real-device execution and ask for second confirmation. A Camera
-   capture run with `--run-real --camera-capture` mutates device state by taking
-   a photo and creating a media file, so it must not run from the first
+   capture run with `--run-real --runtime-mode capture_e2e` mutates device state
+   by taking a photo and creating a media file, so it must not run from the first
    confirmation.
 9. For Camera real-device execution after second confirmation, first run
    `camera-smoke-preflight <run_id> --serial <device_serial>` to verify the
    device and built-in Camera target. Camera is a system app; do not require or
    request an app package. Use
-   `advance <run_id> --run-real --camera-direct --serial <device_serial> --hdc-path <hdc_path>`
+   `advance <run_id> --run-real --runtime-mode direct_smoke --serial <device_serial> --hdc-path <hdc_path>`
    as the framework check: it validates the pytest draft, runs the draft gate,
    foregrounds Camera, verifies the real UiTest layout belongs to Camera,
    records `camera_direct_smoke.json`, writes the reviewable experience record,
    and exports the team manifest. For confirmed capture flows, run
-   `advance <run_id> --run-real --camera-capture --serial <device_serial> --hdc-path <hdc_path>`;
+   `advance <run_id> --run-real --runtime-mode capture_e2e --serial <device_serial> --hdc-path <hdc_path>`;
    this additionally verifies photo mode and the shutter node, snapshots media
    files under `/storage/media/100/local/files/Photo`, taps the shutter,
    verifies a new media file appears, and records `camera_capture_e2e.json`.

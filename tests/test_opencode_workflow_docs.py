@@ -13,7 +13,7 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
         self.assertIn("Two-Stage Confirmation", combined)
         self.assertIn("confirm-plan", combined)
         self.assertIn("advance <run_id>", combined)
-        self.assertIn("--run-real --camera-capture", combined)
+        self.assertIn("--run-real --runtime-mode capture_e2e", combined)
         self.assertIn("second confirmation", combined)
         self.assertIn("must not run", combined)
 
@@ -98,6 +98,7 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
         self.assertIn("Quality Gates", template)
         self.assertIn("Required Python Touchpoints", template)
         self.assertIn("tools/leaf_author/domain_registry.py", template)
+        self.assertIn("tools/leaf_author/runtime_registry.py", template)
         self.assertIn("Avoid adding new domain branches", template)
 
     def test_readme_documents_multi_run_context_management(self):
@@ -116,6 +117,7 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
         self.assertIn("/leaf-report", readme)
         self.assertIn("one run at a time", readme)
         self.assertIn("tools/leaf_author/domain_registry.py", readme)
+        self.assertIn("--runtime-mode direct_smoke", readme)
         self.assertNotIn("test HAP", readme)
         self.assertNotIn("test package", readme)
 
@@ -131,6 +133,7 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
 
         self.assertIn("system Camera", combined)
         self.assertIn("Python/HDC/UiTest", combined)
+        self.assertIn("--runtime-mode direct_smoke", combined)
         self.assertNotIn("test HAP", combined)
         self.assertNotIn("test-runner HAP", combined)
         self.assertNotIn("@ohos/hypium", combined)

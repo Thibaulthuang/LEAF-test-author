@@ -60,14 +60,17 @@ Adding a domain normally requires reviewing these files:
 
 - `tools/leaf_author/domain_registry.py`: register the domain contract for
   target feature inference, semantic plan validation, and action mapping.
+- `tools/leaf_author/runtime_registry.py`: register real-device runtime modes
+  such as `direct_smoke` or `capture_e2e` when the domain has executable
+  system-app evidence.
 - `tools/leaf_author/<domain>_smoke.py`: domain preflight/direct/e2e execution if needed.
 - `tests/`: unit tests for plan validation, generated drafts, quality gates, and CLI output.
 
 Avoid adding new domain branches to core workflow orchestration. The workflow
 state machine, phase contract, report surfaces, and context manifests should
 remain domain-neutral. Domain-specific behavior enters through the registry,
-domain skill, optional runtime smoke module, and reviewable quality-gate
-artifacts.
+domain skill, runtime registry, optional runtime smoke module, and reviewable
+quality-gate artifacts.
 
 ## Safety Rules
 
