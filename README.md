@@ -73,6 +73,19 @@ Inspect a batch summary before focusing on a single run:
 python3 -m tools.leaf_author inspect-batch camera-suite
 ```
 
+Resume safe local stages across a batch:
+
+```bash
+python3 -m tools.leaf_author resume-batch camera-suite --auto-safe
+```
+
+Report one run or a batch without loading large artifacts into OpenCode context:
+
+```bash
+python3 -m tools.leaf_author report-run run-demo
+python3 -m tools.leaf_author report-batch camera-suite
+```
+
 Run safe local stages directly:
 
 ```bash
@@ -119,6 +132,12 @@ For multi-case work, group run ids with `create-batch`. Use `list-batches` and
 `inspect-batch` to decide which run needs attention next, then switch back to
 `inspect-run <run_id>` for details. Batch manifests store membership and phase
 counts only; they do not duplicate run artifacts.
+
+Use `report-run` and `report-batch` when the agent needs an operator-facing
+decision summary: current phase, latest quality gate, user checkpoint, next safe
+command, and existing evidence paths. Use `resume-batch --auto-safe` to advance
+only confirmed safe local stages across multiple runs; it still stops at plan
+confirmation and real-device confirmation.
 
 This keeps attention scoped to the active run and makes multi-case authoring
 and execution resumable without relying on conversational memory.

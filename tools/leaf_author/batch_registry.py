@@ -5,6 +5,7 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
+from tools.leaf_author.authoring import resume_run
 from tools.leaf_author.run_registry import inspect_run
 
 
@@ -78,6 +79,31 @@ def list_batches(root: Path) -> dict[str, object]:
     }
 
 
+def resume_batch(root: Path, batch_id: str, auto_safe: bool = False) -> dict[str, object]:
+    batch = _load_batch(root, batch_id)
+    runs = [_resume_batch_run(root, run_id, auto_safe=auto_safe) for run_id in batch["run_ids"]]
+    statuses = Counter(str(run.get("status", "in_progress")) for run in runs)
+    return {
+        "schema_version": "1.0",
+        "batch_id": batch_id,
+        "title": batch.get("title", batch_id),
+        "auto_safe": auto_safe,
+        "summary": {
+            "advanced": sum(1 for run in runs if run.get("auto_advanced") is True),
+            "waiting_for_confirmation": sum(1 for run in runs if run.get("status") == "waiting_for_confirmation"),
+            "complete": statuses.get("complete", 0),
+            "in_progress": statuses.get("in_progress", 0),
+            "failed": statuses.get("failed", 0),
+        },
+        "runs": runs,
+        "context_policy": {
+            "scope": "batch_resume",
+            "load_strategy": "one_run_resume_summary_at_a_time",
+            "artifact_loading": "on_demand",
+        },
+    }
+
+
 def _load_batch(root: Path, batch_id: str) -> dict[str, object]:
     batch_path = root / ".leaf" / "batches" / batch_id / "batch.json"
     return json.loads(batch_path.read_text(encoding="utf-8"))
@@ -98,6 +124,25 @@ def _run_batch_summary(run: dict[str, object]) -> dict[str, object]:
         "current_phase": run.get("current_phase"),
         "confirmed_plan": run.get("confirmed_plan"),
         "next_action": run.get("next_action"),
+    }
+
+
+def _resume_batch_run(root: Path, run_id: str, auto_safe: bool) -> dict[str, object]:
+    resume = resume_run(root, str(run_id), auto_safe=auto_safe)
+    resume_summary = resume.get("resume_summary", {})
+    status = str(resume.get("status", "in_progress"))
+    if status == "in_progress" and isinstance(resume_summary, dict) and resume_summary.get("requires_user_confirmation"):
+        status = "waiting_for_confirmation"
+    if resume.get("current_phase") == "complete":
+        status = "complete"
+    return {
+        "run_id": run_id,
+        "current_phase": resume.get("current_phase"),
+        "confirmed_plan": resume.get("confirmed_plan"),
+        "next_action": resume.get("next_action"),
+        "auto_advanced": bool(resume.get("auto_advanced", False)),
+        "status": status,
+        "resume_summary": resume_summary,
     }
 
 

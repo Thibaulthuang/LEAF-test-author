@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 from tools.leaf_author.authoring import advance_run, confirm_plan, resume_run, start_new_case
-from tools.leaf_author.batch_registry import create_batch, inspect_batch, list_batches
+from tools.leaf_author.batch_registry import create_batch, inspect_batch, list_batches, resume_batch
 from tools.leaf_author.build import build_openharmony_haps
 from tools.leaf_author.camera_smoke import run_camera_capture_e2e, run_camera_direct_smoke, run_camera_smoke, write_camera_smoke_preflight
 from tools.leaf_author.device_diagnostics import discover_test_targets, inspect_e2e_readiness, inspect_package_dir, inspect_test_target
@@ -16,6 +16,7 @@ from tools.leaf_author.e2e_report import write_e2e_preflight_report
 from tools.leaf_author.hypium import sync_openharmony_export
 from tools.leaf_author.openharmony_discovery import discover_hap_artifacts
 from tools.leaf_author.openharmony_project import scaffold_openharmony_test_project
+from tools.leaf_author.reports import report_batch, report_run
 from tools.leaf_author.run_registry import inspect_run, list_runs
 
 
@@ -66,6 +67,19 @@ def main(argv: list[str] | None = None) -> int:
     inspect_batch_parser = subparsers.add_parser("inspect-batch")
     inspect_batch_parser.add_argument("batch_id")
     inspect_batch_parser.add_argument("--root", type=Path, default=Path("."))
+
+    resume_batch_parser = subparsers.add_parser("resume-batch")
+    resume_batch_parser.add_argument("batch_id")
+    resume_batch_parser.add_argument("--root", type=Path, default=Path("."))
+    resume_batch_parser.add_argument("--auto-safe", action="store_true")
+
+    report_run_parser = subparsers.add_parser("report-run")
+    report_run_parser.add_argument("run_id")
+    report_run_parser.add_argument("--root", type=Path, default=Path("."))
+
+    report_batch_parser = subparsers.add_parser("report-batch")
+    report_batch_parser.add_argument("batch_id")
+    report_batch_parser.add_argument("--root", type=Path, default=Path("."))
 
     advance = subparsers.add_parser("advance")
     advance.add_argument("run_id")
@@ -223,6 +237,15 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "inspect-batch":
         print(json.dumps(inspect_batch(args.root, args.batch_id), ensure_ascii=False, indent=2))
+        return 0
+    if args.command == "resume-batch":
+        print(json.dumps(resume_batch(args.root, args.batch_id, auto_safe=args.auto_safe), ensure_ascii=False, indent=2))
+        return 0
+    if args.command == "report-run":
+        print(json.dumps(report_run(args.root, args.run_id), ensure_ascii=False, indent=2))
+        return 0
+    if args.command == "report-batch":
+        print(json.dumps(report_batch(args.root, args.batch_id), ensure_ascii=False, indent=2))
         return 0
     if args.command == "advance":
         print(

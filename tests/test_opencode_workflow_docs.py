@@ -48,8 +48,13 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
         self.assertEqual(contract["resume_policy"]["auto_safe_flag"], "--auto-safe")
         self.assertEqual(contract["context_policy"]["run_listing"], "lightweight_summaries")
         self.assertEqual(contract["context_policy"]["run_inspection"], "single_run_context_slice")
+        self.assertEqual(contract["context_policy"]["run_report"], "summary_plus_existing_evidence_paths")
         self.assertEqual(contract["context_policy"]["batch_listing"], "lightweight_batch_summaries")
         self.assertEqual(contract["context_policy"]["batch_inspection"], "batch_summary_without_artifact_duplication")
+        self.assertEqual(contract["context_policy"]["batch_report"], "batch_summary_then_one_run_report")
+        self.assertIn("resume_batch", contract["entrypoints"])
+        self.assertIn("report_run", contract["entrypoints"])
+        self.assertIn("report_batch", contract["entrypoints"])
 
     def test_domain_template_documents_required_extension_points(self):
         root = Path(__file__).resolve().parents[1]
@@ -69,6 +74,9 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
         self.assertIn("inspect-run", readme)
         self.assertIn("create-batch", readme)
         self.assertIn("inspect-batch", readme)
+        self.assertIn("resume-batch", readme)
+        self.assertIn("report-run", readme)
+        self.assertIn("report-batch", readme)
         self.assertIn("one run at a time", readme)
 
 
