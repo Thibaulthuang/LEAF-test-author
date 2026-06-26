@@ -74,6 +74,37 @@ class RunAuditTests(unittest.TestCase):
             failed_checks = [check["name"] for check in result["checks"] if not check["passed"]]
             self.assertIn("real_device_safety_profile", failed_checks)
 
+    def test_audit_run_checks_capture_approval_artifact_matches_preflight(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _complete_capture_e2e(root, "audit-capture-approved")
+
+            result = audit_run(root, "audit-capture-approved")
+
+            self.assertEqual(result["status"], "passed")
+            self.assertEqual(result["latest_quality_gate"], "CAMERA_CAPTURE_E2E_PASS")
+            self.assertEqual(result["evidence"]["real_device_approval"], ".leaf/runs/audit-capture-approved/real_device_approval.json")
+            self.assertEqual(result["real_device_trace"]["required_approval_token"], "approve_camera_capture_e2e")
+            self.assertEqual(result["real_device_trace"]["approval_status"], "approved")
+            passed_checks = [check["name"] for check in result["checks"] if check["passed"]]
+            self.assertIn("real_device_approval_artifact_ready", passed_checks)
+            self.assertIn("real_device_approval_matches_preflight", passed_checks)
+
+    def test_audit_run_fails_when_capture_approval_artifact_drifts_from_preflight(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _complete_capture_e2e(root, "audit-capture-approval-drift")
+            approval_path = root / ".leaf" / "runs" / "audit-capture-approval-drift" / "real_device_approval.json"
+            approval = json.loads(approval_path.read_text(encoding="utf-8"))
+            approval["approval_token"] = "wrong-token"
+            approval_path.write_text(json.dumps(approval, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            result = audit_run(root, "audit-capture-approval-drift")
+
+            self.assertEqual(result["status"], "failed")
+            failed_checks = [check["name"] for check in result["checks"] if not check["passed"]]
+            self.assertIn("real_device_approval_matches_preflight", failed_checks)
+
     def test_audit_run_can_verify_preflight_serial_is_currently_connected(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -721,6 +752,63 @@ def _complete_direct_smoke(root: Path, run_id: str) -> None:
         return ProbeCommandResult(1, "", f"unexpected {args}")
 
     advance_run(root, run_id, hdc_runner=runner, serial="SERIAL123", run_real=True, runtime_mode="direct_smoke", hdc_path="/sdk/hdc")
+
+
+def _complete_capture_e2e(root: Path, run_id: str) -> None:
+    start_new_case(root, "camera", "打开相机；点击拍照", run_id=run_id)
+    confirm_plan(root, run_id)
+
+    def fake_capture(root_arg, run_id_arg, **kwargs):
+        run_dir = root_arg / ".leaf" / "runs" / run_id_arg
+        raw_path = run_dir / "capture_after.raw.json"
+        index_path = run_dir / "capture_after.index.json"
+        capture_path = run_dir / "camera_capture_e2e.json"
+        raw_path.write_text('{"attributes":{"bundleName":"com.huawei.hmos.camera","text":"拍照"},"children":[]}\n', encoding="utf-8")
+        index_path.write_text('{"kind":"ui_snapshot","nodes":[]}\n', encoding="utf-8")
+        capture_path.write_text(
+            json.dumps(
+                {
+                    "run_id": run_id_arg,
+                    "status": "complete",
+                    "quality_gate": "CAMERA_CAPTURE_E2E_PASS",
+                    "evidence": {
+                        "capture_triggered": True,
+                        "media_delta_detected": True,
+                        "layout_verified": True,
+                        "ui_snapshot_refs": [
+                            {
+                                "raw_path": str(raw_path.relative_to(root_arg)),
+                                "index_path": str(index_path.relative_to(root_arg)),
+                            }
+                        ],
+                    },
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        from tools.leaf_author.workflow import load_workflow, save_workflow
+
+        workflow = load_workflow(root_arg, run_id_arg)
+        artifacts = dict(workflow.get("artifacts", {}))
+        artifacts["camera_capture_e2e"] = str(capture_path.relative_to(root_arg))
+        workflow["artifacts"] = artifacts
+        workflow["current_phase"] = "camera_capture_e2e_complete"
+        save_workflow(root_arg, workflow)
+        return {"status": "complete", "quality_gate": "CAMERA_CAPTURE_E2E_PASS"}
+
+    with patch("tools.leaf_author.camera_smoke.run_camera_capture_e2e", side_effect=fake_capture):
+        advance_run(
+            root,
+            run_id,
+            serial="SERIAL123",
+            run_real=True,
+            runtime_mode="capture_e2e",
+            hdc_path="/sdk/hdc",
+            approval_token="approve_camera_capture_e2e",
+        )
 
 
 def _inject_ready_real_device_artifacts(root: Path, run_id: str) -> None:

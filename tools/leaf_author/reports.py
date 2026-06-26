@@ -198,6 +198,8 @@ def _real_device_preflight(root: Path, artifacts: dict[str, object]) -> dict[str
         "risk_level": payload.get("risk_level"),
         "mutates_device_state": payload.get("mutates_device_state"),
         "approval_status": payload.get("approval_status"),
+        "required_approval_token": payload.get("required_approval_token"),
+        "approval_token": payload.get("approval_token"),
         "input_status": payload.get("input_status"),
         "next_action": payload.get("next_action"),
         "decision_contract": _with_target_policy(decision_contract if isinstance(decision_contract, dict) else {}),

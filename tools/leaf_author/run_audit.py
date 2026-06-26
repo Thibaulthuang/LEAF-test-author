@@ -46,6 +46,8 @@ def audit_run(
     checks.extend(_live_device_checks(live_device_result, enabled=live_device))
     checks.extend(_device_selection_checks(device_selection if isinstance(device_selection, dict) else None, preflight if isinstance(preflight, dict) else None))
     evidence = report.get("evidence", {})
+    real_device_approval = _load_real_device_approval(root, evidence if isinstance(evidence, dict) else {})
+    checks.extend(_real_device_approval_checks(real_device_approval, preflight if isinstance(preflight, dict) else None))
     real_device_input = _load_real_device_input(root, evidence if isinstance(evidence, dict) else {})
     checks.extend(
         _real_device_input_checks(
@@ -69,6 +71,7 @@ def audit_run(
     real_device_trace = _real_device_trace(
         latest_quality_gate=latest_quality_gate,
         device_selection=device_selection if isinstance(device_selection, dict) else None,
+        real_device_approval=real_device_approval,
         real_device_input=real_device_input,
         preflight=preflight if isinstance(preflight, dict) else None,
         live_device_result=live_device_result,
@@ -92,6 +95,7 @@ def audit_run(
         "evidence": {
             "report": "report-run",
             "device_selection": device_selection.get("artifact") if isinstance(device_selection, dict) else None,
+            "real_device_approval": real_device_approval.get("artifact") if isinstance(real_device_approval, dict) else None,
             "real_device_input": real_device_input.get("artifact") if isinstance(real_device_input, dict) else None,
             "real_device_preflight": preflight.get("artifact") if isinstance(preflight, dict) else None,
             "runtime_evidence": runtime_evidence.get("artifact") if isinstance(runtime_evidence, dict) else None,
@@ -255,6 +259,58 @@ def _device_selection_checks(device_selection: dict[str, object] | None, preflig
             )
         )
     return checks
+
+
+def _load_real_device_approval(root: Path, evidence: dict[str, object]) -> dict[str, object] | None:
+    value = evidence.get("real_device_approval")
+    if not isinstance(value, str) or not value:
+        return None
+    path = root / value
+    if not path.is_file():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {"artifact": value, "status": "invalid", "error": {"type": "JSONDecodeError", "message": "real_device_approval is not valid JSON"}}
+    if not isinstance(payload, dict):
+        return {"artifact": value, "status": "invalid", "error": {"type": "TypeError", "message": "real_device_approval must be a JSON object"}}
+    payload["artifact"] = value
+    return payload
+
+
+def _real_device_approval_checks(
+    real_device_approval: dict[str, object] | None,
+    preflight: dict[str, object] | None,
+) -> list[dict[str, object]]:
+    if not preflight or not preflight.get("required_approval_token"):
+        return []
+    checks = [
+        _check(
+            "real_device_approval_artifact_ready",
+            isinstance(real_device_approval, dict) and real_device_approval.get("status") == "approved",
+            "Real-device approval artifact records approved operator consent.",
+        )
+    ]
+    checks.append(
+        _check(
+            "real_device_approval_matches_preflight",
+            _approval_matches_preflight(real_device_approval, preflight),
+            "Real-device approval artifact matches preflight runtime mode and approval token.",
+        )
+    )
+    return checks
+
+
+def _approval_matches_preflight(real_device_approval: dict[str, object] | None, preflight: dict[str, object]) -> bool:
+    if not isinstance(real_device_approval, dict):
+        return False
+    return (
+        real_device_approval.get("runtime_mode") == preflight.get("runtime_mode")
+        and real_device_approval.get("required_approval_token") == preflight.get("required_approval_token")
+        and real_device_approval.get("approval_token") == preflight.get("approval_token")
+        and real_device_approval.get("status") == "approved"
+        and preflight.get("approval_status") == "approved"
+    )
 
 
 def _load_real_device_input(root: Path, evidence: dict[str, object]) -> dict[str, object] | None:
@@ -452,12 +508,14 @@ def _real_device_trace(
     *,
     latest_quality_gate: str,
     device_selection: dict[str, object] | None,
+    real_device_approval: dict[str, object] | None,
     real_device_input: dict[str, object] | None,
     preflight: dict[str, object] | None,
     live_device_result: dict[str, object] | None = None,
 ) -> dict[str, object]:
     artifacts = {
         "device_selection": device_selection.get("artifact") if isinstance(device_selection, dict) else None,
+        "real_device_approval": real_device_approval.get("artifact") if isinstance(real_device_approval, dict) else None,
         "real_device_input": real_device_input.get("artifact") if isinstance(real_device_input, dict) else None,
         "real_device_preflight": preflight.get("artifact") if isinstance(preflight, dict) else None,
     }
