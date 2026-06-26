@@ -160,6 +160,7 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
         self.assertIn("Report `next_command`", readme)
         self.assertIn("Batch audit applies the same boundary", readme)
         self.assertIn("focus_plan", readme)
+        self.assertIn("target_policy", readme)
         self.assertIn("matches that run's resume", readme)
         self.assertIn("never marks a user checkpoint safe", readme)
         self.assertIn("requires `ui_tree`", readme)

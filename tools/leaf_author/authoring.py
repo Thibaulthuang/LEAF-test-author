@@ -362,6 +362,7 @@ def _resume_summary(decision: dict[str, object]) -> dict[str, object]:
         "context_slice": decision.get("context_slice", []),
         "trigger_source": decision.get("trigger_source", "workflow.json"),
         "allowed_artifacts": decision.get("allowed_artifacts", []),
+        "target_policy": decision.get("target_policy", {}),
         "user_loop": decision.get("user_loop", {}),
     }
 

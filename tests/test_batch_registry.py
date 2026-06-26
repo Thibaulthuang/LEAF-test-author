@@ -181,6 +181,7 @@ class BatchRegistryTests(unittest.TestCase):
             self.assertEqual(result["focus_plan"]["agent_owner"], "leaf-test-author")
             self.assertEqual(result["focus_plan"]["context_slice"], ["workflow", "plan"])
             self.assertEqual(result["focus_plan"]["allowed_artifacts"], ["workflow", "plan", "device_probe"])
+            self.assertEqual(result["focus_plan"]["target_policy"]["scope"], "system_app_only")
             self.assertEqual(result["focus_plan"]["user_loop"]["position"], "approve_plan")
             self.assertEqual(result["focus_plan"]["user_loop"]["required_input"], "confirm or revise plan")
             self.assertEqual(result["focus_plan"]["safe_to_auto_continue"], False)

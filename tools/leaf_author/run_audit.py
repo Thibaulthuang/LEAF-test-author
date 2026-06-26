@@ -768,6 +768,7 @@ def _batch_resume_checks(resume_view: dict[str, object]) -> list[dict[str, objec
         and bool(focus_plan.get("agent_owner"))
         and isinstance(focus_plan.get("context_slice"), list)
         and isinstance(focus_plan.get("allowed_artifacts"), list)
+        and isinstance(focus_plan.get("target_policy"), dict)
         and isinstance(focus_plan.get("user_loop"), dict)
     )
     focus_matches_run = focus_present and _batch_focus_matches_selected_run(focus_plan, resume_view)
@@ -775,6 +776,7 @@ def _batch_resume_checks(resume_view: dict[str, object]) -> list[dict[str, objec
     focus_gui_context = focus_present and (
         focus_plan.get("agent_owner") != "leaf-gui-agent" or "ui_tree" in _string_list(focus_plan.get("context_slice"))
     )
+    focus_target_policy = focus_present and _target_policy_handoff_ready(focus_plan.get("target_policy"), focus_plan.get("target_policy"))
     return [
         _check("batch_resume_attention_boundary", attention_boundary, "Batch resume context policy uses one active run boundary."),
         _check("batch_resume_focus_present", focus_present, "Incomplete batches expose one selected focus run."),
@@ -782,6 +784,7 @@ def _batch_resume_checks(resume_view: dict[str, object]) -> list[dict[str, objec
         _check("batch_resume_focus_matches_run", focus_matches_run, "Batch focus plan matches the selected run resume contract."),
         _check("batch_resume_focus_user_boundary", focus_user_boundary, "Batch focus plan never marks a user checkpoint safe for automatic continuation."),
         _check("batch_resume_focus_gui_context", focus_gui_context, "Batch GUI-agent focus includes ui_tree in the bounded context slice."),
+        _check("batch_resume_focus_target_policy", focus_target_policy, "Batch focus plan preserves the system-app-only target policy."),
     ]
 
 
@@ -812,6 +815,7 @@ def _batch_focus_matches_selected_run(focus_plan: object, resume_view: dict[str,
         and focus_plan.get("agent_owner") == summary.get("agent_owner")
         and _string_list(focus_plan.get("context_slice")) == _string_list(summary.get("context_slice"))
         and _string_list(focus_plan.get("allowed_artifacts")) == _string_list(summary.get("allowed_artifacts"))
+        and focus_plan.get("target_policy") == summary.get("target_policy")
         and focus_plan.get("user_checkpoint") == summary.get("user_checkpoint")
         and bool(focus_plan.get("requires_user_confirmation")) == bool(summary.get("requires_user_confirmation"))
         and bool(focus_plan.get("safe_to_auto_continue")) == bool(summary.get("safe_to_auto_continue"))

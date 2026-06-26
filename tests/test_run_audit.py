@@ -402,6 +402,7 @@ class RunAuditTests(unittest.TestCase):
 
             self.assertEqual(result["focus_plan"]["selected_run_id"], "audit-focus-wait")
             self.assertEqual(result["focus_plan"]["attention_boundary"], "one_active_run")
+            self.assertEqual(result["focus_plan"]["target_policy"]["scope"], "system_app_only")
             failed_checks = [check["name"] for check in result["batch_checks"] if not check["passed"]]
             self.assertNotIn("batch_resume_focus_present", failed_checks)
             self.assertNotIn("batch_resume_attention_boundary", failed_checks)
@@ -409,6 +410,7 @@ class RunAuditTests(unittest.TestCase):
             self.assertNotIn("batch_resume_focus_matches_run", failed_checks)
             self.assertNotIn("batch_resume_focus_user_boundary", failed_checks)
             self.assertNotIn("batch_resume_focus_gui_context", failed_checks)
+            self.assertNotIn("batch_resume_focus_target_policy", failed_checks)
 
     def test_audit_batch_fails_when_focus_plan_drifts_from_selected_run_summary(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -435,6 +437,19 @@ class RunAuditTests(unittest.TestCase):
             self.assertEqual(result["status"], "failed")
             failed_checks = [check["name"] for check in result["batch_checks"] if not check["passed"]]
             self.assertIn("batch_resume_focus_user_boundary", failed_checks)
+
+    def test_audit_batch_fails_when_focus_plan_target_policy_drifts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "打开相机；点击拍照", run_id="audit-focus-target-policy")
+            create_batch(root, "audit-focus-target-policy-batch", ["audit-focus-target-policy"])
+
+            with patch("tools.leaf_author.run_audit.resume_batch", return_value=_batch_resume_view_with_target_policy_drift()):
+                result = audit_batch(root, "audit-focus-target-policy-batch")
+
+            self.assertEqual(result["status"], "failed")
+            failed_checks = [check["name"] for check in result["batch_checks"] if not check["passed"]]
+            self.assertIn("batch_resume_focus_target_policy", failed_checks)
 
     def test_audit_batch_fails_when_gui_focus_plan_omits_ui_tree_context(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -604,6 +619,12 @@ def _batch_resume_view_with_user_boundary_drift() -> dict[str, object]:
     return view
 
 
+def _batch_resume_view_with_target_policy_drift() -> dict[str, object]:
+    view = _batch_resume_view_for_focus("audit-focus-target-policy")
+    view["focus_plan"]["target_policy"] = {"scope": "hap_package", "forbidden_terms": []}
+    return view
+
+
 def _batch_resume_view_with_gui_context_drift() -> dict[str, object]:
     view = _batch_resume_view_for_focus("audit-focus-gui")
     view["focus_plan"]["agent_owner"] = "leaf-gui-agent"
@@ -629,6 +650,7 @@ def _batch_resume_view_for_focus(run_id: str) -> dict[str, object]:
             "next_action": "present_plan_for_confirmation",
             "context_slice": ["workflow", "plan"],
             "allowed_artifacts": ["workflow", "plan", "device_probe"],
+            "target_policy": {"scope": "system_app_only", "forbidden_terms": ["hap"]},
             "user_checkpoint": "first_plan_confirmation",
             "user_loop": {
                 "position": "approve_plan",
@@ -656,6 +678,7 @@ def _batch_resume_view_for_focus(run_id: str) -> dict[str, object]:
                     "agent_owner": "leaf-test-author",
                     "context_slice": ["workflow", "plan"],
                     "allowed_artifacts": ["workflow", "plan", "device_probe"],
+                    "target_policy": {"scope": "system_app_only", "forbidden_terms": ["hap"]},
                     "user_checkpoint": "first_plan_confirmation",
                     "requires_user_confirmation": True,
                     "safe_to_auto_continue": False,
