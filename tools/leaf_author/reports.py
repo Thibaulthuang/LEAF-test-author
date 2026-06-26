@@ -307,6 +307,7 @@ def _next_report_focus(runs: list[dict[str, object]]) -> dict[str, object] | Non
 
 
 def _batch_report_summary(run: dict[str, object]) -> dict[str, object]:
+    real_device_preflight = run.get("real_device_preflight")
     return {
         "run_id": run.get("run_id"),
         "domain": run.get("domain"),
@@ -318,4 +319,18 @@ def _batch_report_summary(run: dict[str, object]) -> dict[str, object]:
         "user_action_required": run.get("user_action_required"),
         "user_checkpoint": run.get("user_checkpoint"),
         "next_command": run.get("next_command"),
+        "real_device_preflight": _batch_preflight_summary(real_device_preflight if isinstance(real_device_preflight, dict) else None),
+    }
+
+
+def _batch_preflight_summary(preflight: dict[str, object] | None) -> dict[str, object] | None:
+    if not preflight:
+        return None
+    return {
+        "runtime_mode": preflight.get("runtime_mode"),
+        "status": preflight.get("status"),
+        "risk_level": preflight.get("risk_level"),
+        "mutates_device_state": preflight.get("mutates_device_state"),
+        "approval_status": preflight.get("approval_status"),
+        "input_status": preflight.get("input_status"),
     }
