@@ -4,6 +4,7 @@ import unittest
 from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
+from typing import Optional
 
 from tools.leaf_author.authoring import advance_run, confirm_plan, start_new_case
 from tools.leaf_author.batch_registry import create_batch
@@ -401,6 +402,30 @@ class ReportTests(unittest.TestCase):
             self.assertEqual(result["runs"][0]["runtime_evidence"]["ui_snapshot_ref_count"], 1)
             self.assertEqual(result["runs"][0]["runtime_evidence"]["ui_snapshots"][0]["phase"], "after_launch")
 
+    def test_report_batch_summarizes_real_device_risk_and_approval_status(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_report_preflight(root, "report-batch-direct-risk", runtime_mode="direct_smoke")
+            _write_report_preflight(
+                root,
+                "report-batch-capture-risk",
+                runtime_mode="capture_e2e",
+                required_approval_token="approve_camera_capture_e2e",
+            )
+            create_batch(root, "report-batch-risk", ["report-batch-direct-risk", "report-batch-capture-risk"])
+
+            result = report_batch(root, "report-batch-risk")
+
+            self.assertEqual(result["real_device_summary"]["total_preflights"], 2)
+            self.assertEqual(result["real_device_summary"]["runtime_modes"], ["capture_e2e", "direct_smoke"])
+            self.assertEqual(result["real_device_summary"]["risk_levels"], ["device_state_mutation", "read_only_probe"])
+            self.assertEqual(result["real_device_summary"]["mutates_device_state"], 1)
+            self.assertEqual(result["real_device_summary"]["read_only"], 1)
+            self.assertEqual(result["real_device_summary"]["approval_statuses"], ["approved", "not_required"])
+            self.assertEqual(result["real_device_summary"]["approval_required"], 1)
+            self.assertEqual(result["real_device_summary"]["approval_approved"], 1)
+            self.assertEqual(result["real_device_summary"]["approval_tokens"], ["approve_camera_capture_e2e"])
+
     def test_cli_report_commands_output_json(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -423,6 +448,50 @@ class ReportTests(unittest.TestCase):
             self.assertEqual(batch_exit, 0)
             self.assertEqual(run_payload["run_id"], "report-cli")
             self.assertEqual(batch_payload["batch_id"], "report-batch")
+
+
+def _write_report_preflight(
+    root: Path,
+    run_id: str,
+    *,
+    runtime_mode: str,
+    required_approval_token: Optional[str] = None,
+) -> None:
+    start_new_case(root, "camera", "打开相机；点击拍照", run_id=run_id)
+    confirm_plan(root, run_id)
+    run_dir = root / ".leaf" / "runs" / run_id
+    risk_level = "device_state_mutation" if required_approval_token else "read_only_probe"
+    preflight_path = run_dir / "real_device_preflight.json"
+    preflight_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "1.0",
+                "artifact_kind": "real_device_runtime_preflight",
+                "run_id": run_id,
+                "domain": "camera",
+                "runtime_mode": runtime_mode,
+                "status": "ready",
+                "serial": "SERIAL123",
+                "serial_source": "explicit_arg",
+                "risk_level": risk_level,
+                "mutates_device_state": bool(required_approval_token),
+                "approval_status": "approved" if required_approval_token else "not_required",
+                "required_approval_token": required_approval_token,
+                "approval_token": required_approval_token,
+                "input_status": "ready",
+                "next_action": "run_real_device_runtime",
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    workflow_path = run_dir / "workflow.json"
+    workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+    workflow["artifacts"]["real_device_preflight"] = str(preflight_path.relative_to(root))
+    workflow["current_phase"] = "complete"
+    workflow_path.write_text(json.dumps(workflow, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":

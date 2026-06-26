@@ -533,6 +533,7 @@ def _batch_preflight_summary(preflight: dict[str, object] | None) -> dict[str, o
         "risk_level": preflight.get("risk_level"),
         "mutates_device_state": preflight.get("mutates_device_state"),
         "approval_status": preflight.get("approval_status"),
+        "required_approval_token": preflight.get("required_approval_token"),
         "input_status": preflight.get("input_status"),
     }
 
@@ -542,11 +543,21 @@ def _batch_real_device_summary(runs: list[dict[str, object]]) -> dict[str, objec
     serials = sorted({str(preflight.get("serial")) for preflight in preflights if preflight.get("serial")})
     runtime_modes = sorted({str(preflight.get("runtime_mode")) for preflight in preflights if preflight.get("runtime_mode")})
     statuses = sorted({str(preflight.get("status")) for preflight in preflights if preflight.get("status")})
+    risk_levels = sorted({str(preflight.get("risk_level")) for preflight in preflights if preflight.get("risk_level")})
+    approval_statuses = sorted({str(preflight.get("approval_status")) for preflight in preflights if preflight.get("approval_status")})
+    approval_tokens = sorted({str(preflight.get("required_approval_token")) for preflight in preflights if preflight.get("required_approval_token")})
     return {
         "total_preflights": len(preflights),
         "serials": serials,
         "runtime_modes": runtime_modes,
         "statuses": statuses,
+        "risk_levels": risk_levels,
+        "mutates_device_state": sum(1 for preflight in preflights if preflight.get("mutates_device_state") is True),
+        "read_only": sum(1 for preflight in preflights if preflight.get("mutates_device_state") is False),
+        "approval_statuses": approval_statuses,
+        "approval_required": sum(1 for preflight in preflights if preflight.get("required_approval_token")),
+        "approval_approved": sum(1 for preflight in preflights if preflight.get("approval_status") == "approved"),
+        "approval_tokens": approval_tokens,
     }
 
 
