@@ -1,12 +1,15 @@
 import json
 import tempfile
 import unittest
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
 from tools.leaf_author.authoring import advance_run
 from tools.leaf_author.runtime_registry import (
     approved_real_device_next_command,
+    build_runtime_registry_contract,
     classify_experience_result,
     experience_candidate_keys,
     quality_artifact_priority,
@@ -14,6 +17,7 @@ from tools.leaf_author.runtime_registry import (
     resolve_runtime_mode,
     runtime_artifact_keys,
     runtime_safety_profile,
+    validate_runtime_registry,
     run_domain_runtime,
 )
 
@@ -104,6 +108,47 @@ class RuntimeRegistryTests(unittest.TestCase):
         self.assertEqual(capture["risk_level"], "device_state_mutation")
         self.assertEqual(capture["mutates_device_state"], True)
         self.assertEqual(capture["requires_approval_token"], "approve_camera_capture_e2e")
+
+    def test_runtime_registry_contract_exports_modes_artifacts_quality_and_safety(self):
+        contract = build_runtime_registry_contract()
+        camera = contract["domains"]["camera"]
+
+        self.assertEqual(contract["manifest_kind"], "leaf_runtime_registry_contract")
+        self.assertEqual(camera["default_real_device_runtime_mode"], "direct_smoke")
+        self.assertEqual(camera["runtime_modes"], ["direct_smoke", "capture_e2e"])
+        self.assertIn("camera_direct_smoke", camera["runtime_artifacts"])
+        self.assertEqual(camera["runtime_quality_gates"]["camera_capture_e2e"], "CAMERA_CAPTURE_E2E_PASS")
+        self.assertEqual(camera["safety_profiles"]["capture_e2e"]["requires_approval_token"], "approve_camera_capture_e2e")
+
+    def test_runtime_registry_guard_rejects_incomplete_runtime_registration(self):
+        contract = build_runtime_registry_contract()
+        del contract["domains"]["camera"]["runtime_quality_gates"]["camera_direct_smoke"]
+        contract["domains"]["camera"]["safety_profiles"]["capture_e2e"]["requires_approval_token"] = None
+
+        result = validate_runtime_registry(contract)
+
+        self.assertEqual(result["status"], "unstable")
+        self.assertIn("runtime_registry.camera.direct_smoke: quality gate must be defined for camera_direct_smoke", result["issues"])
+        self.assertIn("runtime_registry.camera.capture_e2e: mutating mode must require approval token", result["issues"])
+
+    def test_runtime_registry_guard_accepts_default_registry(self):
+        result = validate_runtime_registry()
+
+        self.assertEqual(result["status"], "stable")
+        self.assertEqual(result["exit_code"], 0)
+        self.assertEqual(result["domain_count"], 1)
+
+    def test_cli_runtime_registry_contract_outputs_json(self):
+        from tools.leaf_author.__main__ import main
+
+        output = StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["runtime-registry-contract"])
+
+        self.assertEqual(exit_code, 0)
+        payload = json.loads(output.getvalue())
+        self.assertEqual(payload["manifest_kind"], "leaf_runtime_registry_contract")
+        self.assertIn("camera", payload["domains"])
 
     def test_advance_run_can_use_generic_runtime_mode_for_camera_direct(self):
         with tempfile.TemporaryDirectory() as tmp:

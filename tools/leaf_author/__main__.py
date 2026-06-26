@@ -21,6 +21,7 @@ from tools.leaf_author.phase_guard import build_agent_handoff_contract, validate
 from tools.leaf_author.real_device_contract import build_real_device_contract
 from tools.leaf_author.reports import report_batch, report_run
 from tools.leaf_author.run_registry import inspect_run, list_runs
+from tools.leaf_author.runtime_registry import build_runtime_registry_contract
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -98,6 +99,7 @@ def main(argv: list[str] | None = None) -> int:
     subparsers.add_parser("phase-guard")
     subparsers.add_parser("agent-handoff-contract")
     subparsers.add_parser("real-device-contract")
+    subparsers.add_parser("runtime-registry-contract")
 
     advance = subparsers.add_parser("advance")
     advance.add_argument("run_id")
@@ -286,6 +288,9 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "real-device-contract":
         print(json.dumps(build_real_device_contract(), ensure_ascii=False, indent=2))
+        return 0
+    if args.command == "runtime-registry-contract":
+        print(json.dumps(build_runtime_registry_contract(), ensure_ascii=False, indent=2))
         return 0
     if args.command == "advance":
         print(

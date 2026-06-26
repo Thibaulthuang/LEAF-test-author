@@ -118,7 +118,9 @@ context. Use `python3 -m tools.leaf_author agent-handoff-contract` when a
 domain, GUI, or execution subagent needs the current machine-readable handoff
 map. Use `python3 -m tools.leaf_author real-device-contract` when a subagent
 needs the stable approval/input/preflight gates for real-device runtime
-execution.
+execution. Use `python3 -m tools.leaf_author runtime-registry-contract` when a
+domain plugin or execution subagent needs the registered runtime modes,
+quality gates, runtime artifacts, and safety profiles.
 
 - `plan` with `confirmed_plan=false`: present `plan.json` and must stop for
   `first_plan_confirmation`.

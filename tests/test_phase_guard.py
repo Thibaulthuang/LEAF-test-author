@@ -15,6 +15,7 @@ class PhaseGuardTests(unittest.TestCase):
         self.assertEqual(result["trigger_source"], "workflow.json")
         self.assertEqual(result["attention_boundary"], "one_active_run")
         self.assertEqual(result["real_device_gate_status"], "stable")
+        self.assertEqual(result["runtime_registry_status"], "stable")
         self.assertIn("leaf-test-author", result["agent_owners"])
         self.assertIn("leaf-gui-agent", result["agent_owners"])
         self.assertEqual(result["user_checkpoints"]["first_plan_confirmation"], ["plan"])
@@ -32,6 +33,7 @@ class PhaseGuardTests(unittest.TestCase):
         self.assertEqual(contract["real_device_gates"]["approval"]["user_loop"]["position"], "approve_real_device")
         self.assertEqual(contract["real_device_gates"]["approval"]["user_loop"]["required_input"], "<approval-token>")
         self.assertEqual(contract["real_device_gates"]["preflight"]["decision_contract"]["agent_owner"], "leaf-test-author")
+        self.assertEqual(contract["runtime_registry"]["camera"]["default_real_device_runtime_mode"], "direct_smoke")
 
     def test_cli_phase_guard_and_agent_handoff_contract_output_json(self):
         from tools.leaf_author.__main__ import main
@@ -48,12 +50,18 @@ class PhaseGuardTests(unittest.TestCase):
         with redirect_stdout(real_device_output):
             real_device_exit = main(["real-device-contract"])
 
+        runtime_output = StringIO()
+        with redirect_stdout(runtime_output):
+            runtime_exit = main(["runtime-registry-contract"])
+
         self.assertEqual(guard_exit, 0)
         self.assertEqual(json.loads(guard_output.getvalue())["status"], "stable")
         self.assertEqual(handoff_exit, 0)
         self.assertEqual(json.loads(handoff_output.getvalue())["manifest_kind"], "leaf_agent_handoff_contract")
         self.assertEqual(real_device_exit, 0)
         self.assertEqual(json.loads(real_device_output.getvalue())["manifest_kind"], "leaf_real_device_gate_contract")
+        self.assertEqual(runtime_exit, 0)
+        self.assertEqual(json.loads(runtime_output.getvalue())["manifest_kind"], "leaf_runtime_registry_contract")
 
 
 if __name__ == "__main__":

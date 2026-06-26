@@ -69,6 +69,87 @@ _RUNTIME_EXPERIENCE_RULES = {
 }
 
 
+def build_runtime_registry_contract() -> dict[str, object]:
+    domains = sorted(set(_DOMAIN_RUNTIME_MODES) | set(_DEFAULT_REAL_DEVICE_RUNTIME_MODE))
+    return {
+        "schema_version": "1.0",
+        "manifest_kind": "leaf_runtime_registry_contract",
+        "domains": {
+            domain: {
+                "default_real_device_runtime_mode": _DEFAULT_REAL_DEVICE_RUNTIME_MODE.get(domain),
+                "runtime_modes": list(_DOMAIN_RUNTIME_MODES.get(domain, [])),
+                "runtime_artifacts": list(_DOMAIN_RUNTIME_ARTIFACTS.get(domain, [])),
+                "runtime_quality_gates": dict(_DOMAIN_RUNTIME_QUALITY_GATES.get(domain, {})),
+                "safety_profiles": {
+                    mode: runtime_safety_profile(domain, mode)
+                    for mode in _DOMAIN_RUNTIME_MODES.get(domain, [])
+                },
+            }
+            for domain in domains
+        },
+    }
+
+
+def validate_runtime_registry(contract: dict[str, object] | None = None) -> dict[str, object]:
+    contract = contract or build_runtime_registry_contract()
+    issues: list[str] = []
+    domains = contract.get("domains")
+    if not isinstance(domains, dict) or not domains:
+        issues.append("runtime_registry: contract must define domains")
+        domains = {}
+
+    for domain, domain_contract in domains.items():
+        if not isinstance(domain_contract, dict):
+            issues.append(f"runtime_registry.{domain}: domain contract must be an object")
+            continue
+        modes = _string_list(domain_contract.get("runtime_modes"))
+        default_mode = domain_contract.get("default_real_device_runtime_mode")
+        artifacts = _string_list(domain_contract.get("runtime_artifacts"))
+        quality_gates = domain_contract.get("runtime_quality_gates")
+        safety_profiles = domain_contract.get("safety_profiles")
+        if not modes:
+            issues.append(f"runtime_registry.{domain}: runtime_modes must not be empty")
+        if isinstance(default_mode, str) and default_mode and default_mode not in modes:
+            issues.append(f"runtime_registry.{domain}: default_real_device_runtime_mode must be registered")
+        if not isinstance(quality_gates, dict):
+            issues.append(f"runtime_registry.{domain}: runtime_quality_gates must be an object")
+            quality_gates = {}
+        if not isinstance(safety_profiles, dict):
+            issues.append(f"runtime_registry.{domain}: safety_profiles must be an object")
+            safety_profiles = {}
+        if len(artifacts) < len(modes):
+            issues.append(f"runtime_registry.{domain}: runtime_artifacts must cover registered modes")
+        for mode in modes:
+            artifact = _mode_artifact_name(domain, mode)
+            if artifact not in artifacts:
+                issues.append(f"runtime_registry.{domain}.{mode}: runtime artifact {artifact} must be exported")
+            quality_gate = quality_gates.get(artifact)
+            if not isinstance(quality_gate, str) or not quality_gate:
+                issues.append(f"runtime_registry.{domain}.{mode}: quality gate must be defined for {artifact}")
+            elif quality_gate not in _RUNTIME_EXPERIENCE_RULES:
+                issues.append(f"runtime_registry.{domain}.{mode}: experience rule must exist for {quality_gate}")
+            safety = safety_profiles.get(mode)
+            if not isinstance(safety, dict):
+                issues.append(f"runtime_registry.{domain}.{mode}: safety profile must be defined")
+                continue
+            for field in ["risk_level", "mutates_device_state", "requires_approval_token", "operator_message"]:
+                if field not in safety:
+                    issues.append(f"runtime_registry.{domain}.{mode}: safety profile missing {field}")
+            if not isinstance(safety.get("mutates_device_state"), bool):
+                issues.append(f"runtime_registry.{domain}.{mode}: mutates_device_state must be boolean")
+            if safety.get("mutates_device_state") and not isinstance(safety.get("requires_approval_token"), str):
+                issues.append(f"runtime_registry.{domain}.{mode}: mutating mode must require approval token")
+
+    return {
+        "schema_version": "1.0",
+        "manifest_kind": "leaf_runtime_registry_guard",
+        "status": "stable" if not issues else "unstable",
+        "issues": issues,
+        "exit_code": 0 if not issues else 1,
+        "domain_count": len(domains),
+    }
+
+
 def resolve_runtime_mode(
     runtime_mode: str | None = None,
     camera_direct: bool = False,
@@ -189,3 +270,17 @@ def run_domain_runtime(
             "result": result,
         }
     raise ValueError(f"unsupported runtime mode for domain {domain}: {runtime_mode}")
+
+
+def _mode_artifact_name(domain: str, runtime_mode: str) -> str:
+    if domain == "camera" and runtime_mode == "direct_smoke":
+        return "camera_direct_smoke"
+    if domain == "camera" and runtime_mode == "capture_e2e":
+        return "camera_capture_e2e"
+    return f"{domain}_{runtime_mode}"
+
+
+def _string_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value]

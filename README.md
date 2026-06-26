@@ -120,6 +120,7 @@ Validate the phase trigger, context, agent, and user-in-loop contract:
 python3 -m tools.leaf_author phase-guard
 python3 -m tools.leaf_author agent-handoff-contract
 python3 -m tools.leaf_author real-device-contract
+python3 -m tools.leaf_author runtime-registry-contract
 ```
 
 Run safe local stages directly:
@@ -197,6 +198,9 @@ runtime execution. It exposes the approval, input, and preflight decision
 contracts from `tools/leaf_author/real_device_contract.py`, including the
 `agent_owner`, bounded `context_slice`, allowed artifacts, and `user_loop`
 position that subagents should use before or during device execution.
+`runtime-registry-contract` prints the registered runtime modes, default mode,
+runtime artifacts, quality gates, and safety profiles that domain plugins must
+keep complete before real-device execution can be considered stable.
 
 Each `resume` refreshes `.leaf/runs/<run_id>/context_manifest.json`. This file is
 the handoff boundary for multi-agent and multi-case work: it names the active

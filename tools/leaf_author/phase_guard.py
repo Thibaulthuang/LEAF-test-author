@@ -4,6 +4,7 @@ from collections import defaultdict
 
 from tools.leaf_author.phase_contract import load_phase_contract
 from tools.leaf_author.real_device_contract import build_real_device_contract, validate_real_device_contract
+from tools.leaf_author.runtime_registry import build_runtime_registry_contract, validate_runtime_registry
 
 
 REQUIRED_PHASE_FIELDS = {
@@ -57,6 +58,8 @@ def validate_phase_contract() -> dict[str, object]:
     _expect_phase_value(phases, "complete", "batch_focus_priority", 1000, issues)
     real_device_guard = validate_real_device_contract()
     issues.extend(str(issue) for issue in real_device_guard.get("issues", []) if isinstance(issue, str))
+    runtime_guard = validate_runtime_registry()
+    issues.extend(str(issue) for issue in runtime_guard.get("issues", []) if isinstance(issue, str))
 
     summary = build_agent_handoff_contract(contract)
     return {
@@ -71,6 +74,7 @@ def validate_phase_contract() -> dict[str, object]:
         "agent_owners": sorted(summary["agents"]),
         "user_checkpoints": summary["user_checkpoints"],
         "real_device_gate_status": real_device_guard.get("status"),
+        "runtime_registry_status": runtime_guard.get("status"),
     }
 
 
@@ -112,6 +116,7 @@ def build_agent_handoff_contract(contract: dict[str, object] | None = None) -> d
         "user_checkpoints": {checkpoint: phases for checkpoint, phases in sorted(checkpoint_phases.items())},
         "auto_safe_phases": auto_safe_phases,
         "real_device_gates": build_real_device_contract()["gates"],
+        "runtime_registry": build_runtime_registry_contract()["domains"],
     }
 
 
