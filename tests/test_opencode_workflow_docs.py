@@ -69,6 +69,8 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
         self.assertEqual(contract["phases"]["plan"]["user_checkpoint"], "first_plan_confirmation")
         self.assertEqual(contract["phases"]["e2e_ready"]["user_checkpoint"], "real_device_confirmation")
         self.assertEqual(contract["phases"]["plan"]["auto_safe"], False)
+        self.assertEqual(contract["phases"]["plan"]["batch_focus_priority"], 60)
+        self.assertLess(contract["phases"]["hypium_draft"]["batch_focus_priority"], contract["phases"]["plan"]["batch_focus_priority"])
         self.assertEqual(contract["phases"]["hypium_draft"]["auto_safe"], True)
         self.assertEqual(contract["phases"]["pytest_ran"]["agent_owner"], "leaf-gui-agent")
         self.assertIn("ui_tree", contract["phases"]["pytest_ran"]["context_slice"])

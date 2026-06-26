@@ -46,6 +46,19 @@ class BatchRegistryTests(unittest.TestCase):
             self.assertEqual(result["next_run_focus"]["next_action"], "validate_pytest_draft")
             self.assertEqual(result["context_policy"]["scope"], "batch_summary")
 
+    def test_inspect_batch_focus_priority_uses_phase_contract_not_action_table(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "打开相机；点击拍照", run_id="batch-plan")
+            start_new_case(root, "camera", "打开相机；切拍照模式；点击拍照", run_id="batch-safe")
+            confirm_plan(root, "batch-safe")
+            create_batch(root, "camera-batch", ["batch-plan", "batch-safe"])
+
+            result = inspect_batch(root, "camera-batch")
+
+            self.assertEqual(result["next_run_focus"]["run_id"], "batch-safe")
+            self.assertEqual(result["next_run_focus"]["focus_source"], "workflow-contract")
+
     def test_list_batches_returns_lightweight_summaries(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

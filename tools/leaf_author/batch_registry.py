@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from tools.leaf_author.authoring import resume_run
+from tools.leaf_author.phase_contract import batch_focus_priority_for_run
 from tools.leaf_author.run_registry import inspect_run
 
 
@@ -124,6 +125,7 @@ def _run_batch_summary(run: dict[str, object]) -> dict[str, object]:
         "current_phase": run.get("current_phase"),
         "confirmed_plan": run.get("confirmed_plan"),
         "next_action": run.get("next_action"),
+        "focus_source": "workflow-contract",
     }
 
 
@@ -147,20 +149,8 @@ def _resume_batch_run(root: Path, run_id: str, auto_safe: bool) -> dict[str, obj
 
 
 def _next_run_focus(runs: list[dict[str, object]]) -> dict[str, object] | None:
-    priority = {
-        "validate_pytest_draft": 10,
-        "run_pytest_draft": 20,
-        "collect_gui_context": 30,
-        "record_experience": 40,
-        "export_team_knowledge": 50,
-        "present_plan_for_confirmation": 60,
-        "prepare_haps_or_target_bundle": 70,
-        "run_real_hypium": 80,
-        "inspect_workflow_state": 90,
-        "complete": 100,
-    }
     candidates = [_run_batch_summary(run) for run in runs if run.get("next_action") != "complete"]
     if not candidates:
         return None
-    candidates.sort(key=lambda run: priority.get(str(run.get("next_action")), 99))
+    candidates.sort(key=batch_focus_priority_for_run)
     return candidates[0]

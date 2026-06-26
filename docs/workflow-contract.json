@@ -60,7 +60,8 @@
         "plan",
         "device_probe"
       ],
-      "next_action": "present_plan_for_confirmation"
+      "next_action": "present_plan_for_confirmation",
+      "batch_focus_priority": 60
     },
     "pytest_draft": {
       "user_checkpoint": null,
@@ -80,7 +81,8 @@
         "case",
         "pytest"
       ],
-      "next_action": "validate_pytest_draft"
+      "next_action": "validate_pytest_draft",
+      "batch_focus_priority": 10
     },
     "hypium_draft": {
       "user_checkpoint": null,
@@ -102,7 +104,8 @@
         "pytest",
         "hypium"
       ],
-      "next_action": "validate_pytest_draft"
+      "next_action": "validate_pytest_draft",
+      "batch_focus_priority": 10
     },
     "validated": {
       "user_checkpoint": null,
@@ -120,7 +123,8 @@
       "allowed_artifacts": [
         "validation"
       ],
-      "next_action": "run_pytest_draft"
+      "next_action": "run_pytest_draft",
+      "batch_focus_priority": 20
     },
     "pytest_ran": {
       "user_checkpoint": null,
@@ -139,7 +143,8 @@
       "allowed_artifacts": [
         "pytest_result"
       ],
-      "next_action": "collect_gui_context"
+      "next_action": "collect_gui_context",
+      "batch_focus_priority": 30
     },
     "hypium_ran": {
       "user_checkpoint": null,
@@ -158,7 +163,8 @@
       "allowed_artifacts": [
         "hypium_result"
       ],
-      "next_action": "collect_gui_context"
+      "next_action": "collect_gui_context",
+      "batch_focus_priority": 30
     },
     "gui_context_collected": {
       "user_checkpoint": null,
@@ -177,7 +183,8 @@
       "allowed_artifacts": [
         "gui_context"
       ],
-      "next_action": "record_experience"
+      "next_action": "record_experience",
+      "batch_focus_priority": 40
     },
     "experience_recorded": {
       "user_checkpoint": null,
@@ -195,7 +202,8 @@
       "allowed_artifacts": [
         "experience"
       ],
-      "next_action": "export_team_knowledge"
+      "next_action": "export_team_knowledge",
+      "batch_focus_priority": 50
     },
     "e2e_not_ready": {
       "user_checkpoint": null,
@@ -215,7 +223,8 @@
         "e2e_preflight_report",
         "e2e_readiness"
       ],
-      "next_action": "prepare_haps_or_target_bundle"
+      "next_action": "prepare_haps_or_target_bundle",
+      "batch_focus_priority": 70
     },
     "e2e_ready": {
       "user_checkpoint": "real_device_confirmation",
@@ -235,7 +244,8 @@
         "e2e_preflight_report",
         "e2e_readiness"
       ],
-      "next_action": "run_real_hypium"
+      "next_action": "run_real_hypium",
+      "batch_focus_priority": 80
     },
     "openharmony_synced": {
       "user_checkpoint": "manual_operator_decision",
@@ -253,7 +263,8 @@
       "allowed_artifacts": [
         "openharmony_test_project"
       ],
-      "next_action": "build_app_and_test_haps"
+      "next_action": "build_app_and_test_haps",
+      "batch_focus_priority": 85
     },
     "openharmony_built": {
       "user_checkpoint": "manual_operator_decision",
@@ -273,7 +284,8 @@
         "openharmony_build",
         "package_inventory"
       ],
-      "next_action": "inspect_e2e_readiness"
+      "next_action": "inspect_e2e_readiness",
+      "batch_focus_priority": 86
     },
     "openharmony_build_failed": {
       "user_checkpoint": "manual_operator_decision",
@@ -291,7 +303,8 @@
       "allowed_artifacts": [
         "openharmony_build"
       ],
-      "next_action": "inspect_openharmony_build"
+      "next_action": "inspect_openharmony_build",
+      "batch_focus_priority": 87
     },
     "complete": {
       "user_checkpoint": null,
@@ -309,7 +322,8 @@
       "allowed_artifacts": [
         "team_export_manifest"
       ],
-      "next_action": "complete"
+      "next_action": "complete",
+      "batch_focus_priority": 1000
     }
   },
   "quality_gates": {

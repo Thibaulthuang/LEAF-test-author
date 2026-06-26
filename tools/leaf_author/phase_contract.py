@@ -53,11 +53,23 @@ def decide_next_step(workflow: dict[str, object], contract: dict[str, object] | 
         "context_slice": [str(item) for item in phase.get("context_slice", [])] if isinstance(phase.get("context_slice"), list) else [],
         "trigger_source": str(phase.get("trigger_source", "workflow.json")),
         "allowed_artifacts": [str(item) for item in phase.get("allowed_artifacts", [])] if isinstance(phase.get("allowed_artifacts"), list) else [],
+        "batch_focus_priority": _batch_focus_priority(phase),
         "user_loop": {
             "position": str(user_loop.get("position", "observe_safe_local_progress")),
             "required_input": str(user_loop.get("required_input", "")),
         },
     }
+
+
+def batch_focus_priority_for_run(run: dict[str, object], contract: dict[str, object] | None = None) -> int:
+    if str(run.get("next_action", "")) == "complete" or str(run.get("current_phase", "")) == "complete":
+        return 1000
+    contract = contract or load_phase_contract()
+    phases = contract.get("phases", {})
+    phase = phases.get(str(run.get("current_phase", ""))) if isinstance(phases, dict) else None
+    if isinstance(phase, dict):
+        return _batch_focus_priority(phase)
+    return 90
 
 
 def write_context_manifest(root: Path, run_id: str, decision: dict[str, object] | None = None) -> dict[str, object]:
@@ -119,9 +131,15 @@ def _unknown_phase(current_phase: str) -> dict[str, object]:
         "agent_owner": "leaf-test-author",
         "context_slice": ["workflow"],
         "trigger_source": "workflow.json",
+        "batch_focus_priority": 90,
         "operator_message": f"Unknown phase {current_phase}; inspect workflow.json before continuing.",
         "user_loop": {
             "position": "manual_triage",
             "required_input": "operator_decision",
         },
     }
+
+
+def _batch_focus_priority(phase: dict[str, object]) -> int:
+    value = phase.get("batch_focus_priority", 90)
+    return value if isinstance(value, int) else 90

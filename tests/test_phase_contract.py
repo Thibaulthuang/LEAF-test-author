@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 
 from tools.leaf_author.authoring import confirm_plan, resume_run, start_new_case
-from tools.leaf_author.phase_contract import decide_next_step, load_phase_contract, write_context_manifest
+from tools.leaf_author.phase_contract import batch_focus_priority_for_run, decide_next_step, load_phase_contract, write_context_manifest
 from tools.leaf_author.reports import report_run
 from tools.leaf_author.workflow import load_workflow, save_workflow
 
@@ -37,6 +37,13 @@ class PhaseContractTests(unittest.TestCase):
         self.assertEqual(decision["safe_to_auto_continue"], True)
         self.assertEqual(decision["agent_owner"], "tools.leaf_author")
         self.assertEqual(decision["trigger_source"], "workflow.json")
+
+    def test_batch_focus_priority_comes_from_phase_contract(self):
+        self.assertLess(
+            batch_focus_priority_for_run({"current_phase": "hypium_draft", "next_action": "validate_pytest_draft"}),
+            batch_focus_priority_for_run({"current_phase": "plan", "next_action": "present_plan_for_confirmation"}),
+        )
+        self.assertEqual(batch_focus_priority_for_run({"current_phase": "complete", "next_action": "complete"}), 1000)
 
     def test_decision_stops_at_user_checkpoint_even_with_auto_safe(self):
         workflow = {
