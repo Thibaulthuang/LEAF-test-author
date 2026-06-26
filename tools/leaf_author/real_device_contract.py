@@ -1,13 +1,11 @@
 from __future__ import annotations
 
+from tools.leaf_author.target_policy import is_system_app_only_target_policy, with_target_policy
+
 
 _REAL_DEVICE_GATE_KINDS = ["approval", "input", "preflight"]
 _REQUIRED_DECISION_FIELDS = {"trigger_source", "agent_owner", "context_slice", "allowed_artifacts"}
 _REQUIRED_USER_LOOP_FIELDS = {"position", "required_input"}
-_SYSTEM_APP_TARGET_POLICY = {
-    "scope": "system_app_only",
-    "forbidden_terms": ["hap", "test hap", "app hap", "install_hap", "build_app_and_test"],
-}
 _RUNTIME_EVIDENCE = {
     "camera": {
         "direct_smoke": {
@@ -112,7 +110,7 @@ def validate_real_device_contract(contract: dict[str, object] | None = None) -> 
         if not _string_list(decision.get("allowed_artifacts")):
             issues.append(f"real_device_gates.{kind}: allowed_artifacts must not be empty")
         target_policy = decision.get("target_policy")
-        if not isinstance(target_policy, dict) or target_policy.get("scope") != "system_app_only":
+        if not is_system_app_only_target_policy(target_policy):
             issues.append(f"real_device_gates.{kind}: target_policy.scope must be system_app_only")
         if kind in {"approval", "input"} and not str(user_loop.get("required_input", "")):
             issues.append(f"real_device_gates.{kind}: user_loop.required_input must be explicit")
@@ -144,21 +142,21 @@ def validate_real_device_contract(contract: dict[str, object] | None = None) -> 
 
 def real_device_decision_contract(kind: str) -> dict[str, object]:
     if kind == "approval":
-        return _with_target_policy({
+        return with_target_policy({
             "trigger_source": "workflow.json",
             "agent_owner": "leaf-test-author",
             "context_slice": ["workflow", "real_device_approval"],
             "allowed_artifacts": ["workflow", "real_device_approval"],
         })
     if kind == "input":
-        return _with_target_policy({
+        return with_target_policy({
             "trigger_source": "workflow.json",
             "agent_owner": "leaf-test-author",
             "context_slice": ["workflow", "real_device_input"],
             "allowed_artifacts": ["workflow", "real_device_input"],
         })
     if kind == "preflight":
-        return _with_target_policy({
+        return with_target_policy({
             "trigger_source": "workflow.json",
             "agent_owner": "leaf-test-author",
             "context_slice": ["workflow", "runtime_safety", "real_device_input", "real_device_approval"],
@@ -227,7 +225,3 @@ def _string_list(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
     return [str(item) for item in value]
-
-
-def _with_target_policy(decision_contract: dict[str, object]) -> dict[str, object]:
-    return {**decision_contract, "target_policy": _SYSTEM_APP_TARGET_POLICY}

@@ -23,6 +23,7 @@ from tools.leaf_author.reports import report_batch, report_run
 from tools.leaf_author.run_audit import audit_batch, audit_run
 from tools.leaf_author.run_registry import inspect_run, list_runs
 from tools.leaf_author.runtime_registry import build_runtime_registry_contract
+from tools.leaf_author.target_policy import build_target_policy_contract
 from tools.leaf_author.ui_tree_diagnostics import inspect_ui_tree
 from tools.leaf_author.workflow_diagnostics import inspect_workflow_state
 
@@ -137,6 +138,7 @@ def main(argv: list[str] | None = None) -> int:
     validate_extension_contract_parser.add_argument("--strict-real-device", action="store_true")
 
     subparsers.add_parser("phase-guard")
+    subparsers.add_parser("target-policy")
     subparsers.add_parser("agent-handoff-contract")
     subparsers.add_parser("real-device-contract")
     runtime_evidence_contract_parser = subparsers.add_parser("runtime-evidence-contract")
@@ -366,6 +368,9 @@ def main(argv: list[str] | None = None) -> int:
         result = validate_phase_contract()
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return int(result["exit_code"])
+    if args.command == "target-policy":
+        print(json.dumps(build_target_policy_contract(), ensure_ascii=False, indent=2))
+        return 0
     if args.command == "agent-handoff-contract":
         print(json.dumps(build_agent_handoff_contract(), ensure_ascii=False, indent=2))
         return 0

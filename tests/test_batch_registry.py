@@ -212,6 +212,7 @@ class BatchRegistryTests(unittest.TestCase):
             self.assertEqual(result["focus_plan"]["selection_reason"], "run_failed_or_unreadable")
             self.assertEqual(result["focus_plan"]["attention_boundary"], "one_active_run")
             self.assertEqual(result["focus_plan"]["context_slice"], ["workflow"])
+            self.assertIn("test hap", result["focus_plan"]["target_policy"]["forbidden_terms"])
             self.assertEqual(result["focus_plan"]["user_loop"]["position"], "manual_triage")
 
     def test_resume_batch_includes_lightweight_real_device_preflight_summary(self):

@@ -129,6 +129,7 @@ Validate the phase trigger, context, agent, and user-in-loop contract:
 
 ```bash
 python3 -m tools.leaf_author phase-guard
+python3 -m tools.leaf_author target-policy
 python3 -m tools.leaf_author agent-handoff-contract
 python3 -m tools.leaf_author real-device-contract
 python3 -m tools.leaf_author runtime-evidence-contract camera
@@ -209,6 +210,11 @@ without UI-tree context, or leaves a user checkpoint without required operator
 input. `agent-handoff-contract` prints the stable handoff map: which phases each
 agent owns, which context slice each phase may load, which phases can auto-run,
 and where the user must re-enter the loop.
+
+`target-policy` prints the shared system-app-only boundary used by phase
+decisions, reports, real-device gates, and batch handoffs. Domain plugins and
+GUI agents should read that contract instead of carrying their own target
+assumptions.
 
 `real-device-contract` prints the machine-readable gate map for real-device
 runtime execution. It exposes the approval, input, and preflight decision

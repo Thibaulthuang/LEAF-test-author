@@ -8,6 +8,7 @@ from pathlib import Path
 from tools.leaf_author.authoring import resume_run
 from tools.leaf_author.phase_contract import batch_focus_priority_for_run
 from tools.leaf_author.run_registry import inspect_run
+from tools.leaf_author.target_policy import default_target_policy, normalize_target_policy
 
 
 def create_batch(root: Path, batch_id: str, run_ids: list[str], title: str | None = None) -> dict[str, object]:
@@ -174,7 +175,7 @@ def _resume_batch_run(root: Path, run_id: str, auto_safe: bool) -> dict[str, obj
                 "context_slice": ["workflow"],
                 "trigger_source": "workflow.json",
                 "allowed_artifacts": ["workflow"],
-                "target_policy": {"scope": "system_app_only", "forbidden_terms": []},
+                "target_policy": default_target_policy(),
                 "user_loop": {
                     "position": "manual_triage",
                     "required_input": "repair workflow.json",
@@ -226,7 +227,7 @@ def _batch_resume_focus_plan(runs: list[dict[str, object]]) -> dict[str, object]
         "next_action": selected.get("next_action"),
         "context_slice": summary.get("context_slice", []),
         "allowed_artifacts": summary.get("allowed_artifacts", []),
-        "target_policy": summary.get("target_policy", {}),
+        "target_policy": normalize_target_policy(summary.get("target_policy")),
         "user_checkpoint": summary.get("user_checkpoint"),
         "user_loop": {
             "position": str(user_loop.get("position", "")),

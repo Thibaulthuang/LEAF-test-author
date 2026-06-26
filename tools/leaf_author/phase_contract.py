@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from tools.leaf_author.target_policy import default_target_policy, target_policy_from_contract
+
 
 _DEFAULT_MESSAGES = {
     "present_plan_for_confirmation": "Present plan.json for the first user confirmation before generating drafts.",
@@ -53,7 +55,7 @@ def decide_next_step(workflow: dict[str, object], contract: dict[str, object] | 
         "context_slice": [str(item) for item in phase.get("context_slice", [])] if isinstance(phase.get("context_slice"), list) else [],
         "trigger_source": str(phase.get("trigger_source", "workflow.json")),
         "allowed_artifacts": [str(item) for item in phase.get("allowed_artifacts", [])] if isinstance(phase.get("allowed_artifacts"), list) else [],
-        "target_policy": _target_policy(contract),
+        "target_policy": target_policy_from_contract(contract),
         "batch_focus_priority": _batch_focus_priority(phase),
         "user_loop": {
             "position": str(user_loop.get("position", "observe_safe_local_progress")),
@@ -79,7 +81,7 @@ def write_context_manifest(root: Path, run_id: str, decision: dict[str, object] 
     workflow = load_workflow(root, run_id)
     decision = decision or decide_next_step(workflow)
     target_policy = decision.get("target_policy")
-    target_policy = target_policy if isinstance(target_policy, dict) else _target_policy(load_phase_contract())
+    target_policy = target_policy if isinstance(target_policy, dict) else default_target_policy()
     artifacts = dict(workflow.get("artifacts", {}))
     manifest_path = root / ".leaf" / "runs" / run_id / "context_manifest.json"
     artifacts["context_manifest"] = str(manifest_path.relative_to(root))
@@ -189,13 +191,3 @@ def _unknown_phase(current_phase: str) -> dict[str, object]:
 def _batch_focus_priority(phase: dict[str, object]) -> int:
     value = phase.get("batch_focus_priority", 90)
     return value if isinstance(value, int) else 90
-
-
-def _target_policy(contract: dict[str, object]) -> dict[str, object]:
-    policy = contract.get("target_policy")
-    if not isinstance(policy, dict):
-        return {"scope": "system_app_only", "forbidden_terms": []}
-    return {
-        "scope": str(policy.get("scope", "system_app_only")),
-        "forbidden_terms": [str(term) for term in policy.get("forbidden_terms", [])] if isinstance(policy.get("forbidden_terms"), list) else [],
-    }

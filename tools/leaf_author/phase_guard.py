@@ -5,6 +5,7 @@ from collections import defaultdict
 from tools.leaf_author.phase_contract import load_phase_contract
 from tools.leaf_author.real_device_contract import build_real_device_contract, validate_real_device_contract
 from tools.leaf_author.runtime_registry import build_runtime_registry_contract, validate_runtime_registry
+from tools.leaf_author.target_policy import target_policy_forbidden_terms, target_policy_from_contract
 
 
 REQUIRED_PHASE_FIELDS = {
@@ -51,8 +52,8 @@ def validate_phase_contract(contract: dict[str, object] | None = None, *, includ
         if not isinstance(phase.get("batch_focus_priority"), int):
             issues.append(f"{phase_name}: batch_focus_priority must be an integer")
 
-    target_policy = _target_policy(contract)
-    forbidden_terms = _target_policy_forbidden_terms(target_policy)
+    target_policy = target_policy_from_contract(contract)
+    forbidden_terms = target_policy_forbidden_terms(target_policy)
     issues.extend(_target_policy_issues(phases, forbidden_terms))
     _expect_phase_value(phases, "plan", "user_checkpoint", "first_plan_confirmation", issues)
     _expect_phase_value(phases, "plan", "auto_safe", False, issues)
@@ -108,7 +109,7 @@ def build_agent_handoff_contract(contract: dict[str, object] | None = None) -> d
 
     context_policy = contract.get("context_policy", {})
     resume_policy = contract.get("resume_policy", {})
-    target_policy = _target_policy(contract)
+    target_policy = target_policy_from_contract(contract)
     return {
         "schema_version": "1.0",
         "manifest_kind": "leaf_agent_handoff_contract",
@@ -136,20 +137,6 @@ def _expect_phase_value(phases: dict[str, object], phase_name: str, field: str, 
         return
     if phase.get(field) != expected:
         issues.append(f"{phase_name}: {field} must be {expected!r}")
-
-
-def _target_policy(contract: dict[str, object]) -> dict[str, object]:
-    policy = contract.get("target_policy")
-    if isinstance(policy, dict):
-        return policy
-    return {"scope": "system_app_only", "forbidden_terms": []}
-
-
-def _target_policy_forbidden_terms(target_policy: dict[str, object]) -> list[str]:
-    terms = target_policy.get("forbidden_terms")
-    if not isinstance(terms, list):
-        return []
-    return [str(term).lower() for term in terms if str(term)]
 
 
 def _target_policy_issues(phases: dict[str, object], forbidden_terms: list[str]) -> list[str]:

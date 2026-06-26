@@ -8,11 +8,7 @@ from tools.leaf_author.batch_registry import inspect_batch
 from tools.leaf_author.real_device_contract import real_device_decision_contract, real_device_runtime_evidence_schema, real_device_user_loop
 from tools.leaf_author.run_registry import inspect_run
 from tools.leaf_author.runtime_registry import approved_real_device_next_command, quality_artifact_priority, real_device_next_command
-
-_SYSTEM_APP_TARGET_POLICY = {
-    "scope": "system_app_only",
-    "forbidden_terms": ["hap", "test hap", "app hap", "install_hap", "build_app_and_test"],
-}
+from tools.leaf_author.target_policy import default_target_policy, normalize_target_policy, with_target_policy
 
 
 def report_run(root: Path, run_id: str) -> dict[str, object]:
@@ -363,13 +359,14 @@ def _report_decision_contract(
         return _approval_decision_contract()
     if input_required:
         return _input_decision_contract()
-    return {
+    decision_contract = {
         "trigger_source": resume_summary.get("trigger_source", "") if isinstance(resume_summary, dict) else "",
         "agent_owner": resume_summary.get("agent_owner", "") if isinstance(resume_summary, dict) else "",
         "context_slice": resume_summary.get("context_slice", []) if isinstance(resume_summary, dict) else [],
         "allowed_artifacts": resume_summary.get("allowed_artifacts", []) if isinstance(resume_summary, dict) else [],
-        "target_policy": resume_summary.get("target_policy", _SYSTEM_APP_TARGET_POLICY) if isinstance(resume_summary, dict) else _SYSTEM_APP_TARGET_POLICY,
+        "target_policy": resume_summary.get("target_policy", default_target_policy()) if isinstance(resume_summary, dict) else default_target_policy(),
     }
+    return with_target_policy(decision_contract)
 
 
 def _report_operator_message(
@@ -473,7 +470,7 @@ def _unreadable_run_report(root: Path, run_summary: dict[str, object]) -> dict[s
             "agent_owner": "leaf-test-author",
             "context_slice": ["workflow"],
             "allowed_artifacts": ["workflow"],
-            "target_policy": _SYSTEM_APP_TARGET_POLICY,
+            "target_policy": default_target_policy(),
         },
         "operator_message": "Workflow state is unreadable; repair workflow.json before reporting or resuming this run.",
         "next_command": "",
@@ -608,6 +605,4 @@ def _string_list(value: object) -> list[str]:
 
 
 def _with_target_policy(decision_contract: dict[str, object]) -> dict[str, object]:
-    if isinstance(decision_contract.get("target_policy"), dict):
-        return decision_contract
-    return {**decision_contract, "target_policy": _SYSTEM_APP_TARGET_POLICY}
+    return with_target_policy(decision_contract, normalize_target_policy(decision_contract.get("target_policy")))
