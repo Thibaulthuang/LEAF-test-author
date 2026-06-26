@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -94,6 +95,26 @@ class PhaseContractTests(unittest.TestCase):
             self.assertIn('"context_manifest"', payload)
             workflow = load_workflow(root, "manifest-run")
             self.assertEqual(workflow["artifacts"]["context_manifest"], ".leaf/runs/manifest-run/context_manifest.json")
+
+    def test_context_manifest_only_exposes_current_phase_context_artifacts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "打开相机", run_id="bounded-manifest")
+            confirm_plan(root, "bounded-manifest")
+            run_dir = root / ".leaf" / "runs" / "bounded-manifest"
+            large_log = run_dir / "hilog.txt"
+            large_log.write_text("large log", encoding="utf-8")
+            workflow = load_workflow(root, "bounded-manifest")
+            artifacts = dict(workflow["artifacts"])
+            artifacts["hilog"] = ".leaf/runs/bounded-manifest/hilog.txt"
+            workflow["artifacts"] = artifacts
+            save_workflow(root, workflow)
+
+            result = write_context_manifest(root, "bounded-manifest")
+            payload = json.loads((root / result["context_manifest_path"]).read_text(encoding="utf-8"))
+
+            self.assertIn("hypium", payload["referenced_artifacts"])
+            self.assertNotIn("hilog", payload["referenced_artifacts"])
 
 
 if __name__ == "__main__":

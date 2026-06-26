@@ -10,6 +10,7 @@ from tools.leaf_author.generator import generate_pytest_case
 from tools.leaf_author.gui_context import collect_gui_context
 from tools.leaf_author.hypium import export_openharmony_test_project, generate_hypium_case, run_hypium_case
 from tools.leaf_author.phase_contract import decide_next_step, write_context_manifest
+from tools.leaf_author.phase_guard import validate_phase_contract
 from tools.leaf_author.planner import build_plan
 from tools.leaf_author.runner import run_pytest_draft
 from tools.leaf_author.runtime_registry import resolve_runtime_mode, run_domain_runtime
@@ -86,6 +87,9 @@ def confirm_plan(root: Path, run_id: str) -> dict[str, object]:
 
 
 def resume_run(root: Path, run_id: str, auto_safe: bool = False) -> dict[str, object]:
+    guard = validate_phase_contract()
+    if guard.get("status") != "stable":
+        return _blocked_by_phase_guard(root, run_id, guard)
     workflow = load_workflow(root, run_id)
     decision = decide_next_step(workflow)
     context_manifest = write_context_manifest(root, run_id, decision=decision)
@@ -138,6 +142,12 @@ def advance_run(
     hdc_path: str = "hdc",
 ) -> dict[str, object]:
     stages: list[str] = []
+    guard = validate_phase_contract()
+    if guard.get("status") != "stable":
+        return {
+            **_blocked_by_phase_guard(root, run_id, guard),
+            "stages": stages,
+        }
     workflow = load_workflow(root, run_id)
     selected_runtime_mode = resolve_runtime_mode(runtime_mode, camera_direct=camera_direct, camera_capture=camera_capture)
     current_phase = str(workflow.get("current_phase", ""))
@@ -260,4 +270,32 @@ def _resume_summary(decision: dict[str, object]) -> dict[str, object]:
         "trigger_source": decision.get("trigger_source", "workflow.json"),
         "allowed_artifacts": decision.get("allowed_artifacts", []),
         "user_loop": decision.get("user_loop", {}),
+    }
+
+
+def _blocked_by_phase_guard(root: Path, run_id: str, guard: dict[str, object]) -> dict[str, object]:
+    workflow = load_workflow(root, run_id)
+    return {
+        "run_id": run_id,
+        "status": "blocked",
+        "block_reason": "phase_contract_unstable",
+        "current_phase": workflow.get("current_phase"),
+        "confirmed_plan": bool(workflow.get("confirmed_plan", False)),
+        "next_action": "fix_phase_contract",
+        "phase_guard": guard,
+        "resume_summary": {
+            "requires_user_confirmation": True,
+            "safe_to_auto_continue": False,
+            "operator_message": "Phase contract is unstable; fix docs/workflow-contract.json before resuming workflow actions.",
+            "user_checkpoint": "manual_operator_decision",
+            "agent_owner": "leaf-test-author",
+            "context_slice": ["workflow", "phase_guard"],
+            "trigger_source": "workflow.json",
+            "allowed_artifacts": ["workflow"],
+            "user_loop": {
+                "position": "manual_triage",
+                "required_input": "fix phase contract",
+            },
+        },
+        "workflow_path": str(root / ".leaf" / "runs" / run_id / "workflow.json"),
     }

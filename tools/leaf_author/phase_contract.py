@@ -80,11 +80,14 @@ def write_context_manifest(root: Path, run_id: str, decision: dict[str, object] 
     artifacts = dict(workflow.get("artifacts", {}))
     manifest_path = root / ".leaf" / "runs" / run_id / "context_manifest.json"
     artifacts["context_manifest"] = str(manifest_path.relative_to(root))
+    allowed_artifacts = set(str(item) for item in decision.get("allowed_artifacts", []) if isinstance(item, str))
+    context_slice = set(str(item) for item in decision.get("context_slice", []) if isinstance(item, str))
+    exposed_artifacts = allowed_artifacts | context_slice | {"workflow", "context_manifest"}
     referenced_artifacts = {}
     for key, value in artifacts.items():
         if not isinstance(value, str):
             continue
-        if key == "context_manifest" or (root / value).exists():
+        if key in exposed_artifacts and (key == "context_manifest" or (root / value).exists()):
             referenced_artifacts[key] = value
     payload = {
         "schema_version": "1.0",
