@@ -5,6 +5,7 @@ from collections import Counter
 from pathlib import Path
 
 from tools.leaf_author.batch_registry import inspect_batch
+from tools.leaf_author.real_device_contract import real_device_decision_contract, real_device_user_loop
 from tools.leaf_author.run_registry import inspect_run
 from tools.leaf_author.runtime_registry import approved_real_device_next_command, quality_artifact_priority, real_device_next_command
 
@@ -152,36 +153,20 @@ def _real_device_input(root: Path, artifacts: dict[str, object]) -> dict[str, ob
 
 def _approval_user_loop(approval_required: dict[str, object]) -> dict[str, str]:
     required_input = approval_required.get("required_approval_token")
-    return {
-        "position": "approve_real_device",
-        "required_input": str(required_input) if isinstance(required_input, str) else "",
-    }
+    return real_device_user_loop("approval", str(required_input) if isinstance(required_input, str) else "")
 
 
 def _approval_decision_contract() -> dict[str, object]:
-    return {
-        "trigger_source": "workflow.json",
-        "agent_owner": "leaf-test-author",
-        "context_slice": ["workflow", "real_device_approval"],
-        "allowed_artifacts": ["workflow", "real_device_approval"],
-    }
+    return real_device_decision_contract("approval")
 
 
 def _input_user_loop(input_required: dict[str, object]) -> dict[str, str]:
     required_input = input_required.get("required_input")
-    return {
-        "position": "provide_target_inputs",
-        "required_input": str(required_input) if isinstance(required_input, str) else "--serial <serial>",
-    }
+    return real_device_user_loop("input", str(required_input) if isinstance(required_input, str) else "")
 
 
 def _input_decision_contract() -> dict[str, object]:
-    return {
-        "trigger_source": "workflow.json",
-        "agent_owner": "leaf-test-author",
-        "context_slice": ["workflow", "real_device_input"],
-        "allowed_artifacts": ["workflow", "real_device_input"],
-    }
+    return real_device_decision_contract("input")
 
 
 def _report_user_loop(

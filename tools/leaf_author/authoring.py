@@ -12,6 +12,7 @@ from tools.leaf_author.hypium import export_openharmony_test_project, generate_h
 from tools.leaf_author.phase_contract import decide_next_step, write_context_manifest
 from tools.leaf_author.phase_guard import validate_phase_contract
 from tools.leaf_author.planner import build_plan
+from tools.leaf_author.real_device_contract import real_device_decision_contract, real_device_user_loop
 from tools.leaf_author.runner import run_pytest_draft
 from tools.leaf_author.runtime_registry import resolve_runtime_mode, run_domain_runtime, runtime_safety_profile
 from tools.leaf_author.validator import validate_pytest_draft
@@ -161,6 +162,7 @@ def advance_run(
         approval = _real_device_approval_decision(domain, selected_runtime_mode, approval_token)
         if not approval["approved"]:
             approval_artifact = _write_real_device_approval_artifact(root, run_id, workflow, selected_runtime_mode, approval)
+            approval_contract = real_device_decision_contract("approval")
             return {
                 "run_id": run_id,
                 "status": "blocked",
@@ -176,14 +178,11 @@ def advance_run(
                     "safe_to_auto_continue": False,
                     "operator_message": approval["runtime_safety"].get("operator_message", "Explicit real-device approval is required."),
                     "user_checkpoint": "real_device_confirmation",
-                    "agent_owner": "leaf-test-author",
+                    "agent_owner": approval_contract["agent_owner"],
                     "context_slice": ["workflow", "runtime_safety"],
-                    "trigger_source": "workflow.json",
+                    "trigger_source": approval_contract["trigger_source"],
                     "allowed_artifacts": ["workflow"],
-                    "user_loop": {
-                        "position": "approve_real_device",
-                        "required_input": str(approval["required_approval_token"]),
-                    },
+                    "user_loop": real_device_user_loop("approval", str(approval["required_approval_token"])),
                 },
             }
         if approval["required_approval_token"]:
@@ -192,6 +191,7 @@ def advance_run(
         serial_decision = _real_device_serial_decision(serial)
         if not serial_decision["ready"]:
             input_artifact = _write_real_device_input_artifact(root, run_id, workflow, selected_runtime_mode, serial_decision)
+            input_contract = real_device_decision_contract("input")
             return {
                 "run_id": run_id,
                 "status": "blocked",
@@ -205,14 +205,11 @@ def advance_run(
                     "safe_to_auto_continue": False,
                     "operator_message": "Real-device runtime requires an explicit --serial value before local or device stages run.",
                     "user_checkpoint": "manual_operator_decision",
-                    "agent_owner": "leaf-test-author",
+                    "agent_owner": input_contract["agent_owner"],
                     "context_slice": ["workflow"],
-                    "trigger_source": "workflow.json",
+                    "trigger_source": input_contract["trigger_source"],
                     "allowed_artifacts": ["workflow"],
-                    "user_loop": {
-                        "position": "provide_target_inputs",
-                        "required_input": "--serial <serial>",
-                    },
+                    "user_loop": real_device_user_loop("input"),
                 },
             }
         if _has_artifact(workflow, "real_device_input"):
@@ -456,6 +453,7 @@ def _load_real_device_input_blocker(root: Path, workflow: dict[str, object]) -> 
 def _approval_blocker_decision(workflow: dict[str, object], blocker: dict[str, object]) -> dict[str, object]:
     required_token = blocker.get("required_approval_token")
     operator_message = blocker.get("operator_message")
+    contract = real_device_decision_contract("approval")
     return {
         "current_phase": workflow.get("current_phase"),
         "confirmed_plan": bool(workflow.get("confirmed_plan", False)),
@@ -464,21 +462,16 @@ def _approval_blocker_decision(workflow: dict[str, object], blocker: dict[str, o
         "requires_user_confirmation": True,
         "safe_to_auto_continue": False,
         "operator_message": str(operator_message or "Explicit real-device approval is required."),
-        "agent_owner": "leaf-test-author",
-        "context_slice": ["workflow", "real_device_approval"],
-        "trigger_source": "workflow.json",
-        "allowed_artifacts": ["workflow", "real_device_approval"],
+        **contract,
         "batch_focus_priority": 80,
-        "user_loop": {
-            "position": "approve_real_device",
-            "required_input": str(required_token) if isinstance(required_token, str) else "",
-        },
+        "user_loop": real_device_user_loop("approval", str(required_token) if isinstance(required_token, str) else ""),
     }
 
 
 def _input_blocker_decision(workflow: dict[str, object], blocker: dict[str, object]) -> dict[str, object]:
     required_input = blocker.get("required_input")
     operator_message = blocker.get("operator_message")
+    contract = real_device_decision_contract("input")
     return {
         "current_phase": workflow.get("current_phase"),
         "confirmed_plan": bool(workflow.get("confirmed_plan", False)),
@@ -487,15 +480,9 @@ def _input_blocker_decision(workflow: dict[str, object], blocker: dict[str, obje
         "requires_user_confirmation": True,
         "safe_to_auto_continue": False,
         "operator_message": str(operator_message or "Real-device runtime requires an explicit --serial value."),
-        "agent_owner": "leaf-test-author",
-        "context_slice": ["workflow", "real_device_input"],
-        "trigger_source": "workflow.json",
-        "allowed_artifacts": ["workflow", "real_device_input"],
+        **contract,
         "batch_focus_priority": 75,
-        "user_loop": {
-            "position": "provide_target_inputs",
-            "required_input": str(required_input) if isinstance(required_input, str) else "--serial <serial>",
-        },
+        "user_loop": real_device_user_loop("input", str(required_input) if isinstance(required_input, str) else ""),
     }
 
 
@@ -593,16 +580,8 @@ def _write_real_device_preflight_artifact(
         "approval_token": approval_token if required_approval else None,
         "input_status": "ready" if serial_decision.get("ready") else "blocked",
         "next_action": "run_real_device_runtime",
-        "decision_contract": {
-            "trigger_source": "workflow.json",
-            "agent_owner": "leaf-test-author",
-            "context_slice": ["workflow", "runtime_safety", "real_device_input", "real_device_approval"],
-            "allowed_artifacts": ["workflow", "real_device_input", "real_device_approval"],
-        },
-        "user_loop": {
-            "position": "observe_real_device_execution",
-            "required_input": "",
-        },
+        "decision_contract": real_device_decision_contract("preflight"),
+        "user_loop": real_device_user_loop("preflight"),
     }
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
