@@ -532,6 +532,27 @@ class RunAuditTests(unittest.TestCase):
             failed = [run for run in result["runs"] if run["status"] == "failed"][0]
             self.assertIn("workflow_complete", failed["failed_checks"])
 
+    def test_audit_batch_summarizes_real_device_risk_and_approval_status(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _complete_direct_smoke(root, "audit-batch-direct-risk")
+            _complete_capture_e2e(root, "audit-batch-capture-risk")
+            create_batch(root, "audit-batch-risk", ["audit-batch-direct-risk", "audit-batch-capture-risk"])
+
+            result = audit_batch(root, "audit-batch-risk")
+
+            self.assertEqual(result["status"], "passed")
+            self.assertEqual(result["summary"]["passed"], 2)
+            self.assertEqual(result["real_device_summary"]["total_traces"], 2)
+            self.assertEqual(result["real_device_summary"]["runtime_modes"], ["capture_e2e", "direct_smoke"])
+            self.assertEqual(result["real_device_summary"]["risk_levels"], ["device_state_mutation", "read_only_probe"])
+            self.assertEqual(result["real_device_summary"]["mutates_device_state"], 1)
+            self.assertEqual(result["real_device_summary"]["read_only"], 1)
+            self.assertEqual(result["real_device_summary"]["approval_statuses"], ["approved", "not_required"])
+            self.assertEqual(result["real_device_summary"]["approval_required"], 1)
+            self.assertEqual(result["real_device_summary"]["approval_approved"], 1)
+            self.assertEqual(result["real_device_summary"]["approval_tokens"], ["approve_camera_capture_e2e"])
+
     def test_audit_batch_exposes_context_manifest_phase_contract_drift(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

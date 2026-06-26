@@ -1027,12 +1027,22 @@ def _batch_real_device_summary(runs: list[dict[str, object]]) -> dict[str, objec
     serials = sorted({str(trace.get("serial")) for trace in traces if trace.get("serial")})
     runtime_modes = sorted({str(trace.get("runtime_mode")) for trace in traces if trace.get("runtime_mode")})
     quality_gates = sorted({str(trace.get("latest_quality_gate")) for trace in traces if trace.get("latest_quality_gate")})
+    risk_levels = sorted({str(trace.get("risk_level")) for trace in traces if trace.get("risk_level")})
+    approval_statuses = sorted({str(trace.get("approval_status")) for trace in traces if trace.get("approval_status")})
+    approval_tokens = sorted({str(trace.get("required_approval_token")) for trace in traces if trace.get("required_approval_token")})
     live_devices = [trace.get("live_device") for trace in traces if isinstance(trace.get("live_device"), dict)]
     return {
         "total_traces": len(traces),
         "serials": serials,
         "runtime_modes": runtime_modes,
         "quality_gates": quality_gates,
+        "risk_levels": risk_levels,
+        "mutates_device_state": sum(1 for trace in traces if trace.get("mutates_device_state") is True),
+        "read_only": sum(1 for trace in traces if trace.get("mutates_device_state") is False),
+        "approval_statuses": approval_statuses,
+        "approval_required": sum(1 for trace in traces if trace.get("required_approval_token")),
+        "approval_approved": sum(1 for trace in traces if trace.get("approval_status") == "approved"),
+        "approval_tokens": approval_tokens,
         "live_connected": sum(1 for item in live_devices if isinstance(item, dict) and item.get("status") == "connected"),
         "live_unavailable": sum(1 for item in live_devices if isinstance(item, dict) and item.get("status") != "connected"),
     }
