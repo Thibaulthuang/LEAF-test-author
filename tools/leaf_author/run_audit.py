@@ -17,6 +17,7 @@ def audit_run(root: Path, run_id: str) -> dict[str, object]:
         _check("phase_guard", validate_phase_contract().get("status") == "stable", "Phase contract and guard checks are stable."),
         _check("real_device_gate_guard", validate_real_device_contract().get("status") == "stable", "Real-device gate contract is stable."),
         _check("runtime_registry_guard", validate_runtime_registry().get("status") == "stable", "Runtime registry contract is stable."),
+        _check("workflow_readable", report.get("current_phase") != "unreadable", "Workflow state is readable."),
         _check("workflow_complete", report.get("current_phase") == "complete", "Workflow current_phase is complete."),
         _check("no_user_action_required", report.get("user_action_required") is False, "No user checkpoint is pending."),
     ]
@@ -41,6 +42,8 @@ def audit_run(root: Path, run_id: str) -> dict[str, object]:
         "domain": report.get("domain"),
         "platform": report.get("platform"),
         "status": "passed" if passed else "failed",
+        "current_phase": report.get("current_phase"),
+        "next_action": report.get("next_action"),
         "latest_quality_gate": latest_quality_gate,
         "checks": checks,
         "evidence": {
@@ -187,11 +190,28 @@ def _write_run_audit(root: Path, run_id: str, payload: dict[str, object]) -> dic
     path = root / ".leaf" / "runs" / run_id / "run_audit.json"
     payload["audit_path"] = str(path.relative_to(root))
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    workflow = load_workflow(root, run_id)
+    try:
+        workflow = load_workflow(root, run_id)
+    except Exception as exc:
+        payload["workflow_artifact_update"] = {
+            "status": "skipped",
+            "reason": "workflow_unreadable",
+            "error": {
+                "type": type(exc).__name__,
+                "message": str(exc),
+            },
+        }
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        return payload
     artifacts = dict(workflow.get("artifacts", {}))
     artifacts["run_audit"] = str(path.relative_to(root))
     workflow["artifacts"] = artifacts
     save_workflow(root, workflow)
+    payload["workflow_artifact_update"] = {
+        "status": "updated",
+        "artifact_key": "run_audit",
+    }
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return payload
 
 

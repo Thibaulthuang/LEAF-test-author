@@ -49,6 +49,25 @@ class RunAuditTests(unittest.TestCase):
             self.assertIn("workflow_complete", failed_checks)
             self.assertIn("real_device_preflight_ready", failed_checks)
 
+    def test_audit_run_reports_unreadable_workflow_without_rewriting_it(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "坏 workflow", run_id="audit-unreadable")
+            workflow_path = root / ".leaf" / "runs" / "audit-unreadable" / "workflow.json"
+            workflow_path.write_text("", encoding="utf-8")
+
+            result = audit_run(root, "audit-unreadable")
+
+            self.assertEqual(result["status"], "failed")
+            self.assertEqual(result["current_phase"], "unreadable")
+            self.assertEqual(result["next_action"], "repair_workflow")
+            self.assertEqual(result["audit_path"], ".leaf/runs/audit-unreadable/run_audit.json")
+            self.assertTrue((root / result["audit_path"]).is_file())
+            self.assertEqual(workflow_path.read_text(encoding="utf-8"), "")
+            failed_checks = [check["name"] for check in result["checks"] if not check["passed"]]
+            self.assertIn("workflow_complete", failed_checks)
+            self.assertIn("workflow_readable", failed_checks)
+
     def test_audit_run_fails_when_context_manifest_handoff_is_missing(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -116,8 +135,7 @@ class RunAuditTests(unittest.TestCase):
             self.assertEqual(result["summary"]["failed"], 1)
             bad = [run for run in result["runs"] if run["run_id"] == "audit-batch-bad"][0]
             self.assertEqual(bad["status"], "failed")
-            self.assertIn("run_audit_exception", bad["failed_checks"])
-            self.assertIn("error", bad)
+            self.assertIn("workflow_readable", bad["failed_checks"])
             self.assertEqual(result["context_policy"]["load_strategy"], "summaries_first_then_audit_one_run")
 
     def test_cli_audit_batch_outputs_json_and_exit_code(self):
