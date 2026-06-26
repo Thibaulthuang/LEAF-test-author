@@ -6,19 +6,7 @@ from pathlib import Path
 
 from tools.leaf_author.batch_registry import inspect_batch
 from tools.leaf_author.run_registry import inspect_run
-
-_QUALITY_ARTIFACT_PRIORITY = [
-    "camera_capture_e2e",
-    "camera_direct_smoke",
-    "hypium_result",
-    "e2e_run",
-    "pytest_result",
-    "validation",
-    "e2e_preflight_report",
-    "e2e_readiness",
-    "camera_smoke_preflight",
-    "openharmony_build",
-]
+from tools.leaf_author.runtime_registry import quality_artifact_priority
 
 
 def report_run(root: Path, run_id: str) -> dict[str, object]:
@@ -26,7 +14,7 @@ def report_run(root: Path, run_id: str) -> dict[str, object]:
     resume_summary = run.get("resume_summary", {})
     artifacts = run.get("artifacts", {})
     evidence = _existing_artifacts(root, artifacts if isinstance(artifacts, dict) else {})
-    latest_quality_gate = _latest_quality_gate(root, artifacts if isinstance(artifacts, dict) else {})
+    latest_quality_gate = _latest_quality_gate(root, str(run.get("domain", "")), artifacts if isinstance(artifacts, dict) else {})
     safe_to_auto_continue = bool(isinstance(resume_summary, dict) and resume_summary.get("safe_to_auto_continue"))
     user_action_required = bool(isinstance(resume_summary, dict) and resume_summary.get("requires_user_confirmation"))
     user_checkpoint = _user_checkpoint(run, user_action_required)
@@ -98,8 +86,8 @@ def _existing_artifacts(root: Path, artifacts: dict[str, object]) -> dict[str, s
     return evidence
 
 
-def _latest_quality_gate(root: Path, artifacts: dict[str, object]) -> str:
-    for key in _QUALITY_ARTIFACT_PRIORITY:
+def _latest_quality_gate(root: Path, domain: str, artifacts: dict[str, object]) -> str:
+    for key in quality_artifact_priority(domain):
         value = artifacts.get(key)
         if not isinstance(value, str) or not value:
             continue

@@ -64,7 +64,8 @@ Adding a domain normally requires reviewing these files:
   such as `direct_smoke` or `capture_e2e` when the domain has executable
   system-app evidence. Also register the runtime artifact keys, pass quality
   gates, confidence, and review notes consumed by experience recording and team
-  manifests.
+  manifests. Report quality-gate priority should come from this registry, not
+  from report-layer domain branches.
 - `tools/leaf_author/<domain>_smoke.py`: domain preflight/direct/e2e execution if needed.
 - `tests/`: unit tests for plan validation, generated drafts, quality gates, and CLI output.
 

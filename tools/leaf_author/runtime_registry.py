@@ -9,6 +9,21 @@ _GENERIC_EXPERIENCE_KEYS = ["hypium_result", "pytest_result"]
 _DOMAIN_RUNTIME_ARTIFACTS = {
     "camera": ["camera_capture_e2e", "camera_direct_smoke"],
 }
+_GENERIC_QUALITY_ARTIFACTS = [
+    "hypium_result",
+    "e2e_run",
+    "pytest_result",
+    "validation",
+    "e2e_preflight_report",
+    "e2e_readiness",
+    "openharmony_build",
+]
+_DOMAIN_QUALITY_ARTIFACTS = {
+    "camera": ["camera_capture_e2e", "camera_direct_smoke"],
+}
+_DOMAIN_DIAGNOSTIC_ARTIFACTS = {
+    "camera": ["camera_smoke_preflight"],
+}
 _RUNTIME_EXPERIENCE_RULES = {
     "HYPIUM_REAL_PASS": {
         "status": "PASSED_REAL",
@@ -52,6 +67,16 @@ def experience_candidate_keys(domain: str) -> list[str]:
 
 def runtime_artifact_keys(domain: str) -> list[str]:
     return list(_DOMAIN_RUNTIME_ARTIFACTS.get(domain, []))
+
+
+def quality_artifact_priority(domain: str) -> list[str]:
+    domain_keys = _DOMAIN_QUALITY_ARTIFACTS.get(domain, [])
+    diagnostic_keys = _DOMAIN_DIAGNOSTIC_ARTIFACTS.get(domain, [])
+    priority = []
+    for key in [*domain_keys, *_GENERIC_QUALITY_ARTIFACTS, *diagnostic_keys]:
+        if key not in priority:
+            priority.append(key)
+    return priority
 
 
 def classify_experience_result(domain: str, run_result: dict[str, object]) -> dict[str, object]:

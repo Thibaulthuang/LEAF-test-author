@@ -40,6 +40,24 @@ class ReportTests(unittest.TestCase):
             self.assertEqual(result["user_checkpoint"], "first_plan_confirmation")
             self.assertIn("confirm", result["operator_message"].lower())
 
+    def test_report_run_uses_domain_runtime_quality_priority(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "打开相机；点击拍照", run_id="report-runtime")
+            confirm_plan(root, "report-runtime")
+            run_dir = root / ".leaf" / "runs" / "report-runtime"
+            (run_dir / "pytest_result.json").write_text(json.dumps({"quality_gate": "DRAFT_STATIC_PASS"}) + "\n", encoding="utf-8")
+            (run_dir / "camera_direct_smoke.json").write_text(json.dumps({"quality_gate": "CAMERA_DIRECT_SMOKE_PASS"}) + "\n", encoding="utf-8")
+            workflow = json.loads((run_dir / "workflow.json").read_text(encoding="utf-8"))
+            workflow["artifacts"]["pytest_result"] = ".leaf/runs/report-runtime/pytest_result.json"
+            workflow["artifacts"]["camera_direct_smoke"] = ".leaf/runs/report-runtime/camera_direct_smoke.json"
+            workflow["current_phase"] = "complete"
+            (run_dir / "workflow.json").write_text(json.dumps(workflow, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            result = report_run(root, "report-runtime")
+
+            self.assertEqual(result["latest_quality_gate"], "CAMERA_DIRECT_SMOKE_PASS")
+
     def test_report_batch_summarizes_runs_and_next_focus(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -5,7 +5,14 @@ from pathlib import Path
 from unittest.mock import patch
 
 from tools.leaf_author.authoring import advance_run
-from tools.leaf_author.runtime_registry import classify_experience_result, experience_candidate_keys, resolve_runtime_mode, runtime_artifact_keys, run_domain_runtime
+from tools.leaf_author.runtime_registry import (
+    classify_experience_result,
+    experience_candidate_keys,
+    quality_artifact_priority,
+    resolve_runtime_mode,
+    runtime_artifact_keys,
+    run_domain_runtime,
+)
 
 
 class RuntimeRegistryTests(unittest.TestCase):
@@ -55,6 +62,14 @@ class RuntimeRegistryTests(unittest.TestCase):
         )
         self.assertIn("camera_direct_smoke", runtime_artifact_keys("camera"))
         self.assertEqual(experience_candidate_keys("display"), ["hypium_result", "pytest_result"])
+
+    def test_runtime_registry_exposes_report_quality_priority(self):
+        self.assertEqual(
+            quality_artifact_priority("camera")[:4],
+            ["camera_capture_e2e", "camera_direct_smoke", "hypium_result", "e2e_run"],
+        )
+        self.assertNotIn("camera_direct_smoke", quality_artifact_priority("display"))
+        self.assertIn("pytest_result", quality_artifact_priority("display"))
 
     def test_advance_run_can_use_generic_runtime_mode_for_camera_direct(self):
         with tempfile.TemporaryDirectory() as tmp:
