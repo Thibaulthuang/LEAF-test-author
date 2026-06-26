@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from tools.leaf_author.phase_guard import validate_phase_contract
-from tools.leaf_author.real_device_contract import validate_real_device_contract
+from tools.leaf_author.real_device_contract import real_device_runtime_evidence_schema, validate_real_device_contract
 from tools.leaf_author.reports import report_run
 from tools.leaf_author.runtime_registry import runtime_quality_gates, validate_runtime_registry
 from tools.leaf_author.workflow import load_workflow, save_workflow
@@ -43,6 +43,8 @@ def audit_run(root: Path, run_id: str) -> dict[str, object]:
             device_selection if isinstance(device_selection, dict) else None,
         )
     )
+    runtime_evidence = _load_runtime_evidence(root, evidence if isinstance(evidence, dict) else {}, domain, preflight if isinstance(preflight, dict) else None)
+    checks.extend(_runtime_evidence_checks(runtime_evidence, latest_quality_gate))
     context_manifest = _load_context_manifest(root, evidence if isinstance(evidence, dict) else {})
     checks.extend(_context_manifest_checks(context_manifest, report))
     workflow_phase_state = initial_workflow_phase_state if _has_phase_state_snapshot(initial_workflow_phase_state) else _load_workflow_phase_state(root, run_id)
@@ -74,6 +76,7 @@ def audit_run(root: Path, run_id: str) -> dict[str, object]:
             "device_selection": device_selection.get("artifact") if isinstance(device_selection, dict) else None,
             "real_device_input": real_device_input.get("artifact") if isinstance(real_device_input, dict) else None,
             "real_device_preflight": preflight.get("artifact") if isinstance(preflight, dict) else None,
+            "runtime_evidence": runtime_evidence.get("artifact") if isinstance(runtime_evidence, dict) else None,
             "context_manifest": context_manifest.get("artifact") if isinstance(context_manifest, dict) else None,
             "workflow_phase_state": workflow_phase_state.get("artifact") if isinstance(workflow_phase_state, dict) else None,
             "workflow_diagnostics": workflow_diagnostics.get("artifact") if isinstance(workflow_diagnostics, dict) else None,
@@ -209,6 +212,70 @@ def _real_device_input_checks(
             )
         )
     return checks
+
+
+def _load_runtime_evidence(
+    root: Path,
+    evidence: dict[str, object],
+    domain: str,
+    preflight: dict[str, object] | None,
+) -> dict[str, object] | None:
+    if not preflight:
+        return None
+    runtime_mode = preflight.get("runtime_mode")
+    if not isinstance(runtime_mode, str) or not runtime_mode:
+        return None
+    try:
+        schema = real_device_runtime_evidence_schema(domain, runtime_mode)
+    except ValueError:
+        return {
+            "status": "invalid",
+            "schema": None,
+            "artifact": None,
+            "error": {"type": "ValueError", "message": f"runtime evidence schema is missing for {domain}.{runtime_mode}"},
+        }
+    artifact_key = schema.get("artifact")
+    value = evidence.get(str(artifact_key))
+    if not isinstance(value, str) or not value:
+        return {"status": "missing", "schema": schema, "artifact": None}
+    path = root / value
+    if not path.is_file():
+        return {"status": "missing", "schema": schema, "artifact": value}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {"status": "invalid", "schema": schema, "artifact": value, "error": {"type": "JSONDecodeError", "message": "runtime evidence is not valid JSON"}}
+    if not isinstance(payload, dict):
+        return {"status": "invalid", "schema": schema, "artifact": value, "error": {"type": "TypeError", "message": "runtime evidence must be a JSON object"}}
+    payload["artifact"] = value
+    payload["schema"] = schema
+    payload["status"] = payload.get("status")
+    return payload
+
+
+def _runtime_evidence_checks(runtime_evidence: dict[str, object] | None, latest_quality_gate: str) -> list[dict[str, object]]:
+    if not runtime_evidence:
+        return []
+    schema = runtime_evidence.get("schema")
+    if not isinstance(schema, dict):
+        return [_check("runtime_evidence_schema_ready", False, "Runtime evidence schema is registered for the preflight runtime mode.")]
+    evidence = runtime_evidence.get("evidence", {})
+    evidence = evidence if isinstance(evidence, dict) else {}
+    required_fields = [str(field) for field in schema.get("required_evidence_fields", [])] if isinstance(schema.get("required_evidence_fields"), list) else []
+    missing_fields = [field for field in required_fields if field not in evidence]
+    return [
+        _check("runtime_evidence_artifact_ready", runtime_evidence.get("artifact") is not None and runtime_evidence.get("status") == "complete", "Runtime evidence artifact is present and complete."),
+        _check(
+            "runtime_evidence_quality_gate",
+            runtime_evidence.get("quality_gate") == schema.get("quality_gate") == latest_quality_gate,
+            "Runtime evidence quality gate matches the registered schema and latest report gate.",
+        ),
+        _check(
+            "runtime_evidence_required_fields",
+            not missing_fields,
+            "Runtime evidence includes required schema fields." if not missing_fields else f"Runtime evidence missing fields: {', '.join(missing_fields)}.",
+        ),
+    ]
 
 
 def _real_device_trace(

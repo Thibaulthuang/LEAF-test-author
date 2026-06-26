@@ -133,7 +133,9 @@ def run_camera_direct_smoke(
     ui_tree_text = str(layout["raw_layout"])
     ui_snapshot = write_ui_snapshot(root, run_id, phase="after_launch", action_id="camera_direct", raw_layout=ui_tree_text)
     hilog = session.client.hilog()
-    layout_verified = _layout_verified(ui_tree_text, bundle_name, ability_name)
+    bundle_verified = bundle_name in ui_tree_text
+    ability_verified = ability_name in ui_tree_text
+    layout_verified = bundle_verified and ability_verified
     passed = command_succeeded(launch) and command_succeeded(ui_tree) and layout_verified
     return _write_direct_smoke(
         root,
@@ -150,6 +152,8 @@ def run_camera_direct_smoke(
             "evidence": {
                 "layout_path": layout_path,
                 "layout_verified": layout_verified,
+                "bundle_verified": bundle_verified,
+                "ability_verified": ability_verified,
                 "ui_snapshots": {
                     "after_launch": ui_snapshot,
                 },
@@ -259,14 +263,16 @@ def run_camera_capture_e2e(
     hilog = session.client.hilog()
     before_verified = _layout_verified(before_text, bundle_name, ability_name)
     after_verified = _layout_verified(after_text, bundle_name, ability_name)
+    capture_triggered = command_succeeded(capture)
+    media_delta_detected = bool(new_media_files)
     passed = (
         command_succeeded(launch)
         and before_verified
         and photo_mode_node is not None
         and shutter_node is not None
-        and command_succeeded(capture)
+        and capture_triggered
         and after_verified
-        and bool(new_media_files)
+        and media_delta_detected
     )
     failure_reason = _capture_failure_reason(
         launch=launch,
@@ -296,6 +302,9 @@ def run_camera_capture_e2e(
                 "after_layout_path": after["path"],
                 "before_layout_verified": before_verified,
                 "after_layout_verified": after_verified,
+                "layout_verified": before_verified and after_verified,
+                "capture_triggered": capture_triggered,
+                "media_delta_detected": media_delta_detected,
                 "photo_mode_node": photo_mode_node,
                 "shutter_node": shutter_node,
                 "shutter_tap": tap,

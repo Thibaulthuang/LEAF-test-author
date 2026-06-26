@@ -4,6 +4,22 @@ from __future__ import annotations
 _REAL_DEVICE_GATE_KINDS = ["approval", "input", "preflight"]
 _REQUIRED_DECISION_FIELDS = {"trigger_source", "agent_owner", "context_slice", "allowed_artifacts"}
 _REQUIRED_USER_LOOP_FIELDS = {"position", "required_input"}
+_RUNTIME_EVIDENCE = {
+    "camera": {
+        "direct_smoke": {
+            "artifact": "camera_direct_smoke",
+            "quality_gate": "CAMERA_DIRECT_SMOKE_PASS",
+            "required_evidence_fields": ["layout_verified", "bundle_verified", "ability_verified"],
+            "requires_real_device_preflight": True,
+        },
+        "capture_e2e": {
+            "artifact": "camera_capture_e2e",
+            "quality_gate": "CAMERA_CAPTURE_E2E_PASS",
+            "required_evidence_fields": ["capture_triggered", "media_delta_detected", "layout_verified"],
+            "requires_real_device_preflight": True,
+        },
+    },
+}
 
 
 def build_real_device_contract() -> dict[str, object]:
@@ -27,6 +43,7 @@ def build_real_device_contract() -> dict[str, object]:
             "artifact": "real_device_preflight",
             "status_for_execution": "ready",
         },
+        "runtime_evidence": _runtime_evidence_contract(),
     }
 
 
@@ -88,6 +105,8 @@ def validate_real_device_contract(contract: dict[str, object] | None = None) -> 
         if preflight.get("status_for_execution") != "ready":
             issues.append("real_device_gates.execution_preflight: status_for_execution must be ready")
 
+    _validate_runtime_evidence(contract.get("runtime_evidence"), issues)
+
     return {
         "schema_version": "1.0",
         "manifest_kind": "leaf_real_device_gate_guard",
@@ -140,6 +159,43 @@ def real_device_user_loop(kind: str, required_input: str = "") -> dict[str, str]
             "required_input": "",
         }
     raise ValueError(f"unsupported real-device user-loop kind: {kind}")
+
+
+def real_device_runtime_evidence_schema(domain: str, runtime_mode: str) -> dict[str, object]:
+    schema = _RUNTIME_EVIDENCE.get(domain, {}).get(runtime_mode)
+    if not schema:
+        raise ValueError(f"unsupported real-device runtime evidence schema: {domain}.{runtime_mode}")
+    return dict(schema)
+
+
+def _runtime_evidence_contract() -> dict[str, object]:
+    return {
+        domain: {mode: dict(schema) for mode, schema in modes.items()}
+        for domain, modes in _RUNTIME_EVIDENCE.items()
+    }
+
+
+def _validate_runtime_evidence(runtime_evidence: object, issues: list[str]) -> None:
+    if not isinstance(runtime_evidence, dict) or not runtime_evidence:
+        issues.append("real_device_runtime_evidence: contract must define runtime evidence schemas")
+        return
+    for domain, modes in runtime_evidence.items():
+        if not isinstance(modes, dict) or not modes:
+            issues.append(f"real_device_runtime_evidence.{domain}: domain must define runtime modes")
+            continue
+        for mode, schema in modes.items():
+            prefix = f"real_device_runtime_evidence.{domain}.{mode}"
+            if not isinstance(schema, dict):
+                issues.append(f"{prefix}: schema must be an object")
+                continue
+            if not isinstance(schema.get("artifact"), str) or not schema.get("artifact"):
+                issues.append(f"{prefix}: artifact must be defined")
+            if not isinstance(schema.get("quality_gate"), str) or not schema.get("quality_gate"):
+                issues.append(f"{prefix}: quality_gate must be defined")
+            if not _string_list(schema.get("required_evidence_fields")):
+                issues.append(f"{prefix}: required_evidence_fields must not be empty")
+            if schema.get("requires_real_device_preflight") is not True:
+                issues.append(f"{prefix}: requires_real_device_preflight must be true")
 
 
 def _string_list(value: object) -> list[str]:

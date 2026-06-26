@@ -40,6 +40,20 @@ class RealDeviceContractTests(unittest.TestCase):
         self.assertEqual(manifest["gates"]["approval"]["user_loop"]["position"], "approve_real_device")
         self.assertEqual(manifest["gates"]["approval"]["user_loop"]["required_input"], "<approval-token>")
         self.assertEqual(manifest["gates"]["preflight"]["decision_contract"]["agent_owner"], "leaf-test-author")
+        camera_direct = manifest["runtime_evidence"]["camera"]["direct_smoke"]
+        self.assertEqual(camera_direct["artifact"], "camera_direct_smoke")
+        self.assertEqual(camera_direct["quality_gate"], "CAMERA_DIRECT_SMOKE_PASS")
+        self.assertIn("layout_verified", camera_direct["required_evidence_fields"])
+        self.assertTrue(camera_direct["requires_real_device_preflight"])
+
+    def test_real_device_contract_guard_rejects_incomplete_runtime_evidence_schema(self):
+        manifest = build_real_device_contract()
+        del manifest["runtime_evidence"]["camera"]["direct_smoke"]["required_evidence_fields"]
+
+        result = validate_real_device_contract(manifest)
+
+        self.assertEqual(result["status"], "unstable")
+        self.assertIn("real_device_runtime_evidence.camera.direct_smoke: required_evidence_fields must not be empty", result["issues"])
 
     def test_real_device_contract_guard_rejects_unstable_gate(self):
         manifest = build_real_device_contract()
