@@ -123,6 +123,22 @@ class RunAuditTests(unittest.TestCase):
             failed_checks = [check["name"] for check in result["checks"] if not check["passed"]]
             self.assertIn("real_device_approval_matches_preflight", failed_checks)
 
+    def test_audit_run_fails_when_approval_artifact_decision_contract_drifts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _complete_capture_e2e(root, "audit-approval-contract-drift")
+            approval_path = root / ".leaf" / "runs" / "audit-approval-contract-drift" / "real_device_approval.json"
+            approval = json.loads(approval_path.read_text(encoding="utf-8"))
+            approval["decision_contract"]["agent_mode"] = "focused_subagent"
+            approval["decision_contract"]["handoff_required"] = True
+            approval_path.write_text(json.dumps(approval, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            result = audit_run(root, "audit-approval-contract-drift")
+
+            self.assertEqual(result["status"], "failed")
+            failed_checks = [check["name"] for check in result["checks"] if not check["passed"]]
+            self.assertIn("real_device_approval_decision_contract", failed_checks)
+
     def test_audit_run_can_verify_preflight_serial_is_currently_connected(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -251,6 +267,22 @@ class RunAuditTests(unittest.TestCase):
             self.assertEqual(result["real_device_trace"]["artifacts"]["device_selection"], ".leaf/runs/audit-selection/device_selection.json")
             self.assertEqual(result["real_device_trace"]["artifacts"]["real_device_input"], ".leaf/runs/audit-selection/real_device_input.json")
             self.assertEqual(result["real_device_trace"]["artifacts"]["real_device_preflight"], ".leaf/runs/audit-selection/real_device_preflight.json")
+
+    def test_audit_run_fails_when_input_artifact_decision_contract_drifts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _complete_direct_smoke(root, "audit-input-contract-drift")
+            input_path = root / ".leaf" / "runs" / "audit-input-contract-drift" / "real_device_input.json"
+            payload = json.loads(input_path.read_text(encoding="utf-8"))
+            payload["decision_contract"]["agent_mode"] = "focused_subagent"
+            payload["decision_contract"]["handoff_required"] = True
+            input_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            result = audit_run(root, "audit-input-contract-drift")
+
+            self.assertEqual(result["status"], "failed")
+            failed_checks = [check["name"] for check in result["checks"] if not check["passed"]]
+            self.assertIn("real_device_input_decision_contract", failed_checks)
 
     def test_audit_run_fails_incomplete_run(self):
         with tempfile.TemporaryDirectory() as tmp:

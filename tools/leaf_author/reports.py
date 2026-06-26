@@ -145,6 +145,8 @@ def _real_device_approval(root: Path, artifacts: dict[str, object]) -> dict[str,
         return None
     if payload.get("status") != "blocked":
         return None
+    decision_contract = payload.get("decision_contract", {})
+    user_loop = payload.get("user_loop", {})
     return {
         "artifact": value,
         "runtime_mode": payload.get("runtime_mode"),
@@ -152,6 +154,8 @@ def _real_device_approval(root: Path, artifacts: dict[str, object]) -> dict[str,
         "risk_level": payload.get("risk_level"),
         "mutates_device_state": payload.get("mutates_device_state"),
         "operator_message": payload.get("operator_message"),
+        "decision_contract": _with_target_policy(decision_contract if isinstance(decision_contract, dict) else {}),
+        "user_loop": user_loop if isinstance(user_loop, dict) else {},
     }
 
 
@@ -169,12 +173,16 @@ def _real_device_input(root: Path, artifacts: dict[str, object]) -> dict[str, ob
     if payload.get("status") != "blocked":
         return None
     missing = payload.get("missing", [])
+    decision_contract = payload.get("decision_contract", {})
+    user_loop = payload.get("user_loop", {})
     return {
         "artifact": value,
         "runtime_mode": payload.get("runtime_mode"),
         "missing": missing if isinstance(missing, list) else [],
         "required_input": payload.get("required_input"),
         "operator_message": payload.get("operator_message"),
+        "decision_contract": _with_target_policy(decision_contract if isinstance(decision_contract, dict) else {}),
+        "user_loop": user_loop if isinstance(user_loop, dict) else {},
     }
 
 

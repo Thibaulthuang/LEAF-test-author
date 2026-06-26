@@ -131,6 +131,9 @@ class ReportTests(unittest.TestCase):
             self.assertEqual(result["operator_message"], result["approval_required"]["operator_message"])
             self.assertIn("real_device_approval", result["evidence"])
             self.assertEqual(result["approval_required"]["required_approval_token"], "approve_camera_capture_e2e")
+            self.assertEqual(result["approval_required"]["decision_contract"]["agent_mode"], "orchestrator")
+            self.assertEqual(result["approval_required"]["decision_contract"]["handoff_required"], False)
+            self.assertEqual(result["approval_required"]["user_loop"]["position"], "approve_real_device")
             self.assertIn("--approval-token approve_camera_capture_e2e", result["next_command"])
 
     def test_report_run_clears_real_device_approval_after_approval(self):
@@ -184,6 +187,9 @@ class ReportTests(unittest.TestCase):
             self.assertEqual(result["user_action_required"], True)
             self.assertEqual(result["user_loop"]["position"], "provide_target_inputs")
             self.assertEqual(result["input_required"]["missing"], ["serial"])
+            self.assertEqual(result["input_required"]["decision_contract"]["agent_mode"], "orchestrator")
+            self.assertEqual(result["input_required"]["decision_contract"]["handoff_required"], False)
+            self.assertEqual(result["input_required"]["user_loop"]["required_input"], "--serial <serial>")
             self.assertIn("real_device_input", result["evidence"])
             self.assertIn("--serial <serial>", result["next_command"])
             self.assertNotIn("--approval-token", result["next_command"])

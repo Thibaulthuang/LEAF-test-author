@@ -314,6 +314,13 @@ def _real_device_approval_checks(
     ]
     checks.append(
         _check(
+            "real_device_approval_decision_contract",
+            _gate_artifact_decision_contract_ready(real_device_approval, "approval"),
+            "Real-device approval artifact keeps the stable gate decision and user-loop contract.",
+        )
+    )
+    checks.append(
+        _check(
             "real_device_approval_matches_preflight",
             _approval_matches_preflight(real_device_approval, preflight),
             "Real-device approval artifact matches preflight runtime mode and approval token.",
@@ -332,6 +339,28 @@ def _approval_matches_preflight(real_device_approval: dict[str, object] | None, 
         and real_device_approval.get("status") == "approved"
         and preflight.get("approval_status") == "approved"
     )
+
+
+def _gate_artifact_decision_contract_ready(artifact: dict[str, object] | None, kind: str) -> bool:
+    if not isinstance(artifact, dict):
+        return False
+    decision = artifact.get("decision_contract")
+    user_loop = artifact.get("user_loop")
+    if not isinstance(decision, dict) or not isinstance(user_loop, dict):
+        return False
+    expected = real_device_decision_contract(kind)
+    expected_keys = {
+        "trigger_source",
+        "agent_owner",
+        "agent_mode",
+        "handoff_required",
+        "required_inputs",
+        "subagent_boundary",
+        "context_slice",
+        "allowed_artifacts",
+        "target_policy",
+    }
+    return all(decision.get(key) == expected.get(key) for key in expected_keys) and bool(user_loop.get("position"))
 
 
 def _load_real_device_input(root: Path, evidence: dict[str, object]) -> dict[str, object] | None:
@@ -361,6 +390,13 @@ def _real_device_input_checks(
     checks = [
         _check("real_device_input_artifact_ready", real_device_input.get("status") == "ready", "Real-device input artifact records ready serial input."),
     ]
+    checks.append(
+        _check(
+            "real_device_input_decision_contract",
+            _gate_artifact_decision_contract_ready(real_device_input, "input"),
+            "Real-device input artifact keeps the stable gate decision and user-loop contract.",
+        )
+    )
     if preflight:
         checks.append(
             _check(

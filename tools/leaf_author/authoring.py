@@ -565,6 +565,7 @@ def _write_real_device_approval_artifact(
 ) -> dict[str, object]:
     path = root / ".leaf" / "runs" / run_id / "real_device_approval.json"
     safety = approval["runtime_safety"] if isinstance(approval.get("runtime_safety"), dict) else {}
+    required_token = approval.get("required_approval_token")
     payload = {
         "schema_version": "1.0",
         "artifact_kind": "real_device_approval_decision",
@@ -579,6 +580,8 @@ def _write_real_device_approval_artifact(
         "operator_message": safety.get("operator_message", "Explicit real-device approval is required."),
         "user_checkpoint": "real_device_confirmation",
         "next_action": "request_real_device_approval" if not approval.get("approved") else "run_real_device_runtime",
+        "decision_contract": real_device_decision_contract("approval"),
+        "user_loop": real_device_user_loop("approval", str(required_token) if isinstance(required_token, str) else ""),
     }
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -613,6 +616,8 @@ def _write_real_device_input_artifact(
         "operator_message": "Real-device runtime requires an explicit --serial value before local or device stages run.",
         "user_checkpoint": "manual_operator_decision",
         "next_action": "provide_real_device_serial" if not serial_decision.get("ready") else "run_real_device_runtime",
+        "decision_contract": real_device_decision_contract("input"),
+        "user_loop": real_device_user_loop("input"),
     }
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
