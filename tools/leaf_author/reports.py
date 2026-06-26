@@ -94,6 +94,7 @@ def report_batch(root: Path, batch_id: str) -> dict[str, object]:
         "real_device_summary": _batch_real_device_summary(runs),
         "runtime_evidence_summary": _batch_runtime_evidence_summary(runs),
         "gui_handoff_summary": batch_audit["gui_handoff_summary"],
+        "batch_audit_summary": batch_audit["batch_audit_summary"],
         "ui_tree_summary": _batch_ui_tree_summary(runs),
         "next_run_focus": _next_report_focus(runs),
         "runs": [_batch_report_summary(run) for run in runs],
@@ -121,6 +122,7 @@ def _batch_audit_summary(root: Path, batch_id: str) -> dict[str, object]:
     audit_path = root / ".leaf" / "batches" / batch_id / "batch_audit.json"
     default = {
         "gui_handoff_summary": _empty_gui_handoff_summary(),
+        "batch_audit_summary": _empty_batch_audit_summary(),
         "evidence": {},
     }
     if not audit_path.is_file():
@@ -132,9 +134,11 @@ def _batch_audit_summary(root: Path, batch_id: str) -> dict[str, object]:
     if not isinstance(payload, dict):
         return default
     summary = payload.get("gui_handoff_summary")
+    batch_checks = payload.get("batch_checks")
     evidence = {"batch_audit": str(audit_path.relative_to(root))}
     return {
         "gui_handoff_summary": summary if isinstance(summary, dict) else _empty_gui_handoff_summary(),
+        "batch_audit_summary": _batch_audit_check_summary(batch_checks, payload.get("focus_plan")),
         "evidence": evidence,
     }
 
@@ -148,6 +152,28 @@ def _empty_gui_handoff_summary() -> dict[str, object]:
         "failed_runs": [],
         "artifacts": [],
         "attention_boundary": "one_active_run",
+    }
+
+
+def _empty_batch_audit_summary() -> dict[str, object]:
+    return {
+        "total_checks": 0,
+        "passed_checks": 0,
+        "failed_checks": [],
+        "focus_plan": None,
+    }
+
+
+def _batch_audit_check_summary(batch_checks: object, focus_plan: object) -> dict[str, object]:
+    if not isinstance(batch_checks, list):
+        return _empty_batch_audit_summary()
+    checks = [check for check in batch_checks if isinstance(check, dict)]
+    failed = [str(check.get("name")) for check in checks if check.get("name") and not check.get("passed")]
+    return {
+        "total_checks": len(checks),
+        "passed_checks": sum(1 for check in checks if check.get("passed") is True),
+        "failed_checks": failed,
+        "focus_plan": focus_plan if isinstance(focus_plan, dict) else None,
     }
 
 

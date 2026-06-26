@@ -600,6 +600,40 @@ class ReportTests(unittest.TestCase):
             self.assertEqual(result["ui_tree_summary"]["foreground_bundles"], ["com.huawei.hmos.camera"])
             self.assertEqual(result["evidence"]["batch_audit"], ".leaf/batches/report-batch-gui/batch_audit.json")
 
+    def test_report_batch_includes_batch_audit_check_summary(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "打开相机；点击拍照", run_id="report-batch-route")
+            create_batch(root, "report-batch-route", ["report-batch-route"])
+            audit_dir = root / ".leaf" / "batches" / "report-batch-route"
+            audit_dir.mkdir(parents=True, exist_ok=True)
+            (audit_dir / "batch_audit.json").write_text(
+                json.dumps(
+                    {
+                        "batch_checks": [
+                            {"name": "batch_resume_attention_boundary", "passed": True},
+                            {"name": "batch_resume_focus_action_route", "passed": False},
+                        ],
+                        "focus_plan": {
+                            "selected_run_id": "report-batch-route",
+                            "action_route": {"phase": "plan", "command": "bad-command"},
+                        },
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = report_batch(root, "report-batch-route")
+
+            self.assertEqual(result["batch_audit_summary"]["total_checks"], 2)
+            self.assertEqual(result["batch_audit_summary"]["passed_checks"], 1)
+            self.assertEqual(result["batch_audit_summary"]["failed_checks"], ["batch_resume_focus_action_route"])
+            self.assertEqual(result["batch_audit_summary"]["focus_plan"]["selected_run_id"], "report-batch-route")
+            self.assertEqual(result["batch_audit_summary"]["focus_plan"]["action_route"]["command"], "bad-command")
+
     def test_cli_report_commands_output_json(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
