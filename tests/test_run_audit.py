@@ -27,6 +27,10 @@ class RunAuditTests(unittest.TestCase):
             self.assertEqual(result["status"], "passed")
             self.assertEqual(result["latest_quality_gate"], "CAMERA_DIRECT_SMOKE_PASS")
             self.assertIn("real_device_preflight", result["evidence"])
+            self.assertEqual(result["real_device_trace"]["risk_level"], "read_only_probe")
+            self.assertEqual(result["real_device_trace"]["mutates_device_state"], False)
+            self.assertEqual(result["real_device_trace"]["required_approval_token"], None)
+            self.assertEqual(result["real_device_trace"]["approval_status"], "not_required")
             self.assertEqual(result["evidence"]["context_manifest"], ".leaf/runs/audit-pass/context_manifest.json")
             self.assertEqual(result["audit_path"], ".leaf/runs/audit-pass/run_audit.json")
             self.assertTrue((root / result["audit_path"]).is_file())
@@ -50,7 +54,24 @@ class RunAuditTests(unittest.TestCase):
             self.assertIn("runtime_evidence_quality_gate", passed_checks)
             self.assertIn("runtime_evidence_required_fields", passed_checks)
             self.assertIn("runtime_evidence_ui_snapshots_ready", passed_checks)
+            self.assertIn("real_device_safety_profile", passed_checks)
             self.assertTrue(all(check["passed"] for check in result["checks"]))
+
+    def test_audit_run_fails_when_preflight_safety_profile_drifts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _complete_direct_smoke(root, "audit-safety-drift")
+            preflight_path = root / ".leaf" / "runs" / "audit-safety-drift" / "real_device_preflight.json"
+            preflight = json.loads(preflight_path.read_text(encoding="utf-8"))
+            preflight["mutates_device_state"] = True
+            preflight["approval_status"] = "approved"
+            preflight_path.write_text(json.dumps(preflight, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            result = audit_run(root, "audit-safety-drift")
+
+            self.assertEqual(result["status"], "failed")
+            failed_checks = [check["name"] for check in result["checks"] if not check["passed"]]
+            self.assertIn("real_device_safety_profile", failed_checks)
 
     def test_audit_run_includes_workflow_diagnostics_when_present(self):
         with tempfile.TemporaryDirectory() as tmp:

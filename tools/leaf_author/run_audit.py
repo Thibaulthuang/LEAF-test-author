@@ -6,7 +6,7 @@ from pathlib import Path
 from tools.leaf_author.phase_guard import validate_phase_contract
 from tools.leaf_author.real_device_contract import real_device_runtime_evidence_schema, validate_real_device_contract
 from tools.leaf_author.reports import report_run
-from tools.leaf_author.runtime_registry import runtime_quality_gates, validate_runtime_registry
+from tools.leaf_author.runtime_registry import runtime_quality_gates, runtime_safety_profile, validate_runtime_registry
 from tools.leaf_author.workflow import load_workflow, save_workflow
 from tools.leaf_author.batch_registry import resume_batch
 
@@ -33,7 +33,7 @@ def audit_run(root: Path, run_id: str) -> dict[str, object]:
 
     device_selection = report.get("device_selection")
     preflight = report.get("real_device_preflight")
-    checks.extend(_real_device_preflight_checks(preflight if isinstance(preflight, dict) else None, device_selection if isinstance(device_selection, dict) else None))
+    checks.extend(_real_device_preflight_checks(domain, preflight if isinstance(preflight, dict) else None, device_selection if isinstance(device_selection, dict) else None))
     checks.extend(_device_selection_checks(device_selection if isinstance(device_selection, dict) else None, preflight if isinstance(preflight, dict) else None))
     evidence = report.get("evidence", {})
     real_device_input = _load_real_device_input(root, evidence if isinstance(evidence, dict) else {})
@@ -139,13 +139,15 @@ def audit_batch(root: Path, batch_id: str) -> dict[str, object]:
     return _write_batch_audit(root, batch_id, payload)
 
 
-def _real_device_preflight_checks(preflight: dict[str, object] | None, device_selection: dict[str, object] | None = None) -> list[dict[str, object]]:
+def _real_device_preflight_checks(domain: str, preflight: dict[str, object] | None, device_selection: dict[str, object] | None = None) -> list[dict[str, object]]:
     if not preflight:
         return [_check("real_device_preflight_ready", False, "Real-device preflight artifact is missing.")]
+    safety_matches = _preflight_safety_matches_registry(domain, preflight)
     checks = [
         _check("real_device_preflight_ready", preflight.get("status") == "ready", "Real-device preflight status is ready."),
         _check("real_device_input_ready", preflight.get("input_status") == "ready", "Real-device serial/input gate is ready."),
         _check("real_device_approval_ready", preflight.get("approval_status") in {"approved", "not_required"}, "Real-device approval gate is approved or not required."),
+        _check("real_device_safety_profile", safety_matches, "Real-device preflight safety fields match the runtime registry profile."),
     ]
     if device_selection and preflight.get("serial_source") == "device_selection":
         checks.append(
@@ -157,6 +159,22 @@ def _real_device_preflight_checks(preflight: dict[str, object] | None, device_se
             )
         )
     return checks
+
+
+def _preflight_safety_matches_registry(domain: str, preflight: dict[str, object]) -> bool:
+    runtime_mode = preflight.get("runtime_mode")
+    if not isinstance(runtime_mode, str) or not runtime_mode:
+        return False
+    safety = runtime_safety_profile(domain, runtime_mode)
+    required_token = safety.get("requires_approval_token")
+    expected_approval_status = "approved" if required_token else "not_required"
+    return (
+        preflight.get("risk_level") == safety.get("risk_level")
+        and preflight.get("mutates_device_state") == safety.get("mutates_device_state")
+        and preflight.get("required_approval_token") == required_token
+        and preflight.get("approval_status") == expected_approval_status
+        and (not required_token or preflight.get("approval_token") == required_token)
+    )
 
 
 def _device_selection_checks(device_selection: dict[str, object] | None, preflight: dict[str, object] | None) -> list[dict[str, object]]:
@@ -376,6 +394,10 @@ def _real_device_trace(
         "serial": serial,
         "serial_source": serial_source,
         "runtime_mode": runtime_mode,
+        "risk_level": preflight.get("risk_level") if isinstance(preflight, dict) else None,
+        "mutates_device_state": preflight.get("mutates_device_state") if isinstance(preflight, dict) else None,
+        "required_approval_token": preflight.get("required_approval_token") if isinstance(preflight, dict) else None,
+        "approval_status": preflight.get("approval_status") if isinstance(preflight, dict) else None,
         "latest_quality_gate": latest_quality_gate,
         "artifacts": artifacts,
     }
