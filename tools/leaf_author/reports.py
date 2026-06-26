@@ -33,6 +33,7 @@ def report_run(root: Path, run_id: str) -> dict[str, object]:
         real_device_preflight,
         latest_quality_gate,
     )
+    gui_handoff = _gui_handoff_summary(root, evidence)
     safe_to_auto_continue = bool(isinstance(resume_summary, dict) and resume_summary.get("safe_to_auto_continue")) and not approval_required and not input_required
     user_action_required = bool(isinstance(resume_summary, dict) and resume_summary.get("requires_user_confirmation")) or bool(approval_required) or bool(input_required)
     user_checkpoint = "real_device_confirmation" if approval_required else _user_checkpoint(run, user_action_required)
@@ -61,6 +62,7 @@ def report_run(root: Path, run_id: str) -> dict[str, object]:
         "device_selection": device_selection,
         "real_device_preflight": real_device_preflight,
         "runtime_evidence_summary": runtime_evidence_summary,
+        "gui_handoff": gui_handoff,
         "evidence": evidence,
         "context_policy": {
             "scope": "run_report",
@@ -149,6 +151,9 @@ def _add_conventional_evidence(root: Path, run_id: str, evidence: dict[str, str]
     diagnostics = root / ".leaf" / "runs" / run_id / "workflow_diagnostics.json"
     if diagnostics.is_file():
         evidence["workflow_diagnostics"] = str(diagnostics.relative_to(root))
+    ui_tree_diagnostics = root / ".leaf" / "runs" / run_id / "ui_tree_diagnostics.json"
+    if ui_tree_diagnostics.is_file():
+        evidence["ui_tree_diagnostics"] = str(ui_tree_diagnostics.relative_to(root))
 
 
 def _latest_quality_gate(root: Path, domain: str, artifacts: dict[str, object]) -> str:
@@ -167,6 +172,41 @@ def _latest_quality_gate(root: Path, domain: str, artifacts: dict[str, object]) 
         if isinstance(quality_gate, str) and quality_gate:
             return quality_gate
     return "UNKNOWN"
+
+
+def _gui_handoff_summary(root: Path, evidence: dict[str, str]) -> dict[str, object] | None:
+    value = evidence.get("ui_tree_diagnostics")
+    if not isinstance(value, str) or not value:
+        return None
+    path = root / value
+    if not path.is_file():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    handoff = payload.get("handoff")
+    handoff = handoff if isinstance(handoff, dict) else {}
+    user_loop = payload.get("user_loop")
+    target_policy = payload.get("target_policy")
+    return {
+        "artifact": value,
+        "agent_owner": payload.get("agent_owner"),
+        "agent_mode": payload.get("agent_mode"),
+        "handoff_required": handoff.get("handoff_required"),
+        "subagent_boundary": handoff.get("subagent_boundary"),
+        "attention_boundary": handoff.get("attention_boundary"),
+        "artifact_loading": handoff.get("artifact_loading"),
+        "context_slice": handoff.get("context_slice") if isinstance(handoff.get("context_slice"), list) else [],
+        "allowed_artifacts": handoff.get("allowed_artifacts") if isinstance(handoff.get("allowed_artifacts"), list) else [],
+        "specific_question": handoff.get("specific_question"),
+        "user_loop": user_loop if isinstance(user_loop, dict) else {},
+        "target_policy": normalize_target_policy(target_policy),
+        "snapshot_count": payload.get("snapshot_count"),
+        "diff_count": payload.get("diff_count"),
+    }
 
 
 def _real_device_approval(root: Path, artifacts: dict[str, object]) -> dict[str, object] | None:
