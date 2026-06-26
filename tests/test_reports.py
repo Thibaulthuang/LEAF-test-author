@@ -321,6 +321,10 @@ class ReportTests(unittest.TestCase):
 
             result = report_batch(root, "batch-preflight-report")
 
+            self.assertEqual(result["real_device_summary"]["total_preflights"], 1)
+            self.assertEqual(result["real_device_summary"]["serials"], ["SERIAL123"])
+            self.assertEqual(result["real_device_summary"]["runtime_modes"], ["direct_smoke"])
+            self.assertEqual(result["real_device_summary"]["statuses"], ["ready"])
             preflight = result["runs"][0]["real_device_preflight"]
             self.assertEqual(preflight["runtime_mode"], "direct_smoke")
             self.assertEqual(preflight["status"], "ready")

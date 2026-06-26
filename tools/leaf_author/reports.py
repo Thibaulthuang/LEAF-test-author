@@ -73,6 +73,7 @@ def report_batch(root: Path, batch_id: str) -> dict[str, object]:
             "complete": status_counts.get("complete", 0),
             "blocked_or_inspect": status_counts.get("blocked_or_inspect", 0),
         },
+        "real_device_summary": _batch_real_device_summary(runs),
         "next_run_focus": _next_report_focus(runs),
         "runs": [_batch_report_summary(run) for run in runs],
         "context_policy": {
@@ -424,8 +425,22 @@ def _batch_preflight_summary(preflight: dict[str, object] | None) -> dict[str, o
     return {
         "runtime_mode": preflight.get("runtime_mode"),
         "status": preflight.get("status"),
+        "serial": preflight.get("serial"),
         "risk_level": preflight.get("risk_level"),
         "mutates_device_state": preflight.get("mutates_device_state"),
         "approval_status": preflight.get("approval_status"),
         "input_status": preflight.get("input_status"),
+    }
+
+
+def _batch_real_device_summary(runs: list[dict[str, object]]) -> dict[str, object]:
+    preflights = [run.get("real_device_preflight") for run in runs if isinstance(run.get("real_device_preflight"), dict)]
+    serials = sorted({str(preflight.get("serial")) for preflight in preflights if preflight.get("serial")})
+    runtime_modes = sorted({str(preflight.get("runtime_mode")) for preflight in preflights if preflight.get("runtime_mode")})
+    statuses = sorted({str(preflight.get("status")) for preflight in preflights if preflight.get("status")})
+    return {
+        "total_preflights": len(preflights),
+        "serials": serials,
+        "runtime_modes": runtime_modes,
+        "statuses": statuses,
     }
