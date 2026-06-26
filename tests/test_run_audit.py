@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 from tools.leaf_author.authoring import advance_run, confirm_plan, start_new_case
 from tools.leaf_author.batch_registry import create_batch
-from tools.leaf_author.device_probe import ProbeCommandResult
+from tools.leaf_author.device_probe import ProbeCommandResult, select_real_device
 from tools.leaf_author.reports import report_run
 from tools.leaf_author.run_audit import audit_batch, audit_run
 from tools.leaf_author.workflow_diagnostics import inspect_workflow_state
@@ -49,6 +49,29 @@ class RunAuditTests(unittest.TestCase):
             self.assertEqual(result["evidence"]["workflow_diagnostics"], ".leaf/runs/audit-diag/workflow_diagnostics.json")
             passed_checks = [check["name"] for check in result["checks"] if check["passed"]]
             self.assertIn("workflow_diagnostics_ready", passed_checks)
+
+    def test_audit_run_checks_device_selection_matches_preflight_serial(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _complete_direct_smoke(root, "audit-selection")
+
+            def runner(args, timeout_s):
+                if args == ["hdc", "list", "targets"]:
+                    return ProbeCommandResult(0, "SERIAL123\n", "")
+                if args == ["hdc", "-t", "SERIAL123", "shell", "param", "get", "const.product.model"]:
+                    return ProbeCommandResult(0, "MateTest\n", "")
+                if args == ["hdc", "-t", "SERIAL123", "shell", "param", "get", "const.ohos.apiversion"]:
+                    return ProbeCommandResult(0, "14\n", "")
+                return ProbeCommandResult(1, "", f"unexpected {args}")
+
+            select_real_device(root, "audit-selection", hdc_runner=runner)
+
+            result = audit_run(root, "audit-selection")
+
+            self.assertEqual(result["evidence"]["device_selection"], ".leaf/runs/audit-selection/device_selection.json")
+            passed_checks = [check["name"] for check in result["checks"] if check["passed"]]
+            self.assertIn("device_selection_ready", passed_checks)
+            self.assertIn("device_selection_matches_preflight", passed_checks)
 
     def test_audit_run_fails_incomplete_run(self):
         with tempfile.TemporaryDirectory() as tmp:

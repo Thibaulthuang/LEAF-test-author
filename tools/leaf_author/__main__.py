@@ -10,7 +10,7 @@ from tools.leaf_author.batch_registry import create_batch, inspect_batch, list_b
 from tools.leaf_author.build import build_openharmony_haps
 from tools.leaf_author.camera_smoke import run_camera_capture_e2e, run_camera_direct_smoke, run_camera_smoke, write_camera_smoke_preflight
 from tools.leaf_author.device_diagnostics import discover_test_targets, inspect_e2e_readiness, inspect_package_dir, inspect_test_target
-from tools.leaf_author.device_probe import HdcProbe
+from tools.leaf_author.device_probe import HdcProbe, select_real_device
 from tools.leaf_author.e2e import run_e2e
 from tools.leaf_author.e2e_report import write_e2e_preflight_report
 from tools.leaf_author.extension_contract import build_extension_contract, export_extension_contract, validate_extension_contract
@@ -45,6 +45,12 @@ def main(argv: list[str] | None = None) -> int:
 
     select_device = subparsers.add_parser("select-device")
     select_device.add_argument("--serial", default=None)
+
+    select_device_for_run = subparsers.add_parser("select-device-for-run")
+    select_device_for_run.add_argument("run_id")
+    select_device_for_run.add_argument("--root", type=Path, default=Path("."))
+    select_device_for_run.add_argument("--serial", default=None)
+    select_device_for_run.add_argument("--hdc-path", default="hdc")
 
     confirm = subparsers.add_parser("confirm-plan")
     confirm.add_argument("run_id")
@@ -258,6 +264,10 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "select-device":
         result = HdcProbe().select_device(serial=args.serial)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0 if result["status"] == "selected" else 1
+    if args.command == "select-device-for-run":
+        result = select_real_device(args.root, args.run_id, serial=args.serial, hdc_path=args.hdc_path)
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0 if result["status"] == "selected" else 1
     if args.command == "confirm-plan":

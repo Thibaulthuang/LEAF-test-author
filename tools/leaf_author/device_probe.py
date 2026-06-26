@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 import subprocess
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Callable
 
 
@@ -121,12 +123,46 @@ class HdcProbe:
         return ProbeCommandResult(completed.returncode, _decode_bytes(completed.stdout), _decode_bytes(completed.stderr))
 
 
+def select_real_device(
+    root: Path,
+    run_id: str,
+    serial: str | None = None,
+    hdc_runner: ProbeRunner | None = None,
+    hdc_path: str = "hdc",
+) -> dict[str, object]:
+    selection = HdcProbe(runner=hdc_runner, hdc_path=hdc_path).select_device(serial=serial)
+    payload = {
+        **selection,
+        "schema_version": "1.0",
+        "artifact_kind": "real_device_selection",
+        "run_id": run_id,
+    }
+    path = root / ".leaf" / "runs" / run_id / "device_selection.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    _attach_device_selection_artifact(root, run_id, path)
+    return {**payload, "device_selection_path": str(path.relative_to(root))}
+
+
 def _decode_bytes(value: bytes | str | None) -> str:
     if value is None:
         return ""
     if isinstance(value, str):
         return value
     return value.decode("utf-8", errors="replace")
+
+
+def _attach_device_selection_artifact(root: Path, run_id: str, path: Path) -> None:
+    workflow_path = root / ".leaf" / "runs" / run_id / "workflow.json"
+    if not workflow_path.is_file():
+        return
+    from tools.leaf_author.workflow import load_workflow, save_workflow
+
+    workflow = load_workflow(root, run_id)
+    artifacts = dict(workflow.get("artifacts", {}))
+    artifacts["device_selection"] = str(path.relative_to(root))
+    workflow["artifacts"] = artifacts
+    save_workflow(root, workflow)
 
 
 def _parse_targets(output: str) -> list[str]:

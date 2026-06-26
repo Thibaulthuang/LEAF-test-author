@@ -31,6 +31,8 @@ def audit_run(root: Path, run_id: str) -> dict[str, object]:
 
     preflight = report.get("real_device_preflight")
     checks.extend(_real_device_preflight_checks(preflight if isinstance(preflight, dict) else None))
+    device_selection = report.get("device_selection")
+    checks.extend(_device_selection_checks(device_selection if isinstance(device_selection, dict) else None, preflight if isinstance(preflight, dict) else None))
     evidence = report.get("evidence", {})
     context_manifest = _load_context_manifest(root, evidence if isinstance(evidence, dict) else {})
     checks.extend(_context_manifest_checks(context_manifest, report))
@@ -51,6 +53,7 @@ def audit_run(root: Path, run_id: str) -> dict[str, object]:
         "checks": checks,
         "evidence": {
             "report": "report-run",
+            "device_selection": device_selection.get("artifact") if isinstance(device_selection, dict) else None,
             "real_device_preflight": preflight.get("artifact") if isinstance(preflight, dict) else None,
             "context_manifest": context_manifest.get("artifact") if isinstance(context_manifest, dict) else None,
             "workflow_diagnostics": workflow_diagnostics.get("artifact") if isinstance(workflow_diagnostics, dict) else None,
@@ -110,6 +113,23 @@ def _real_device_preflight_checks(preflight: dict[str, object] | None) -> list[d
         _check("real_device_input_ready", preflight.get("input_status") == "ready", "Real-device serial/input gate is ready."),
         _check("real_device_approval_ready", preflight.get("approval_status") in {"approved", "not_required"}, "Real-device approval gate is approved or not required."),
     ]
+
+
+def _device_selection_checks(device_selection: dict[str, object] | None, preflight: dict[str, object] | None) -> list[dict[str, object]]:
+    if not device_selection:
+        return []
+    checks = [
+        _check("device_selection_ready", device_selection.get("status") == "selected", "Device selection artifact selected a concrete hdc target."),
+    ]
+    if preflight:
+        checks.append(
+            _check(
+                "device_selection_matches_preflight",
+                device_selection.get("serial") == preflight.get("serial"),
+                "Device selection serial matches real-device preflight serial.",
+            )
+        )
+    return checks
 
 
 def _load_context_manifest(root: Path, evidence: dict[str, object]) -> dict[str, object] | None:

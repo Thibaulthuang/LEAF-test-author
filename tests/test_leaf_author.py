@@ -279,6 +279,52 @@ class LeafAuthorWorkflowTests(unittest.TestCase):
         self.assertEqual(payload["serial"], "SERIAL123")
         probe_cls.return_value.select_device.assert_called_once_with(serial="SERIAL123")
 
+    def test_select_real_device_writes_run_artifact(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_workflow(root, "camera", "打开相机；点击拍照", run_id="select-run")
+
+            def runner(args, timeout_s):
+                if args == ["hdc", "list", "targets"]:
+                    return ProbeCommandResult(0, "SERIAL123\n", "")
+                if args == ["hdc", "-t", "SERIAL123", "shell", "param", "get", "const.product.model"]:
+                    return ProbeCommandResult(0, "MateTest\n", "")
+                if args == ["hdc", "-t", "SERIAL123", "shell", "param", "get", "const.ohos.apiversion"]:
+                    return ProbeCommandResult(0, "14\n", "")
+                return ProbeCommandResult(1, "", f"unexpected {args}")
+
+            from tools.leaf_author.device_probe import select_real_device
+
+            result = select_real_device(root, "select-run", hdc_runner=runner)
+
+            self.assertEqual(result["status"], "selected")
+            self.assertEqual(result["device_selection_path"], ".leaf/runs/select-run/device_selection.json")
+            payload = json.loads((root / result["device_selection_path"]).read_text(encoding="utf-8"))
+            self.assertEqual(payload["artifact_kind"], "real_device_selection")
+            self.assertEqual(payload["serial"], "SERIAL123")
+            workflow = load_workflow(root, "select-run")
+            self.assertEqual(workflow["artifacts"]["device_selection"], ".leaf/runs/select-run/device_selection.json")
+
+    def test_cli_select_device_for_run_writes_selection_artifact(self):
+        from contextlib import redirect_stdout
+        from io import StringIO
+        from unittest.mock import patch
+
+        from tools.leaf_author.__main__ import main
+
+        output = StringIO()
+        with patch(
+            "tools.leaf_author.__main__.select_real_device",
+            return_value={"status": "selected", "device_selection_path": ".leaf/runs/run-123/device_selection.json"},
+        ) as select_device, redirect_stdout(output):
+            exit_code = main(["select-device-for-run", "run-123", "--serial", "SERIAL123"])
+
+        payload = json.loads(output.getvalue())
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(payload["status"], "selected")
+        select_device.assert_called_once()
+        self.assertEqual(select_device.call_args.kwargs["serial"], "SERIAL123")
+
     def test_authoring_tool_creates_plan_case_and_probe_artifacts(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

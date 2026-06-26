@@ -7,7 +7,7 @@ from pathlib import Path
 
 from tools.leaf_author.authoring import advance_run, confirm_plan, start_new_case
 from tools.leaf_author.batch_registry import create_batch
-from tools.leaf_author.device_probe import ProbeCommandResult
+from tools.leaf_author.device_probe import ProbeCommandResult, select_real_device
 from tools.leaf_author.reports import report_batch, report_run
 from tools.leaf_author.workflow_diagnostics import inspect_workflow_state
 
@@ -233,6 +233,28 @@ class ReportTests(unittest.TestCase):
             self.assertEqual(result["real_device_preflight"]["user_loop"]["position"], "observe_real_device_execution")
             self.assertIn("real_device_preflight", result["evidence"])
             self.assertIn("camera_direct_smoke", result["evidence"])
+
+    def test_report_run_includes_device_selection_evidence_when_present(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "打开相机；点击拍照", run_id="report-selection")
+
+            def runner(args, timeout_s):
+                if args == ["hdc", "list", "targets"]:
+                    return ProbeCommandResult(0, "SERIAL123\n", "")
+                if args == ["hdc", "-t", "SERIAL123", "shell", "param", "get", "const.product.model"]:
+                    return ProbeCommandResult(0, "MateTest\n", "")
+                if args == ["hdc", "-t", "SERIAL123", "shell", "param", "get", "const.ohos.apiversion"]:
+                    return ProbeCommandResult(0, "14\n", "")
+                return ProbeCommandResult(1, "", f"unexpected {args}")
+
+            select_real_device(root, "report-selection", hdc_runner=runner)
+
+            result = report_run(root, "report-selection")
+
+            self.assertEqual(result["device_selection"]["status"], "selected")
+            self.assertEqual(result["device_selection"]["serial"], "SERIAL123")
+            self.assertEqual(result["evidence"]["device_selection"], ".leaf/runs/report-selection/device_selection.json")
 
     def test_report_batch_summarizes_runs_and_next_focus(self):
         with tempfile.TemporaryDirectory() as tmp:

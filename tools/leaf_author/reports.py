@@ -20,6 +20,7 @@ def report_run(root: Path, run_id: str) -> dict[str, object]:
     _add_conventional_evidence(root, run_id, evidence)
     approval_required = None if run.get("current_phase") == "complete" else _real_device_approval(root, artifacts if isinstance(artifacts, dict) else {})
     input_required = None if run.get("current_phase") == "complete" else _real_device_input(root, artifacts if isinstance(artifacts, dict) else {})
+    device_selection = _device_selection(root, artifacts if isinstance(artifacts, dict) else {})
     real_device_preflight = _real_device_preflight(root, artifacts if isinstance(artifacts, dict) else {})
     latest_quality_gate = _latest_quality_gate(root, str(run.get("domain", "")), artifacts if isinstance(artifacts, dict) else {})
     safe_to_auto_continue = bool(isinstance(resume_summary, dict) and resume_summary.get("safe_to_auto_continue")) and not approval_required and not input_required
@@ -46,6 +47,7 @@ def report_run(root: Path, run_id: str) -> dict[str, object]:
         "next_command": _next_command(run_id, run, safe_to_auto_continue, user_checkpoint, approval_required, input_required),
         "approval_required": approval_required,
         "input_required": input_required,
+        "device_selection": device_selection,
         "real_device_preflight": real_device_preflight,
         "evidence": evidence,
         "context_policy": {
@@ -187,6 +189,32 @@ def _real_device_preflight(root: Path, artifacts: dict[str, object]) -> dict[str
         "next_action": payload.get("next_action"),
         "decision_contract": decision_contract if isinstance(decision_contract, dict) else {},
         "user_loop": user_loop if isinstance(user_loop, dict) else {},
+    }
+
+
+def _device_selection(root: Path, artifacts: dict[str, object]) -> dict[str, object] | None:
+    value = artifacts.get("device_selection")
+    if not isinstance(value, str) or not value:
+        return None
+    path = root / value
+    if not path.is_file():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    context_policy = payload.get("context_policy", {})
+    user_loop = payload.get("user_loop", {})
+    device = payload.get("device", {})
+    return {
+        "artifact": value,
+        "status": payload.get("status"),
+        "serial": payload.get("serial"),
+        "targets": payload.get("targets") if isinstance(payload.get("targets"), list) else [],
+        "selection_reason": payload.get("selection_reason"),
+        "context_policy": context_policy if isinstance(context_policy, dict) else {},
+        "user_loop": user_loop if isinstance(user_loop, dict) else {},
+        "device": device if isinstance(device, dict) else {},
     }
 
 
