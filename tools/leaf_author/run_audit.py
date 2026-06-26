@@ -52,6 +52,8 @@ def audit_run(root: Path, run_id: str) -> dict[str, object]:
     checks.extend(_workflow_phase_state_checks(workflow_phase_state, context_manifest, report))
     workflow_diagnostics = _load_workflow_diagnostics(root, evidence if isinstance(evidence, dict) else {})
     checks.extend(_workflow_diagnostics_checks(workflow_diagnostics))
+    ui_tree_diagnostics = _load_ui_tree_diagnostics(root, evidence if isinstance(evidence, dict) else {})
+    checks.extend(_ui_tree_diagnostics_checks(root, ui_tree_diagnostics, runtime_evidence, run_id))
     real_device_trace = _real_device_trace(
         latest_quality_gate=latest_quality_gate,
         device_selection=device_selection if isinstance(device_selection, dict) else None,
@@ -83,6 +85,7 @@ def audit_run(root: Path, run_id: str) -> dict[str, object]:
             "context_manifest": context_manifest.get("artifact") if isinstance(context_manifest, dict) else None,
             "workflow_phase_state": workflow_phase_state.get("artifact") if isinstance(workflow_phase_state, dict) else None,
             "workflow_diagnostics": workflow_diagnostics.get("artifact") if isinstance(workflow_diagnostics, dict) else None,
+            "ui_tree_diagnostics": ui_tree_diagnostics.get("artifact") if isinstance(ui_tree_diagnostics, dict) else None,
         },
     }
     return _write_run_audit(root, run_id, payload)
@@ -435,6 +438,104 @@ def _workflow_diagnostics_checks(workflow_diagnostics: dict[str, object] | None)
         _check("workflow_diagnostics_ready", workflow_diagnostics.get("status") == "passed", "Workflow diagnostics artifact reports a readable workflow."),
         _check("workflow_diagnostics_parseable", bool(isinstance(checks, dict) and checks.get("json_parseable")), "Workflow diagnostics confirms workflow.json parses as JSON."),
     ]
+
+
+def _load_ui_tree_diagnostics(root: Path, evidence: dict[str, object]) -> dict[str, object] | None:
+    value = evidence.get("ui_tree_diagnostics")
+    if not isinstance(value, str) or not value:
+        return None
+    path = root / value
+    if not path.is_file():
+        return {"artifact": value, "status": "failed", "error": {"type": "FileNotFoundError", "message": "ui tree diagnostics artifact is missing"}}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {"artifact": value, "status": "failed", "error": {"type": "JSONDecodeError", "message": "ui tree diagnostics is not valid JSON"}}
+    if not isinstance(payload, dict):
+        return {"artifact": value, "status": "failed", "error": {"type": "TypeError", "message": "ui tree diagnostics must be a JSON object"}}
+    payload["artifact"] = value
+    return payload
+
+
+def _ui_tree_diagnostics_checks(
+    root: Path,
+    ui_tree_diagnostics: dict[str, object] | None,
+    runtime_evidence: dict[str, object] | None,
+    run_id: str,
+) -> list[dict[str, object]]:
+    if not ui_tree_diagnostics:
+        return []
+    snapshots = ui_tree_diagnostics.get("snapshots")
+    snapshots = snapshots if isinstance(snapshots, list) else []
+    diffs = ui_tree_diagnostics.get("diffs")
+    diff_count_matches = not isinstance(diffs, list) or ui_tree_diagnostics.get("diff_count") == len(diffs)
+    ready = (
+        ui_tree_diagnostics.get("manifest_kind") == "leaf_ui_tree_diagnostics"
+        and ui_tree_diagnostics.get("run_id") == run_id
+        and isinstance(ui_tree_diagnostics.get("snapshot_count"), int)
+        and ui_tree_diagnostics.get("snapshot_count") == len(snapshots)
+        and diff_count_matches
+    )
+    return [
+        _check("ui_tree_diagnostics_ready", ready, "UI tree diagnostics artifact is typed and internally consistent."),
+        _check(
+            "ui_tree_diagnostics_indexes_ready",
+            _ui_tree_diagnostics_indexes_ready(root, snapshots),
+            "UI tree diagnostics references parseable raw and indexed UI snapshots.",
+        ),
+        _check(
+            "ui_tree_diagnostics_matches_runtime_evidence",
+            _ui_tree_diagnostics_matches_runtime_evidence(snapshots, runtime_evidence),
+            "UI tree diagnostics snapshots are a subset of runtime evidence UI snapshot refs.",
+        ),
+    ]
+
+
+def _ui_tree_diagnostics_indexes_ready(root: Path, snapshots: list[object]) -> bool:
+    if not snapshots:
+        return False
+    for snapshot in snapshots:
+        if not isinstance(snapshot, dict):
+            return False
+        raw_path = snapshot.get("raw_path")
+        index_path = snapshot.get("index_path")
+        if not isinstance(raw_path, str) or not isinstance(index_path, str):
+            return False
+        if snapshot.get("index_status") != "ready":
+            return False
+        if not (root / raw_path).is_file() or not (root / index_path).is_file():
+            return False
+        try:
+            index_payload = json.loads((root / index_path).read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return False
+        if not isinstance(index_payload, dict) or index_payload.get("kind") != "ui_snapshot":
+            return False
+    return True
+
+
+def _ui_tree_diagnostics_matches_runtime_evidence(snapshots: list[object], runtime_evidence: dict[str, object] | None) -> bool:
+    if not snapshots or not isinstance(runtime_evidence, dict):
+        return False
+    evidence = runtime_evidence.get("evidence")
+    evidence = evidence if isinstance(evidence, dict) else {}
+    refs = evidence.get("ui_snapshot_refs")
+    if not isinstance(refs, list) or not refs:
+        return False
+    runtime_pairs = {
+        (ref.get("raw_path"), ref.get("index_path"))
+        for ref in refs
+        if isinstance(ref, dict) and isinstance(ref.get("raw_path"), str) and isinstance(ref.get("index_path"), str)
+    }
+    if not runtime_pairs:
+        return False
+    for snapshot in snapshots:
+        if not isinstance(snapshot, dict):
+            return False
+        pair = (snapshot.get("raw_path"), snapshot.get("index_path"))
+        if pair not in runtime_pairs:
+            return False
+    return True
 
 
 def _context_manifest_checks(context_manifest: dict[str, object] | None, report: dict[str, object]) -> list[dict[str, object]]:

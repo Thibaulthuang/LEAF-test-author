@@ -11,6 +11,7 @@ from tools.leaf_author.batch_registry import create_batch
 from tools.leaf_author.device_probe import ProbeCommandResult, select_real_device
 from tools.leaf_author.reports import report_run
 from tools.leaf_author.run_audit import audit_batch, audit_run
+from tools.leaf_author.ui_tree_diagnostics import inspect_ui_tree
 from tools.leaf_author.workflow_diagnostics import inspect_workflow_state
 
 
@@ -61,6 +62,36 @@ class RunAuditTests(unittest.TestCase):
             self.assertEqual(result["evidence"]["workflow_diagnostics"], ".leaf/runs/audit-diag/workflow_diagnostics.json")
             passed_checks = [check["name"] for check in result["checks"] if check["passed"]]
             self.assertIn("workflow_diagnostics_ready", passed_checks)
+
+    def test_audit_run_includes_ui_tree_diagnostics_when_present(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _complete_direct_smoke(root, "audit-ui-diag")
+            inspect_ui_tree(root, "audit-ui-diag", phase="after_launch", action_id="camera_direct")
+
+            result = audit_run(root, "audit-ui-diag")
+
+            self.assertEqual(result["status"], "passed")
+            self.assertEqual(result["evidence"]["ui_tree_diagnostics"], ".leaf/runs/audit-ui-diag/ui_tree_diagnostics.json")
+            passed_checks = [check["name"] for check in result["checks"] if check["passed"]]
+            self.assertIn("ui_tree_diagnostics_ready", passed_checks)
+            self.assertIn("ui_tree_diagnostics_indexes_ready", passed_checks)
+            self.assertIn("ui_tree_diagnostics_matches_runtime_evidence", passed_checks)
+
+    def test_audit_run_fails_when_ui_tree_diagnostics_reference_unknown_index(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _complete_direct_smoke(root, "audit-ui-diag-missing-index")
+            diagnostics = inspect_ui_tree(root, "audit-ui-diag-missing-index", phase="after_launch", action_id="camera_direct")
+            diagnostics["snapshots"][0]["index_path"] = ".leaf/runs/audit-ui-diag-missing-index/missing.index.json"
+            (root / diagnostics["artifact"]).write_text(json.dumps(diagnostics, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            result = audit_run(root, "audit-ui-diag-missing-index")
+
+            self.assertEqual(result["status"], "failed")
+            failed_checks = [check["name"] for check in result["checks"] if not check["passed"]]
+            self.assertIn("ui_tree_diagnostics_indexes_ready", failed_checks)
+            self.assertIn("ui_tree_diagnostics_matches_runtime_evidence", failed_checks)
 
     def test_audit_run_checks_device_selection_matches_preflight_serial(self):
         with tempfile.TemporaryDirectory() as tmp:
