@@ -26,29 +26,34 @@ Report the current LEAF workflow decision state for one run or one batch.
    `action_route.handoff_required`, `action_route.subagent_boundary`,
    `action_route.context_slice`, and `action_route.command` when explaining
    which agent or tool should handle the next step.
-6. If `next_action` is `repair_workflow`, run
+6. For batch reports, also present `batch_audit_summary.total_checks`,
+   `batch_audit_summary.passed_checks`, `batch_audit_summary.failed_checks`,
+   and `batch_audit_summary.focus_plan`. If `failed_checks` is non-empty, stop
+   before any resume or subagent dispatch and ask the user to handle the audit
+   failure.
+7. If `next_action` is `repair_workflow`, run
    `python3 -m tools.leaf_author workflow-diagnostics <run_id>` and present the
    diagnostics path, failed checks, and parse error before any resume/audit
    retry.
-7. Do not open large artifacts unless the user asks or the report points to a
+8. Do not open large artifacts unless the user asks or the report points to a
    specific evidence file that must be inspected.
-8. If `runtime_evidence_summary.ui_snapshots` is present and the user asks a UI
+9. If `runtime_evidence_summary.ui_snapshots` is present and the user asks a UI
    positioning or selector question, prefer
    `python3 -m tools.leaf_author inspect-ui-tree <run_id>` with `--phase`,
    `--action-id`, `--id`, `--text`, `--type`, or `--clickable` before opening
    raw layout files.
-9. If `user_checkpoint` is present, stop and ask the user. If `next_command`
+10. If `user_checkpoint` is present, stop and ask the user. If `next_command`
    is safe local work, run it only when it stays inside the workflow's
    auto-safe policy.
-10. Use `decision_contract.agent_owner` and `decision_contract.context_slice` to
+11. Use `decision_contract.agent_owner` and `decision_contract.context_slice` to
    decide whether the main author agent should continue or hand off to a domain
    or GUI subagent. Use `.leaf/runs/<run_id>/context_manifest.json` as the
    artifact handoff packet.
-11. Treat `action_route.command` as the stable phase route from
+12. Treat `action_route.command` as the stable phase route from
    `workflow.json.current_phase`; it is the command hint for OpenCode and should
    not be inferred from conversation memory. If `action_route.user_checkpoint`
    is present, stop for the user before running later phase intent.
-12. Treat `next_command` as contract output. For real-device checkpoints it must
+13. Treat `next_command` as contract output. For real-device checkpoints it must
    come from the runtime registry and should use `--runtime-mode <mode>` when
    the domain has a registered runtime mode.
 
