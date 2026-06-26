@@ -10,7 +10,7 @@ from tools.leaf_author.generator import generate_pytest_case
 from tools.leaf_author.gui_context import collect_gui_context
 from tools.leaf_author.hypium import export_openharmony_test_project, generate_hypium_case, run_hypium_case
 from tools.leaf_author.phase_contract import decide_next_step, write_context_manifest
-from tools.leaf_author.phase_guard import validate_phase_contract
+from tools.leaf_author.phase_guard import build_agent_handoff_contract, validate_phase_contract
 from tools.leaf_author.planner import build_plan
 from tools.leaf_author.real_device_contract import real_device_decision_contract, real_device_user_loop
 from tools.leaf_author.runner import run_pytest_draft
@@ -378,6 +378,31 @@ def _resume_summary(decision: dict[str, object]) -> dict[str, object]:
         "allowed_artifacts": decision.get("allowed_artifacts", []),
         "target_policy": decision.get("target_policy", {}),
         "user_loop": decision.get("user_loop", {}),
+        "action_route": _action_route_for_decision(decision),
+    }
+
+
+def _action_route_for_decision(decision: dict[str, object]) -> dict[str, object]:
+    phase = str(decision.get("current_phase", ""))
+    routes = build_agent_handoff_contract().get("action_routes")
+    if isinstance(routes, dict):
+        route = routes.get(phase)
+        if isinstance(route, dict):
+            return dict(route)
+    return {
+        "phase": phase,
+        "next_action": str(decision.get("next_action", "inspect_workflow_state")),
+        "trigger_source": "workflow.json",
+        "agent_owner": "leaf-test-author",
+        "agent_mode": "orchestrator",
+        "handoff_required": False,
+        "subagent_boundary": "workflow_orchestration",
+        "context_slice": ["workflow"],
+        "allowed_artifacts": ["workflow"],
+        "user_checkpoint": "manual_operator_decision",
+        "auto_safe": False,
+        "user_loop": {"position": "manual_triage", "required_input": "operator_decision"},
+        "command": "python3 -m tools.leaf_author report-run <run_id>",
     }
 
 

@@ -242,6 +242,7 @@ def _batch_resume_focus_plan(runs: list[dict[str, object]]) -> dict[str, object]
             "position": str(user_loop.get("position", "")),
             "required_input": str(user_loop.get("required_input", "")),
         },
+        "action_route": summary.get("action_route") if isinstance(summary.get("action_route"), dict) else {},
         "safe_to_auto_continue": bool(summary.get("safe_to_auto_continue", False)),
         "requires_user_confirmation": bool(summary.get("requires_user_confirmation", False)),
     }

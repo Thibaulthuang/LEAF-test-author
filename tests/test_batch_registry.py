@@ -189,6 +189,10 @@ class BatchRegistryTests(unittest.TestCase):
             self.assertEqual(result["focus_plan"]["user_loop"]["position"], "approve_plan")
             self.assertEqual(result["focus_plan"]["user_loop"]["required_input"], "confirm or revise plan")
             self.assertEqual(result["focus_plan"]["safe_to_auto_continue"], False)
+            self.assertEqual(result["focus_plan"]["action_route"]["phase"], "plan")
+            self.assertEqual(result["focus_plan"]["action_route"]["agent_owner"], "leaf-test-author")
+            self.assertEqual(result["focus_plan"]["action_route"]["user_checkpoint"], "first_plan_confirmation")
+            self.assertEqual(result["focus_plan"]["action_route"]["command"], "python3 -m tools.leaf_author report-run <run_id>")
 
     def test_resume_batch_isolates_unreadable_run_and_continues_safe_runs(self):
         with tempfile.TemporaryDirectory() as tmp:
