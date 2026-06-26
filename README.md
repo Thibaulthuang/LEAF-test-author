@@ -111,6 +111,7 @@ Export the framework extension contract for a domain:
 python3 -m tools.leaf_author extension-contract camera
 python3 -m tools.leaf_author export-extension-contract camera --output /tmp/camera-extension.json
 python3 -m tools.leaf_author validate-extension-contract camera
+python3 -m tools.leaf_author validate-extension-contract camera --strict-real-device
 ```
 
 Run safe local stages directly:

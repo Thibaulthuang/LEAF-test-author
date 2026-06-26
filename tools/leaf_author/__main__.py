@@ -91,6 +91,7 @@ def main(argv: list[str] | None = None) -> int:
 
     validate_extension_contract_parser = subparsers.add_parser("validate-extension-contract")
     validate_extension_contract_parser.add_argument("domain")
+    validate_extension_contract_parser.add_argument("--strict-real-device", action="store_true")
 
     advance = subparsers.add_parser("advance")
     advance.add_argument("run_id")
@@ -266,7 +267,7 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(export_extension_contract(args.domain, args.output), ensure_ascii=False, indent=2))
         return 0
     if args.command == "validate-extension-contract":
-        result = validate_extension_contract(args.domain)
+        result = validate_extension_contract(args.domain, strict_real_device=args.strict_real_device)
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return int(result["exit_code"])
     if args.command == "advance":

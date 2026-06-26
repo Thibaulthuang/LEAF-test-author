@@ -67,14 +67,24 @@ def export_extension_contract(domain: str, output_path: Path) -> dict[str, objec
     }
 
 
-def validate_extension_contract(domain: str) -> dict[str, object]:
+def validate_extension_contract(domain: str, strict_real_device: bool = False) -> dict[str, object]:
     contract = build_extension_contract(domain)
     status = str(contract.get("readiness", {}).get("status", "incomplete"))
     missing = contract.get("readiness", {}).get("missing", [])
+    missing_items = list(missing) if isinstance(missing, list) else []
+    runtime_contract = contract.get("runtime_contract", {})
+    if strict_real_device and isinstance(runtime_contract, dict):
+        if not runtime_contract.get("default_real_device_mode"):
+            missing_items.append("runtime_registry: register a default real-device runtime mode")
+        if not runtime_contract.get("quality_gates"):
+            missing_items.append("runtime_registry: register real-device quality gates")
+    if missing_items:
+        status = "incomplete"
     return {
         "domain": domain,
         "status": status,
-        "missing": missing if isinstance(missing, list) else [],
+        "strict_real_device": strict_real_device,
+        "missing": missing_items,
         "exit_code": 0 if status == "ready" else 1,
     }
 

@@ -57,11 +57,17 @@ class ExtensionContractTests(unittest.TestCase):
     def test_validate_extension_contract_reports_ready_and_incomplete_status(self):
         ready = validate_extension_contract("camera")
         incomplete = validate_extension_contract("display")
+        strict_ready = validate_extension_contract("camera", strict_real_device=True)
+        strict_incomplete = validate_extension_contract("display", strict_real_device=True)
 
         self.assertEqual(ready["status"], "ready")
         self.assertEqual(ready["exit_code"], 0)
         self.assertEqual(incomplete["status"], "incomplete")
         self.assertEqual(incomplete["exit_code"], 1)
+        self.assertEqual(strict_ready["status"], "ready")
+        self.assertEqual(strict_ready["strict_real_device"], True)
+        self.assertEqual(strict_incomplete["status"], "incomplete")
+        self.assertIn("default real-device runtime mode", " ".join(strict_incomplete["missing"]))
 
     def test_cli_export_and_validate_extension_contract(self):
         from tools.leaf_author.__main__ import main
@@ -74,7 +80,7 @@ class ExtensionContractTests(unittest.TestCase):
 
             validate_output = StringIO()
             with redirect_stdout(validate_output):
-                validate_exit = main(["validate-extension-contract", "camera"])
+                validate_exit = main(["validate-extension-contract", "camera", "--strict-real-device"])
 
             incomplete_output = StringIO()
             with redirect_stdout(incomplete_output):
@@ -85,6 +91,7 @@ class ExtensionContractTests(unittest.TestCase):
             self.assertEqual(json.loads(export_output.getvalue())["output_path"], str(output_path))
             self.assertEqual(validate_exit, 0)
             self.assertEqual(json.loads(validate_output.getvalue())["status"], "ready")
+            self.assertEqual(json.loads(validate_output.getvalue())["strict_real_device"], True)
             self.assertEqual(incomplete_exit, 1)
             self.assertEqual(json.loads(incomplete_output.getvalue())["status"], "incomplete")
 
