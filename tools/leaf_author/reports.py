@@ -221,6 +221,7 @@ def _ui_tree_diagnostics_summary(payload: dict[str, object]) -> dict[str, object
     foregrounds = []
     index_statuses = set()
     total_candidates = 0
+    candidate_previews = []
     for snapshot in snapshots:
         if not isinstance(snapshot, dict):
             continue
@@ -233,6 +234,15 @@ def _ui_tree_diagnostics_summary(payload: dict[str, object]) -> dict[str, object
             index_statuses.add(index_status)
         candidate_count = int(snapshot.get("candidate_count") or 0)
         total_candidates += candidate_count
+        snapshot_candidate_previews = _ui_tree_candidate_previews(snapshot)
+        candidate_previews.extend(
+            {
+                "phase": snapshot.get("phase"),
+                "action_id": snapshot.get("action_id"),
+                **candidate,
+            }
+            for candidate in snapshot_candidate_previews
+        )
         snapshot_summaries.append(
             {
                 "phase": snapshot.get("phase"),
@@ -241,16 +251,36 @@ def _ui_tree_diagnostics_summary(payload: dict[str, object]) -> dict[str, object
                 "node_count": snapshot.get("node_count"),
                 "clickable_count": snapshot.get("clickable_count"),
                 "candidate_count": candidate_count,
+                "candidate_previews": snapshot_candidate_previews,
                 "index_status": index_status,
             }
         )
     return {
         "snapshot_count": len(snapshot_summaries),
         "total_candidates": total_candidates,
+        "candidate_previews": candidate_previews[:5],
         "index_statuses": sorted(index_statuses),
         "foregrounds": foregrounds,
         "snapshots": snapshot_summaries,
     }
+
+
+def _ui_tree_candidate_previews(snapshot: dict[str, object]) -> list[dict[str, object]]:
+    candidates = snapshot.get("candidates")
+    candidates = candidates if isinstance(candidates, list) else []
+    previews = []
+    for candidate in candidates[:5]:
+        if not isinstance(candidate, dict):
+            continue
+        previews.append(
+            {
+                "id": candidate.get("id"),
+                "text": candidate.get("text"),
+                "type": candidate.get("type"),
+                "clickable": candidate.get("clickable"),
+            }
+        )
+    return previews
 
 
 def _gui_handoff_contract_issues(payload: dict[str, object], handoff: dict[str, object]) -> list[str]:
