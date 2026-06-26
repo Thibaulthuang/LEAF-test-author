@@ -74,6 +74,24 @@ class RunAuditTests(unittest.TestCase):
             failed_checks = [check["name"] for check in result["checks"] if not check["passed"]]
             self.assertIn("real_device_safety_profile", failed_checks)
 
+    def test_audit_run_fails_when_preflight_decision_contract_handoff_drifts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _complete_direct_smoke(root, "audit-preflight-contract-drift")
+            preflight_path = root / ".leaf" / "runs" / "audit-preflight-contract-drift" / "real_device_preflight.json"
+            preflight = json.loads(preflight_path.read_text(encoding="utf-8"))
+            preflight["decision_contract"]["agent_mode"] = "focused_subagent"
+            preflight["decision_contract"]["handoff_required"] = True
+            preflight["decision_contract"]["required_inputs"] = ["run_id"]
+            preflight["decision_contract"]["subagent_boundary"] = "read_only_gui_context"
+            preflight_path.write_text(json.dumps(preflight, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            result = audit_run(root, "audit-preflight-contract-drift")
+
+            self.assertEqual(result["status"], "failed")
+            failed_checks = [check["name"] for check in result["checks"] if not check["passed"]]
+            self.assertIn("real_device_preflight_decision_contract", failed_checks)
+
     def test_audit_run_checks_capture_approval_artifact_matches_preflight(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

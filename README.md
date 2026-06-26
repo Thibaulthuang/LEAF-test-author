@@ -227,8 +227,10 @@ assumptions.
 `real-device-contract` prints the machine-readable gate map for real-device
 runtime execution. It exposes the approval, input, and preflight decision
 contracts from `tools/leaf_author/real_device_contract.py`, including the
-`agent_owner`, bounded `context_slice`, allowed artifacts, and `user_loop`
-position that subagents should use before or during device execution.
+`agent_owner`, `agent_mode`, `handoff_required`, `required_inputs`,
+`subagent_boundary`, bounded `context_slice`, allowed artifacts, and
+`user_loop` position that subagents should use before or during device
+execution.
 `runtime-registry-contract` prints the registered runtime modes, default mode,
 runtime artifacts, quality gates, and safety profiles that domain plugins must
 keep complete before real-device execution can be considered stable.

@@ -1,10 +1,20 @@
 from __future__ import annotations
 
+from tools.leaf_author.agent_handoff import AGENT_MODES, HANDOFF_RULES
 from tools.leaf_author.target_policy import is_system_app_only_target_policy, with_target_policy
 
 
 _REAL_DEVICE_GATE_KINDS = ["approval", "input", "preflight"]
-_REQUIRED_DECISION_FIELDS = {"trigger_source", "agent_owner", "context_slice", "allowed_artifacts"}
+_REQUIRED_DECISION_FIELDS = {
+    "trigger_source",
+    "agent_owner",
+    "agent_mode",
+    "handoff_required",
+    "required_inputs",
+    "subagent_boundary",
+    "context_slice",
+    "allowed_artifacts",
+}
 _REQUIRED_USER_LOOP_FIELDS = {"position", "required_input"}
 _RUNTIME_EVIDENCE = {
     "camera": {
@@ -98,6 +108,15 @@ def validate_real_device_contract(contract: dict[str, object] | None = None) -> 
             issues.append(f"real_device_gates.{kind}: trigger_source must be workflow.json")
         if decision.get("agent_owner") != "leaf-test-author":
             issues.append(f"real_device_gates.{kind}: agent_owner must be leaf-test-author")
+        if decision.get("agent_mode") != AGENT_MODES["leaf-test-author"]:
+            issues.append(f"real_device_gates.{kind}: agent_mode must be orchestrator")
+        expected_handoff = HANDOFF_RULES["leaf-test-author"]
+        if decision.get("handoff_required") != expected_handoff["handoff_required"]:
+            issues.append(f"real_device_gates.{kind}: handoff_required must match leaf-test-author handoff rule")
+        if decision.get("required_inputs") != expected_handoff["required_inputs"]:
+            issues.append(f"real_device_gates.{kind}: required_inputs must match leaf-test-author handoff rule")
+        if decision.get("subagent_boundary") != expected_handoff["subagent_boundary"]:
+            issues.append(f"real_device_gates.{kind}: subagent_boundary must match leaf-test-author handoff rule")
         context_slice = _string_list(decision.get("context_slice"))
         if "workflow" not in context_slice:
             issues.append(f"real_device_gates.{kind}: context_slice must include workflow")
@@ -141,10 +160,12 @@ def validate_real_device_contract(contract: dict[str, object] | None = None) -> 
 
 
 def real_device_decision_contract(kind: str) -> dict[str, object]:
+    base = _leaf_test_author_handoff_fields()
     if kind == "approval":
         return with_target_policy({
             "trigger_source": "workflow.json",
             "agent_owner": "leaf-test-author",
+            **base,
             "context_slice": ["workflow", "real_device_approval"],
             "allowed_artifacts": ["workflow", "real_device_approval"],
         })
@@ -152,6 +173,7 @@ def real_device_decision_contract(kind: str) -> dict[str, object]:
         return with_target_policy({
             "trigger_source": "workflow.json",
             "agent_owner": "leaf-test-author",
+            **base,
             "context_slice": ["workflow", "real_device_input"],
             "allowed_artifacts": ["workflow", "real_device_input"],
         })
@@ -159,10 +181,21 @@ def real_device_decision_contract(kind: str) -> dict[str, object]:
         return with_target_policy({
             "trigger_source": "workflow.json",
             "agent_owner": "leaf-test-author",
+            **base,
             "context_slice": ["workflow", "runtime_safety", "real_device_input", "real_device_approval"],
             "allowed_artifacts": ["workflow", "real_device_input", "real_device_approval"],
         })
     raise ValueError(f"unsupported real-device contract kind: {kind}")
+
+
+def _leaf_test_author_handoff_fields() -> dict[str, object]:
+    handoff = HANDOFF_RULES["leaf-test-author"]
+    return {
+        "agent_mode": AGENT_MODES["leaf-test-author"],
+        "handoff_required": handoff["handoff_required"],
+        "required_inputs": list(handoff["required_inputs"]),
+        "subagent_boundary": handoff["subagent_boundary"],
+    }
 
 
 def real_device_user_loop(kind: str, required_input: str = "") -> dict[str, str]:

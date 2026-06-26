@@ -160,6 +160,7 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
         self.assertIn("specific_question", readme)
         self.assertIn("checkpoint owner is the user", readme)
         self.assertIn("real-device-contract", readme)
+        self.assertIn("`agent_owner`, `agent_mode`, `handoff_required`", readme)
         self.assertIn("runtime-registry-contract", readme)
         self.assertIn("--runtime-mode direct_smoke", readme)
         self.assertIn("approve_camera_capture_e2e", readme)

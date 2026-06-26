@@ -128,8 +128,9 @@ domain, GUI, or execution subagent needs the shared system-app-only target
 boundary. Use `python3 -m tools.leaf_author agent-handoff-contract` when a
 domain, GUI, or execution subagent needs the current machine-readable handoff
 map. Use `python3 -m tools.leaf_author real-device-contract` when a subagent
-needs the stable approval/input/preflight gates for real-device runtime
-execution. Use `python3 -m tools.leaf_author runtime-evidence-contract <domain>`
+needs the stable approval/input/preflight gates, `agent_mode`,
+`handoff_required`, `required_inputs`, and `subagent_boundary` for real-device
+runtime execution. Use `python3 -m tools.leaf_author runtime-evidence-contract <domain>`
 when a domain plugin or execution subagent needs the required evidence fields
 for each real-device runtime artifact. Use
 `python3 -m tools.leaf_author runtime-registry-contract` when a domain plugin or

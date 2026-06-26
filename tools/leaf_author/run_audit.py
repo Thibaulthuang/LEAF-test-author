@@ -6,7 +6,7 @@ from pathlib import Path
 from tools.leaf_author.agent_handoff import AGENT_MODES, HANDOFF_RULES
 from tools.leaf_author.device_probe import HdcProbe, ProbeRunner
 from tools.leaf_author.phase_guard import validate_phase_contract
-from tools.leaf_author.real_device_contract import real_device_runtime_evidence_schema, validate_real_device_contract
+from tools.leaf_author.real_device_contract import real_device_decision_contract, real_device_runtime_evidence_schema, validate_real_device_contract
 from tools.leaf_author.reports import report_run
 from tools.leaf_author.runtime_registry import runtime_quality_gates, runtime_safety_profile, validate_runtime_registry
 from tools.leaf_author.workflow import load_workflow, save_workflow
@@ -172,6 +172,7 @@ def _real_device_preflight_checks(domain: str, preflight: dict[str, object] | No
         _check("real_device_input_ready", preflight.get("input_status") == "ready", "Real-device serial/input gate is ready."),
         _check("real_device_approval_ready", preflight.get("approval_status") in {"approved", "not_required"}, "Real-device approval gate is approved or not required."),
         _check("real_device_safety_profile", safety_matches, "Real-device preflight safety fields match the runtime registry profile."),
+        _check("real_device_preflight_decision_contract", _preflight_decision_contract_ready(preflight), "Real-device preflight keeps the stable gate decision and handoff contract."),
     ]
     if device_selection and preflight.get("serial_source") == "device_selection":
         checks.append(
@@ -183,6 +184,25 @@ def _real_device_preflight_checks(domain: str, preflight: dict[str, object] | No
             )
         )
     return checks
+
+
+def _preflight_decision_contract_ready(preflight: dict[str, object]) -> bool:
+    decision = preflight.get("decision_contract")
+    if not isinstance(decision, dict):
+        return False
+    expected = real_device_decision_contract("preflight")
+    expected_keys = {
+        "trigger_source",
+        "agent_owner",
+        "agent_mode",
+        "handoff_required",
+        "required_inputs",
+        "subagent_boundary",
+        "context_slice",
+        "allowed_artifacts",
+        "target_policy",
+    }
+    return all(decision.get(key) == expected.get(key) for key in expected_keys)
 
 
 def _preflight_safety_matches_registry(domain: str, preflight: dict[str, object]) -> bool:
