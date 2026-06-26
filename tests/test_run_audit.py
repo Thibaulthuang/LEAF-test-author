@@ -215,6 +215,19 @@ class RunAuditTests(unittest.TestCase):
             self.assertIn("workflow_complete", failed_checks)
             self.assertIn("real_device_preflight_ready", failed_checks)
 
+    def test_audit_run_fails_when_unconfirmed_plan_has_real_device_artifacts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "打开相机；点击拍照", run_id="audit-unconfirmed-real")
+            _inject_ready_real_device_artifacts(root, "audit-unconfirmed-real")
+
+            result = audit_run(root, "audit-unconfirmed-real")
+
+            self.assertEqual(result["status"], "failed")
+            failed_checks = [check["name"] for check in result["checks"] if not check["passed"]]
+            self.assertIn("real_device_requires_confirmed_plan", failed_checks)
+            self.assertEqual(result["real_device_trace"]["runtime_mode"], "direct_smoke")
+
     def test_audit_run_reports_unreadable_workflow_without_rewriting_it(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -513,6 +526,19 @@ class RunAuditTests(unittest.TestCase):
             self.assertEqual(result["summary"]["failed"], 1)
             self.assertIn("context_manifest_matches_phase_contract", result["runs"][0]["failed_checks"])
 
+    def test_audit_batch_exposes_unconfirmed_real_device_artifacts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "打开相机；点击拍照", run_id="audit-batch-unconfirmed-real")
+            create_batch(root, "audit-batch-unconfirmed-real", ["audit-batch-unconfirmed-real"])
+            _inject_ready_real_device_artifacts(root, "audit-batch-unconfirmed-real")
+
+            result = audit_batch(root, "audit-batch-unconfirmed-real")
+
+            self.assertEqual(result["status"], "failed")
+            self.assertEqual(result["summary"]["failed"], 1)
+            self.assertIn("real_device_requires_confirmed_plan", result["runs"][0]["failed_checks"])
+
     def test_audit_batch_can_verify_live_device_for_completed_runs(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -695,6 +721,93 @@ def _complete_direct_smoke(root: Path, run_id: str) -> None:
         return ProbeCommandResult(1, "", f"unexpected {args}")
 
     advance_run(root, run_id, hdc_runner=runner, serial="SERIAL123", run_real=True, runtime_mode="direct_smoke", hdc_path="/sdk/hdc")
+
+
+def _inject_ready_real_device_artifacts(root: Path, run_id: str) -> None:
+    run_dir = root / ".leaf" / "runs" / run_id
+    input_path = run_dir / "real_device_input.json"
+    preflight_path = run_dir / "real_device_preflight.json"
+    smoke_path = run_dir / "camera_direct_smoke.json"
+    raw_path = run_dir / "ui_after_launch.raw.json"
+    index_path = run_dir / "ui_after_launch.index.json"
+    raw_path.write_text('{"attributes":{"bundleName":"com.huawei.hmos.camera"},"children":[]}\n', encoding="utf-8")
+    index_path.write_text('{"kind":"ui_snapshot","nodes":[]}\n', encoding="utf-8")
+    input_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "1.0",
+                "artifact_kind": "real_device_input_decision",
+                "run_id": run_id,
+                "domain": "camera",
+                "runtime_mode": "direct_smoke",
+                "status": "ready",
+                "serial": "SERIAL123",
+                "serial_source": "explicit_arg",
+                "missing": [],
+                "required_input": "--serial <serial>",
+                "next_action": "run_real_device_runtime",
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    preflight_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "1.0",
+                "artifact_kind": "real_device_runtime_preflight",
+                "run_id": run_id,
+                "domain": "camera",
+                "runtime_mode": "direct_smoke",
+                "status": "ready",
+                "serial": "SERIAL123",
+                "serial_source": "explicit_arg",
+                "risk_level": "read_only_probe",
+                "mutates_device_state": False,
+                "approval_status": "not_required",
+                "required_approval_token": None,
+                "approval_token": None,
+                "input_status": "ready",
+                "next_action": "run_real_device_runtime",
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    smoke_path.write_text(
+        json.dumps(
+            {
+                "run_id": run_id,
+                "status": "complete",
+                "quality_gate": "CAMERA_DIRECT_SMOKE_PASS",
+                "evidence": {
+                    "layout_verified": True,
+                    "bundle_verified": True,
+                    "ability_verified": True,
+                    "ui_snapshot_refs": [
+                        {
+                            "raw_path": str(raw_path.relative_to(root)),
+                            "index_path": str(index_path.relative_to(root)),
+                        }
+                    ],
+                },
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    workflow_path = run_dir / "workflow.json"
+    workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+    workflow["artifacts"]["real_device_input"] = str(input_path.relative_to(root))
+    workflow["artifacts"]["real_device_preflight"] = str(preflight_path.relative_to(root))
+    workflow["artifacts"]["camera_direct_smoke"] = str(smoke_path.relative_to(root))
+    workflow_path.write_text(json.dumps(workflow, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 def _completed_report_for_corrupt_manifest() -> dict[str, object]:

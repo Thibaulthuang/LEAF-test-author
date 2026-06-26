@@ -56,6 +56,7 @@ def audit_run(
     )
     runtime_evidence = _load_runtime_evidence(root, evidence if isinstance(evidence, dict) else {}, domain, preflight if isinstance(preflight, dict) else None)
     checks.extend(_runtime_evidence_checks(root, runtime_evidence, latest_quality_gate))
+    checks.extend(_real_device_plan_confirmation_checks(report, preflight if isinstance(preflight, dict) else None, real_device_input, runtime_evidence))
     refreshed_context_manifest = _load_context_manifest_from_workflow(root, run_id) or _load_context_manifest(root, evidence if isinstance(evidence, dict) else {})
     context_manifest = _auditable_context_manifest(initial_context_manifest, refreshed_context_manifest)
     checks.extend(_context_manifest_checks(context_manifest, report))
@@ -370,6 +371,28 @@ def _runtime_evidence_checks(root: Path, runtime_evidence: dict[str, object] | N
             _ui_snapshot_refs_ready(root, ui_snapshot_refs),
             "Runtime evidence links parseable UI snapshot raw and index artifacts.",
         ),
+    ]
+
+
+def _real_device_plan_confirmation_checks(
+    report: dict[str, object],
+    preflight: dict[str, object] | None,
+    real_device_input: dict[str, object] | None,
+    runtime_evidence: dict[str, object] | None,
+) -> list[dict[str, object]]:
+    has_real_device_artifacts = any(
+        [
+            isinstance(preflight, dict) and bool(preflight.get("artifact")),
+            isinstance(real_device_input, dict) and bool(real_device_input.get("artifact")),
+            isinstance(runtime_evidence, dict) and bool(runtime_evidence.get("artifact")),
+        ]
+    )
+    return [
+        _check(
+            "real_device_requires_confirmed_plan",
+            not has_real_device_artifacts or report.get("confirmed_plan") is True,
+            "Real-device input, preflight, and runtime evidence must not exist before first plan confirmation.",
+        )
     ]
 
 
