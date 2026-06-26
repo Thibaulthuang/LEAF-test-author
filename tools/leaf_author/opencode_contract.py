@@ -26,7 +26,13 @@ _CONTRACT_SOURCES = [
     "real-device-contract",
     "runtime-registry-contract",
     "runtime-evidence-contract",
+    "runtime-mode-only-open-code-entrypoints",
 ]
+_OPEN_CODE_FORBIDDEN_RUNTIME_FLAGS = {
+    "--camera-direct": "must use --runtime-mode instead of legacy --camera-direct",
+    "--camera-capture": "must use --runtime-mode instead of legacy --camera-capture",
+}
+_RUNTIME_MODE_REQUIRED_TERMS = ["--runtime-mode direct_smoke", "--runtime-mode capture_e2e"]
 
 
 def validate_opencode_contract(root: Path | None = None) -> dict[str, object]:
@@ -66,6 +72,7 @@ def _validate_commands(root: Path, issues: list[str]) -> int:
                     issues.append(f"{rel}: must invoke leaf-test-author")
                 else:
                     issues.append(f"{rel}: missing required contract term {term!r}")
+        _validate_runtime_mode_entrypoint_text(rel, text, issues)
         if "python3 -m tools.leaf_author new-case" in lowered and "leaf-test-author" not in lowered:
             issues.append(f"{rel}: must not expose Python new-case as the user-facing owner")
     return count
@@ -86,4 +93,15 @@ def _validate_skills(root: Path, issues: list[str]) -> int:
         for term in required_terms:
             if term.lower() not in lowered:
                 issues.append(f"{rel}: missing required contract term {term!r}")
+        _validate_runtime_mode_entrypoint_text(rel, text, issues)
     return count
+
+
+def _validate_runtime_mode_entrypoint_text(rel: str, text: str, issues: list[str]) -> None:
+    for flag, message in _OPEN_CODE_FORBIDDEN_RUNTIME_FLAGS.items():
+        if flag in text:
+            issues.append(f"{rel}: {message}")
+    if rel.endswith("leaf-new-case.md") or rel.endswith("leaf-test-author/SKILL.md") or rel.endswith("leaf-camera/SKILL.md"):
+        for term in _RUNTIME_MODE_REQUIRED_TERMS:
+            if term not in text:
+                issues.append(f"{rel}: missing required runtime mode command {term!r}")

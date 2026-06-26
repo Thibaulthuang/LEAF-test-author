@@ -56,7 +56,7 @@ Example:
 
 - First confirmation: approve the plan, then run `confirm-plan` and
   `advance <run_id>` automatically for safe local artifacts and validation.
-- Second confirmation: required before `--run-real --camera-capture`; tell the
+- Second confirmation: required before `--run-real --runtime-mode capture_e2e`; tell the
   user this will take a photo and create a new media file, then pass
   `--approval-token approve_camera_capture_e2e`.
 

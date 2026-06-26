@@ -89,7 +89,7 @@ selectors before the result can be treated as a business pass:
 ## Current Real-Device Framework Gate
 
 The executable Camera framework gate is
-`advance <run_id> --run-real --camera-direct --serial <serial> --hdc-path <hdc_path>`.
+`advance <run_id> --run-real --runtime-mode direct_smoke --serial <serial> --hdc-path <hdc_path>`.
 This path validates the generated pytest draft, runs the local draft gate, starts
 the built-in Camera app, reads the real `uitest dumpLayout` output file, and
 passes only when the layout contains:
@@ -101,15 +101,16 @@ This is the first real-device e2e framework check for Camera. It proves device
 control, app launch, layout capture, evidence recording, and workflow export. It
 does not yet prove capture-photo business behavior.
 
-For confirmed capture workflows, `advance <run_id> --run-real --camera-capture
---serial <serial> --hdc-path <hdc_path>` is the stronger direct e2e path. It
+For confirmed capture workflows, `advance <run_id> --run-real --runtime-mode capture_e2e
+--serial <serial> --approval-token approve_camera_capture_e2e --hdc-path <hdc_path>` is the stronger direct e2e path. It
 starts the built-in Camera app, verifies photo mode through
 `COMPONENT_ID_CONTROL_PHOTO_2` / text `拍照`, verifies the shutter node
 `COMPONENT_ID_SHUTTER_PHOTO_1`, taps the shutter center with UiTest, and verifies
 the app remains on the Camera layout after the action. It also compares media
 files under `/storage/media/100/local/files/Photo` before and after the shutter
 tap, and passes only when a new photo file appears. This path mutates device
-state by taking a photo and must only run after plan confirmation.
+state by taking a photo and must only run after plan confirmation plus explicit
+capture approval.
 
 ## Basic Operation Levels
 

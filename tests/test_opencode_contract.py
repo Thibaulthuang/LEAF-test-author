@@ -21,6 +21,37 @@ class OpenCodeContractTests(unittest.TestCase):
         self.assertEqual(result["target_policy"]["scope"], "system_app_only")
         self.assertIn("workflow.json", result["contract_sources"])
         self.assertIn("target-policy", result["contract_sources"])
+        self.assertIn("runtime-mode-only-open-code-entrypoints", result["contract_sources"])
+
+    def test_opencode_contract_rejects_legacy_camera_runtime_flags_in_open_code_docs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            commands = root / ".opencode" / "commands"
+            skills_root = root / ".opencode" / "skills"
+            commands.mkdir(parents=True)
+            for filename in ["leaf-resume.md", "leaf-batch.md", "leaf-report.md"]:
+                (commands / filename).write_text(
+                    f"# /{filename[:-3]}\n\nleaf-test-author workflow.json resume --auto-safe report-batch resume-batch report-run audit-run --runtime-mode\n",
+                    encoding="utf-8",
+                )
+            (commands / "leaf-new-case.md").write_text(
+                "# /leaf-new-case\n\nleaf-test-author workflow.json plan.json --run-real --camera-capture\n",
+                encoding="utf-8",
+            )
+            for skill_name in ["leaf-test-author", "leaf-camera", "leaf-gui-agent", "leaf-domain-template"]:
+                skill_dir = skills_root / skill_name
+                skill_dir.mkdir(parents=True)
+                skill_dir.joinpath("SKILL.md").write_text(
+                    "workflow.json context_manifest target_policy user_loop phase-guard "
+                    "agent-handoff-contract system Camera real-device confirmation Camera UiTest "
+                    "read-only uitest dumpLayout hilog workflow domain openharmony --runtime-mode direct_smoke\n",
+                    encoding="utf-8",
+                )
+
+            result = validate_opencode_contract(root)
+
+            self.assertEqual(result["status"], "unstable")
+            self.assertIn(".opencode/commands/leaf-new-case.md: must use --runtime-mode instead of legacy --camera-capture", result["issues"])
 
     def test_opencode_contract_rejects_command_that_skips_author_skill(self):
         with tempfile.TemporaryDirectory() as tmp:

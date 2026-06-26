@@ -69,7 +69,7 @@ continue automatically:
 
 The second confirmation is required before device-mutating execution. A Camera
 capture command such as
-`python3 -m tools.leaf_author advance <run_id> --run-real --camera-capture --serial <serial> --approval-token approve_camera_capture_e2e --hdc-path <hdc_path>`
+`python3 -m tools.leaf_author advance <run_id> --run-real --runtime-mode capture_e2e --serial <serial> --approval-token approve_camera_capture_e2e --hdc-path <hdc_path>`
 must not run from the first confirmation. State clearly that the action will
 take a photo and create a new media file. Only run it after the user explicitly
 confirms the real-device capture step. The approval token is the deterministic
@@ -233,13 +233,13 @@ The first implementation supports:
 - Inspecting Camera system-app readiness through `camera-smoke-preflight`.
 - Running `run-camera-direct-smoke` as a safe first real-device framework check.
   This foregrounds the built-in Camera app and records layout/log evidence.
-- Running `advance <run_id> --run-real --camera-direct --serial <serial>` as
+- Running `advance <run_id> --run-real --runtime-mode direct_smoke --serial <serial>` as
   the current Camera framework path:
   it performs draft validation, the local draft gate, Camera direct smoke,
   reviewable experience recording, and team manifest export in one resumable
   workflow. The smoke must verify the real UiTest layout contains the Camera
   bundle and ability before it can pass.
-- Running `advance <run_id> --run-real --camera-capture --serial <serial> --approval-token approve_camera_capture_e2e` for
+- Running `advance <run_id> --run-real --runtime-mode capture_e2e --serial <serial> --approval-token approve_camera_capture_e2e` for
   confirmed Camera capture flows. This path verifies the photo-mode and shutter
   nodes from the real Camera layout, clicks the shutter through UiTest, records
   `camera_capture_e2e.json`, then writes experience and team manifest artifacts.
