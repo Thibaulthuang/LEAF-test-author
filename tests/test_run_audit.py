@@ -9,6 +9,7 @@ from unittest.mock import patch
 from tools.leaf_author.authoring import advance_run, confirm_plan, start_new_case
 from tools.leaf_author.batch_registry import create_batch
 from tools.leaf_author.device_probe import ProbeCommandResult, select_real_device
+from tools.leaf_author.phase_guard import build_agent_handoff_contract
 from tools.leaf_author.reports import report_run
 from tools.leaf_author.run_audit import audit_batch, audit_run
 from tools.leaf_author.ui_tree_diagnostics import inspect_ui_tree
@@ -780,6 +781,19 @@ class RunAuditTests(unittest.TestCase):
             failed_checks = [check["name"] for check in result["batch_checks"] if not check["passed"]]
             self.assertIn("batch_resume_focus_matches_run", failed_checks)
 
+    def test_audit_batch_fails_when_focus_plan_action_route_drifts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "打开相机；点击拍照", run_id="audit-focus-route")
+            create_batch(root, "audit-focus-route-batch", ["audit-focus-route"])
+
+            with patch("tools.leaf_author.run_audit.resume_batch", return_value=_batch_resume_view_with_action_route_drift()):
+                result = audit_batch(root, "audit-focus-route-batch")
+
+            self.assertEqual(result["status"], "failed")
+            failed_checks = [check["name"] for check in result["batch_checks"] if not check["passed"]]
+            self.assertIn("batch_resume_focus_action_route", failed_checks)
+
     def test_audit_batch_fails_when_focus_plan_auto_crosses_user_checkpoint(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -1137,6 +1151,13 @@ def _batch_resume_view_with_focus_drift() -> dict[str, object]:
     return view
 
 
+def _batch_resume_view_with_action_route_drift() -> dict[str, object]:
+    view = _batch_resume_view_for_focus("audit-focus-route")
+    view["focus_plan"]["action_route"]["agent_owner"] = "leaf-gui-agent"
+    view["focus_plan"]["action_route"]["command"] = "python3 -m tools.leaf_author inspect-ui-tree <run_id>"
+    return view
+
+
 def _batch_resume_view_with_user_boundary_drift() -> dict[str, object]:
     view = _batch_resume_view_for_focus("audit-focus-user")
     view["focus_plan"]["safe_to_auto_continue"] = True
@@ -1177,6 +1198,7 @@ def _batch_resume_view_with_agent_handoff_drift() -> dict[str, object]:
 
 
 def _batch_resume_view_for_focus(run_id: str) -> dict[str, object]:
+    action_route = build_agent_handoff_contract()["action_routes"]["plan"]
     return {
         "focus_plan": {
             "selected_run_id": run_id,
@@ -1200,6 +1222,7 @@ def _batch_resume_view_for_focus(run_id: str) -> dict[str, object]:
             },
             "safe_to_auto_continue": False,
             "requires_user_confirmation": True,
+            "action_route": dict(action_route),
         },
         "context_policy": {
             "attention_boundary": "one_active_run",
@@ -1229,6 +1252,7 @@ def _batch_resume_view_for_focus(run_id: str) -> dict[str, object]:
                         "position": "approve_plan",
                         "required_input": "confirm or revise plan",
                     },
+                    "action_route": dict(action_route),
                 },
             }
         ],

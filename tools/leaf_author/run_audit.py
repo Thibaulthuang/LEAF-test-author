@@ -1099,11 +1099,13 @@ def _batch_resume_checks(resume_view: dict[str, object]) -> list[dict[str, objec
     )
     focus_target_policy = focus_present and _target_policy_handoff_ready(focus_plan.get("target_policy"), focus_plan.get("target_policy"))
     focus_agent_handoff_rule = focus_present and _batch_focus_agent_handoff_rule_ready(focus_plan)
+    focus_action_route = focus_present and _batch_focus_action_route_ready(focus_plan, resume_view)
     return [
         _check("batch_resume_attention_boundary", attention_boundary, "Batch resume context policy uses one active run boundary."),
         _check("batch_resume_focus_present", focus_present, "Incomplete batches expose one selected focus run."),
         _check("batch_resume_focus_handoff", focus_handoff, "Batch focus plan includes agent, context, artifacts, and user loop metadata."),
         _check("batch_resume_focus_matches_run", focus_matches_run, "Batch focus plan matches the selected run resume contract."),
+        _check("batch_resume_focus_action_route", focus_action_route, "Batch focus plan action_route matches the selected run route contract."),
         _check("batch_resume_focus_user_boundary", focus_user_boundary, "Batch focus plan never marks a user checkpoint safe for automatic continuation."),
         _check("batch_resume_focus_gui_context", focus_gui_context, "Batch GUI-agent focus includes ui_tree in the bounded context slice."),
         _check("batch_resume_focus_target_policy", focus_target_policy, "Batch focus plan preserves the system-app-only target policy."),
@@ -1161,6 +1163,41 @@ def _batch_focus_matches_selected_run(focus_plan: object, resume_view: dict[str,
         and focus_user_loop.get("position") == summary_user_loop.get("position")
         and focus_user_loop.get("required_input") == summary_user_loop.get("required_input")
     )
+
+
+def _batch_focus_action_route_ready(focus_plan: object, resume_view: dict[str, object]) -> bool:
+    if not isinstance(focus_plan, dict):
+        return False
+    selected_run_id = focus_plan.get("selected_run_id")
+    runs = resume_view.get("runs")
+    if not isinstance(runs, list):
+        return False
+    selected = next((run for run in runs if isinstance(run, dict) and run.get("run_id") == selected_run_id), None)
+    if not isinstance(selected, dict):
+        return False
+    summary = selected.get("resume_summary")
+    if not isinstance(summary, dict):
+        return False
+    focus_route = focus_plan.get("action_route")
+    summary_route = summary.get("action_route")
+    if not isinstance(focus_route, dict) or not isinstance(summary_route, dict):
+        return False
+    keys = {
+        "phase",
+        "next_action",
+        "trigger_source",
+        "agent_owner",
+        "agent_mode",
+        "handoff_required",
+        "subagent_boundary",
+        "context_slice",
+        "allowed_artifacts",
+        "user_checkpoint",
+        "auto_safe",
+        "user_loop",
+        "command",
+    }
+    return all(focus_route.get(key) == summary_route.get(key) for key in keys)
 
 
 def _batch_focus_respects_user_boundary(focus_plan: object) -> bool:
