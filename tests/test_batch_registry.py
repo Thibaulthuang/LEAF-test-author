@@ -165,6 +165,42 @@ class BatchRegistryTests(unittest.TestCase):
             self.assertEqual(result["runs"][1]["auto_advanced"], True)
             self.assertEqual(result["runs"][1]["current_phase"], "complete")
 
+    def test_resume_batch_auto_safe_blocks_when_batch_audit_failed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "打开相机；切拍照模式；点击拍照", run_id="batch-audit-safe")
+            confirm_plan(root, "batch-audit-safe")
+            create_batch(root, "camera-batch", ["batch-audit-safe"])
+            audit_dir = root / ".leaf" / "batches" / "camera-batch"
+            (audit_dir / "batch_audit.json").write_text(
+                json.dumps(
+                    {
+                        "status": "failed",
+                        "batch_checks": [
+                            {"name": "batch_resume_focus_action_route", "passed": False},
+                        ],
+                        "focus_plan": {
+                            "selected_run_id": "batch-audit-safe",
+                            "action_route": {"command": "bad-command"},
+                        },
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = resume_batch(root, "camera-batch", auto_safe=True)
+
+            self.assertEqual(result["status"], "blocked")
+            self.assertEqual(result["block_reason"], "batch_audit_failed")
+            self.assertEqual(result["batch_audit_summary"]["failed_checks"], ["batch_resume_focus_action_route"])
+            self.assertEqual(result["focus_plan"]["selected_run_id"], "batch-audit-safe")
+            self.assertEqual(result["summary"]["advanced"], 0)
+            self.assertEqual(result["runs"][0]["auto_advanced"], False)
+            self.assertEqual(result["runs"][0]["current_phase"], "hypium_draft")
+
     def test_resume_batch_returns_single_run_focus_plan_for_agent_handoff(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

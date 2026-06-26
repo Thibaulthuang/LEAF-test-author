@@ -84,6 +84,34 @@ def list_batches(root: Path) -> dict[str, object]:
 
 def resume_batch(root: Path, batch_id: str, auto_safe: bool = False) -> dict[str, object]:
     batch = _load_batch(root, batch_id)
+    audit_guard = _batch_audit_guard(root, batch_id) if auto_safe else None
+    if audit_guard:
+        runs = [_resume_batch_run(root, run_id, auto_safe=False) for run_id in batch["run_ids"]]
+        statuses = Counter(str(run.get("status", "in_progress")) for run in runs)
+        return {
+            "schema_version": "1.0",
+            "batch_id": batch_id,
+            "title": batch.get("title", batch_id),
+            "auto_safe": auto_safe,
+            "status": "blocked",
+            "block_reason": "batch_audit_failed",
+            "batch_audit_summary": audit_guard,
+            "summary": {
+                "advanced": 0,
+                "waiting_for_confirmation": sum(1 for run in runs if run.get("status") == "waiting_for_confirmation"),
+                "complete": statuses.get("complete", 0),
+                "in_progress": statuses.get("in_progress", 0),
+                "failed": statuses.get("failed", 0),
+            },
+            "focus_plan": audit_guard.get("focus_plan") if isinstance(audit_guard.get("focus_plan"), dict) else _batch_resume_focus_plan(runs),
+            "runs": runs,
+            "context_policy": {
+                "scope": "batch_resume",
+                "load_strategy": "one_run_resume_summary_at_a_time",
+                "artifact_loading": "on_demand",
+                "attention_boundary": "one_active_run",
+            },
+        }
     runs = [_resume_batch_run(root, run_id, auto_safe=auto_safe) for run_id in batch["run_ids"]]
     statuses = Counter(str(run.get("status", "in_progress")) for run in runs)
     focus_plan = _batch_resume_focus_plan(runs)
@@ -113,6 +141,32 @@ def resume_batch(root: Path, batch_id: str, auto_safe: bool = False) -> dict[str
 def _load_batch(root: Path, batch_id: str) -> dict[str, object]:
     batch_path = root / ".leaf" / "batches" / batch_id / "batch.json"
     return json.loads(batch_path.read_text(encoding="utf-8"))
+
+
+def _batch_audit_guard(root: Path, batch_id: str) -> dict[str, object] | None:
+    audit_path = root / ".leaf" / "batches" / batch_id / "batch_audit.json"
+    if not audit_path.is_file():
+        return None
+    try:
+        payload = json.loads(audit_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    checks = payload.get("batch_checks")
+    if not isinstance(checks, list):
+        return None
+    normalized_checks = [check for check in checks if isinstance(check, dict)]
+    failed = [str(check.get("name")) for check in normalized_checks if check.get("name") and not check.get("passed")]
+    if not failed:
+        return None
+    return {
+        "artifact": str(audit_path.relative_to(root)),
+        "total_checks": len(normalized_checks),
+        "passed_checks": sum(1 for check in normalized_checks if check.get("passed") is True),
+        "failed_checks": failed,
+        "focus_plan": payload.get("focus_plan") if isinstance(payload.get("focus_plan"), dict) else None,
+    }
 
 
 def _batch_paths(root: Path) -> list[Path]:
