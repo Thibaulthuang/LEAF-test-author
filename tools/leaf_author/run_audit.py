@@ -106,6 +106,7 @@ def audit_batch(root: Path, batch_id: str) -> dict[str, object]:
                 "domain": run.get("domain"),
                 "status": run.get("status"),
                 "latest_quality_gate": run.get("latest_quality_gate"),
+                "real_device_trace": run.get("real_device_trace") if isinstance(run.get("real_device_trace"), dict) else None,
                 "failed_checks": [check["name"] for check in run.get("checks", []) if isinstance(check, dict) and not check.get("passed")],
                 **({"error": run["error"]} if isinstance(run.get("error"), dict) else {}),
             }

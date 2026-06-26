@@ -176,6 +176,10 @@ class RunAuditTests(unittest.TestCase):
             self.assertEqual(result["summary"]["failed"], 1)
             self.assertEqual(result["audit_path"], ".leaf/batches/audit-batch/batch_audit.json")
             self.assertTrue((root / result["audit_path"]).is_file())
+            passed = [run for run in result["runs"] if run["status"] == "passed"][0]
+            self.assertEqual(passed["real_device_trace"]["runtime_mode"], "direct_smoke")
+            self.assertEqual(passed["real_device_trace"]["latest_quality_gate"], "CAMERA_DIRECT_SMOKE_PASS")
+            self.assertEqual(passed["real_device_trace"]["artifacts"]["real_device_preflight"], ".leaf/runs/audit-batch-pass/real_device_preflight.json")
             failed = [run for run in result["runs"] if run["status"] == "failed"][0]
             self.assertIn("workflow_complete", failed["failed_checks"])
 
