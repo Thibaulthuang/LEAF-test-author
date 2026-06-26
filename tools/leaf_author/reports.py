@@ -209,6 +209,46 @@ def _gui_handoff_summary(root: Path, evidence: dict[str, str]) -> dict[str, obje
         "diff_count": payload.get("diff_count"),
         "contract_status": "ready" if not contract_issues else "drift",
         "contract_issues": contract_issues,
+        "ui_tree_summary": _ui_tree_diagnostics_summary(payload),
+    }
+
+
+def _ui_tree_diagnostics_summary(payload: dict[str, object]) -> dict[str, object]:
+    snapshots = payload.get("snapshots")
+    snapshots = snapshots if isinstance(snapshots, list) else []
+    snapshot_summaries = []
+    foregrounds = []
+    index_statuses = set()
+    total_candidates = 0
+    for snapshot in snapshots:
+        if not isinstance(snapshot, dict):
+            continue
+        foreground = snapshot.get("foreground")
+        foreground = foreground if isinstance(foreground, dict) else {}
+        if foreground:
+            foregrounds.append(foreground)
+        index_status = snapshot.get("index_status")
+        if isinstance(index_status, str) and index_status:
+            index_statuses.add(index_status)
+        candidate_count = int(snapshot.get("candidate_count") or 0)
+        total_candidates += candidate_count
+        snapshot_summaries.append(
+            {
+                "phase": snapshot.get("phase"),
+                "action_id": snapshot.get("action_id"),
+                "foreground": foreground,
+                "node_count": snapshot.get("node_count"),
+                "clickable_count": snapshot.get("clickable_count"),
+                "candidate_count": candidate_count,
+                "index_status": index_status,
+            }
+        )
+    return {
+        "snapshot_count": len(snapshot_summaries),
+        "total_candidates": total_candidates,
+        "index_statuses": sorted(index_statuses),
+        "foregrounds": foregrounds,
+        "snapshots": snapshot_summaries,
     }
 
 

@@ -322,6 +322,12 @@ class ReportTests(unittest.TestCase):
             self.assertEqual(result["gui_handoff"]["target_policy"]["scope"], "system_app_only")
             self.assertEqual(result["gui_handoff"]["contract_status"], "ready")
             self.assertEqual(result["gui_handoff"]["contract_issues"], [])
+            self.assertEqual(result["gui_handoff"]["ui_tree_summary"]["snapshot_count"], 1)
+            self.assertEqual(result["gui_handoff"]["ui_tree_summary"]["total_candidates"], 0)
+            self.assertEqual(result["gui_handoff"]["ui_tree_summary"]["index_statuses"], ["ready"])
+            self.assertEqual(result["gui_handoff"]["ui_tree_summary"]["foregrounds"][0]["bundle"], "com.huawei.hmos.camera")
+            self.assertEqual(result["gui_handoff"]["ui_tree_summary"]["snapshots"][0]["phase"], "after_launch")
+            self.assertEqual(result["gui_handoff"]["ui_tree_summary"]["snapshots"][0]["node_count"], 1)
             self.assertEqual(result["evidence"]["ui_tree_diagnostics"], ".leaf/runs/report-gui-handoff/ui_tree_diagnostics.json")
 
     def test_report_run_marks_gui_handoff_drift(self):
