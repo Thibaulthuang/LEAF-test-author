@@ -34,6 +34,12 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
 
         self.assertIn("--auto-safe", command)
         self.assertIn("safe_to_auto_continue", command)
+        self.assertIn("resume_summary.action_route", command)
+        self.assertIn("action_route.command", command)
+        self.assertIn("agent_mode", command)
+        self.assertIn("handoff_required", command)
+        self.assertIn("subagent_boundary", command)
+        self.assertIn("user_checkpoint", command)
         self.assertIn("must still stop", command)
 
     def test_leaf_batch_documents_multi_case_entrypoint(self):
@@ -44,6 +50,12 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
         self.assertIn("create-batch", command)
         self.assertIn("resume-batch", command)
         self.assertIn("report-batch", command)
+        self.assertIn("focus_plan.action_route", command)
+        self.assertIn("action_route.command", command)
+        self.assertIn("agent_mode", command)
+        self.assertIn("handoff_required", command)
+        self.assertIn("subagent_boundary", command)
+        self.assertIn("user_checkpoint", command)
         self.assertIn("one run at a time", command)
         self.assertIn("must still stop", command)
 

@@ -30,6 +30,33 @@ Examples:
 6. Keep attention scoped to one run at a time. Use the batch report to pick a
    `next_run_focus`, then use `/leaf-report <run_id>` or `inspect-run <run_id>`
    before opening run artifacts.
+7. When `resume-batch` returns a `focus_plan`, read
+   `focus_plan.action_route` before dispatching the selected run. The route is
+   derived from that run's persisted phase, not from the batch conversation.
 
 Batch commands are coordination commands. They do not replace domain skills,
 plan confirmation, or real-device approval.
+
+## One-Run Dispatch Contract
+
+`focus_plan.action_route` is the batch-safe version of the single-run
+`resume_summary.action_route`. It keeps multi-case authoring from collapsing
+all plans, artifacts, and evidence into one OpenCode context.
+
+- `action_route.command`: the deterministic command for the selected run, if the
+  current phase can advance without more user input.
+- `agent_mode`: whether the selected run should stay with `leaf-test-author` or
+  be handed to a bounded specialist such as `leaf-gui-agent`.
+- `handoff_required`: whether OpenCode must create an explicit handoff instead
+  of continuing inline.
+- `subagent_boundary`: the work boundary for the receiving agent. Do not let a
+  GUI/domain handoff rewrite the whole workflow or modify unrelated runs.
+- `context_slice`: the exact run-level context to load for the selected case.
+  Keep the rest of the batch as lightweight summaries.
+- `user_checkpoint`: the user-in-loop stop point for the selected run. If it is
+  present, `resume-batch --auto-safe` must still stop before crossing it.
+
+For multi-use-case writing and execution, batch state chooses the next run, and
+the selected run's `action_route` chooses the phase action. This preserves
+attention by loading one run, one phase, and one agent boundary at a time while
+leaving the user as the owner of plan and real-device approval.
