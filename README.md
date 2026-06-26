@@ -247,7 +247,9 @@ evidence exists. It reads the indexed snapshot paths exposed by `report-run`,
 filters by `phase` or `action_id`, and can search candidates by id, text, type,
 or clickability without loading the raw layout into the main agent context. When
 multiple snapshots match, it also reports adjacent snapshot diffs; pass
-`--no-diff` when only selector candidates are needed.
+`--no-diff` when only selector candidates are needed. The diagnostics result is
+saved as `ui_tree_diagnostics.json` and registered in the run workflow unless
+`--no-write-artifact` is used.
 
 ## Development
 

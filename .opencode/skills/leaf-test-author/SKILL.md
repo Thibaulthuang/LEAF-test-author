@@ -168,7 +168,9 @@ When a report includes UI snapshot references, prefer
 `--action-id`, and selector filters before opening raw layout files. This keeps
 GUI diagnosis on indexed evidence and preserves the one-run attention boundary.
 Use the default adjacent snapshot `diffs` to reason about before/after UI
-changes; pass `--no-diff` when only selector candidates are needed.
+changes; pass `--no-diff` when only selector candidates are needed. The command
+writes `ui_tree_diagnostics.json` into the run artifacts by default, so GUI
+handoffs can reference that artifact instead of replaying the query.
 
 ## Subagent Boundaries
 

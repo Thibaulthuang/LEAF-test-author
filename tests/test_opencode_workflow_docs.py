@@ -163,6 +163,8 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
         self.assertIn("filters by `phase` or `action_id`", readme)
         self.assertIn("adjacent snapshot diffs", readme)
         self.assertIn("`--no-diff`", readme)
+        self.assertIn("ui_tree_diagnostics.json", readme)
+        self.assertIn("`--no-write-artifact`", readme)
         self.assertNotIn("test HAP", readme)
         self.assertNotIn("test package", readme)
 
@@ -211,6 +213,7 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
         self.assertIn("inspect-ui-tree", skill)
         self.assertIn("one-run attention boundary", skill)
         self.assertIn("adjacent snapshot `diffs`", skill)
+        self.assertIn("ui_tree_diagnostics.json", skill)
         self.assertIn("User-In-Loop", skill)
         self.assertIn("first_plan_confirmation", skill)
         self.assertIn("real_device_confirmation", skill)

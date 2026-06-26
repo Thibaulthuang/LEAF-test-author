@@ -5,6 +5,7 @@ from pathlib import Path
 
 from tools.leaf_author.reports import report_run
 from tools.leaf_author.runtime.ui_tree import diff_indexes, find_candidates
+from tools.leaf_author.workflow import load_workflow, save_workflow
 
 
 def inspect_ui_tree(
@@ -19,6 +20,7 @@ def inspect_ui_tree(
     clickable: bool | None = None,
     limit: int = 10,
     include_diffs: bool = True,
+    write_artifact: bool = True,
 ) -> dict[str, object]:
     report = report_run(root, run_id)
     runtime_summary = report.get("runtime_evidence_summary")
@@ -59,6 +61,8 @@ def inspect_ui_tree(
     }
     if include_diffs:
         payload["diffs"] = diffs
+    if write_artifact:
+        payload = _write_diagnostics_artifact(root, run_id, payload)
     return payload
 
 
@@ -157,3 +161,19 @@ def _selectors(node_id: str | None, text: str | None, node_type: str | None, cli
     if clickable is not None:
         selector["clickable"] = clickable
     return [selector] if selector else []
+
+
+def _write_diagnostics_artifact(root: Path, run_id: str, payload: dict[str, object]) -> dict[str, object]:
+    path = root / ".leaf" / "runs" / run_id / "ui_tree_diagnostics.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    updated = {**payload, "artifact": str(path.relative_to(root))}
+    path.write_text(json.dumps(updated, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    try:
+        workflow = load_workflow(root, run_id)
+    except Exception:
+        return updated
+    artifacts = dict(workflow.get("artifacts", {}))
+    artifacts["ui_tree_diagnostics"] = str(path.relative_to(root))
+    workflow["artifacts"] = artifacts
+    save_workflow(root, workflow)
+    return updated

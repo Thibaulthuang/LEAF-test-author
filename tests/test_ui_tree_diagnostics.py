@@ -7,7 +7,7 @@ from pathlib import Path
 
 from tools.leaf_author.runtime.evidence import write_ui_snapshot
 from tools.leaf_author.ui_tree_diagnostics import inspect_ui_tree
-from tools.leaf_author.workflow import create_workflow
+from tools.leaf_author.workflow import create_workflow, load_workflow
 
 
 class UiTreeDiagnosticsTests(unittest.TestCase):
@@ -29,6 +29,20 @@ class UiTreeDiagnosticsTests(unittest.TestCase):
             self.assertIn("拍照", candidate_texts)
             self.assertTrue(result["snapshots"][0]["raw_path"].endswith(".raw.json"))
             self.assertTrue(result["snapshots"][0]["index_path"].endswith(".index.json"))
+            self.assertEqual(result["artifact"], ".leaf/runs/ui-diag/ui_tree_diagnostics.json")
+            self.assertTrue((root / result["artifact"]).is_file())
+            workflow = load_workflow(root, "ui-diag")
+            self.assertEqual(workflow["artifacts"]["ui_tree_diagnostics"], ".leaf/runs/ui-diag/ui_tree_diagnostics.json")
+
+    def test_inspect_ui_tree_can_skip_artifact_write(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_run_with_ui_snapshots(root)
+
+            result = inspect_ui_tree(root, "ui-diag", write_artifact=False)
+
+            self.assertNotIn("artifact", result)
+            self.assertFalse((root / ".leaf" / "runs" / "ui-diag" / "ui_tree_diagnostics.json").exists())
 
     def test_inspect_ui_tree_filters_phase_and_action(self):
         with tempfile.TemporaryDirectory() as tmp:

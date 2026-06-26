@@ -115,6 +115,7 @@ def main(argv: list[str] | None = None) -> int:
     inspect_ui_tree_parser.set_defaults(clickable=None)
     inspect_ui_tree_parser.add_argument("--limit", type=int, default=10)
     inspect_ui_tree_parser.add_argument("--no-diff", action="store_true")
+    inspect_ui_tree_parser.add_argument("--no-write-artifact", action="store_true")
 
     audit_run_parser = subparsers.add_parser("audit-run")
     audit_run_parser.add_argument("run_id")
@@ -336,6 +337,7 @@ def main(argv: list[str] | None = None) -> int:
                     clickable=args.clickable,
                     limit=args.limit,
                     include_diffs=not args.no_diff,
+                    write_artifact=not args.no_write_artifact,
                 ),
                 ensure_ascii=False,
                 indent=2,
