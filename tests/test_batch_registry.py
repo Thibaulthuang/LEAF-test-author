@@ -132,6 +132,43 @@ class BatchRegistryTests(unittest.TestCase):
             self.assertEqual(result["runs"][1]["auto_advanced"], True)
             self.assertEqual(result["runs"][1]["current_phase"], "complete")
 
+    def test_resume_batch_includes_lightweight_real_device_preflight_summary(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "打开相机；点击拍照", run_id="batch-real-device")
+            run_dir = root / ".leaf" / "runs" / "batch-real-device"
+            preflight_path = run_dir / "real_device_preflight.json"
+            preflight_path.write_text(
+                json.dumps(
+                    {
+                        "runtime_mode": "direct_smoke",
+                        "status": "ready",
+                        "risk_level": "read_only_probe",
+                        "mutates_device_state": False,
+                        "approval_status": "not_required",
+                        "input_status": "ready",
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            workflow_path = run_dir / "workflow.json"
+            workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+            workflow["current_phase"] = "complete"
+            workflow["confirmed_plan"] = True
+            workflow["artifacts"]["real_device_preflight"] = ".leaf/runs/batch-real-device/real_device_preflight.json"
+            workflow_path.write_text(json.dumps(workflow, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            create_batch(root, "camera-batch", ["batch-real-device"])
+
+            result = resume_batch(root, "camera-batch", auto_safe=True)
+
+            self.assertEqual(result["runs"][0]["status"], "complete")
+            self.assertEqual(result["runs"][0]["real_device_preflight"]["runtime_mode"], "direct_smoke")
+            self.assertEqual(result["runs"][0]["real_device_preflight"]["status"], "ready")
+            self.assertEqual(result["runs"][0]["real_device_preflight"]["approval_status"], "not_required")
+
     def test_cli_resume_batch_auto_safe_outputs_json(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

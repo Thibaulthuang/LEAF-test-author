@@ -145,6 +145,7 @@ def _resume_batch_run(root: Path, run_id: str, auto_safe: bool) -> dict[str, obj
         "auto_advanced": bool(resume.get("auto_advanced", False)),
         "status": status,
         "resume_summary": resume_summary,
+        "real_device_preflight": _real_device_preflight_summary(root, str(run_id)),
     }
 
 
@@ -154,3 +155,28 @@ def _next_run_focus(runs: list[dict[str, object]]) -> dict[str, object] | None:
         return None
     candidates.sort(key=batch_focus_priority_for_run)
     return candidates[0]
+
+
+def _real_device_preflight_summary(root: Path, run_id: str) -> dict[str, object] | None:
+    workflow = inspect_run(root, run_id)
+    artifacts = workflow.get("artifacts", {})
+    if not isinstance(artifacts, dict):
+        return None
+    value = artifacts.get("real_device_preflight")
+    if not isinstance(value, str) or not value:
+        return None
+    path = root / value
+    if not path.is_file():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    return {
+        "runtime_mode": payload.get("runtime_mode"),
+        "status": payload.get("status"),
+        "risk_level": payload.get("risk_level"),
+        "mutates_device_state": payload.get("mutates_device_state"),
+        "approval_status": payload.get("approval_status"),
+        "input_status": payload.get("input_status"),
+    }
