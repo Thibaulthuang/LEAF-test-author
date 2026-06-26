@@ -116,7 +116,9 @@ phase still uses `workflow.json` as the trigger source, exposes a bounded
 context slice, respects auto-safe checkpoint rules, and gives GUI phases UI-tree
 context. Use `python3 -m tools.leaf_author agent-handoff-contract` when a
 domain, GUI, or execution subagent needs the current machine-readable handoff
-map.
+map. Use `python3 -m tools.leaf_author real-device-contract` when a subagent
+needs the stable approval/input/preflight gates for real-device runtime
+execution.
 
 - `plan` with `confirmed_plan=false`: present `plan.json` and must stop for
   `first_plan_confirmation`.
@@ -145,6 +147,10 @@ packet for subagents: it contains the active `agent_owner`, `context_slice`,
 `referenced_artifacts`, `user_checkpoint`, and `attention_boundary`. If the
 manifest says `leaf-gui-agent`, pass the UI snapshot index path and the specific
 question; do not pass the full run directory unless diagnosis requires it.
+For real-device execution gates, use `real-device-contract` plus
+`real_device_approval.json`, `real_device_input.json`, or
+`real_device_preflight.json` instead of reconstructing gate logic in prompt
+text.
 
 ## Subagent Boundaries
 

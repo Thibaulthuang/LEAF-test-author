@@ -119,6 +119,7 @@ Validate the phase trigger, context, agent, and user-in-loop contract:
 ```bash
 python3 -m tools.leaf_author phase-guard
 python3 -m tools.leaf_author agent-handoff-contract
+python3 -m tools.leaf_author real-device-contract
 ```
 
 Run safe local stages directly:
@@ -190,6 +191,12 @@ without UI-tree context, or leaves a user checkpoint without required operator
 input. `agent-handoff-contract` prints the stable handoff map: which phases each
 agent owns, which context slice each phase may load, which phases can auto-run,
 and where the user must re-enter the loop.
+
+`real-device-contract` prints the machine-readable gate map for real-device
+runtime execution. It exposes the approval, input, and preflight decision
+contracts from `tools/leaf_author/real_device_contract.py`, including the
+`agent_owner`, bounded `context_slice`, allowed artifacts, and `user_loop`
+position that subagents should use before or during device execution.
 
 Each `resume` refreshes `.leaf/runs/<run_id>/context_manifest.json`. This file is
 the handoff boundary for multi-agent and multi-case work: it names the active

@@ -18,6 +18,7 @@ from tools.leaf_author.hypium import sync_openharmony_export
 from tools.leaf_author.openharmony_discovery import discover_hap_artifacts
 from tools.leaf_author.openharmony_project import scaffold_openharmony_test_project
 from tools.leaf_author.phase_guard import build_agent_handoff_contract, validate_phase_contract
+from tools.leaf_author.real_device_contract import build_real_device_contract
 from tools.leaf_author.reports import report_batch, report_run
 from tools.leaf_author.run_registry import inspect_run, list_runs
 
@@ -96,6 +97,7 @@ def main(argv: list[str] | None = None) -> int:
 
     subparsers.add_parser("phase-guard")
     subparsers.add_parser("agent-handoff-contract")
+    subparsers.add_parser("real-device-contract")
 
     advance = subparsers.add_parser("advance")
     advance.add_argument("run_id")
@@ -281,6 +283,9 @@ def main(argv: list[str] | None = None) -> int:
         return int(result["exit_code"])
     if args.command == "agent-handoff-contract":
         print(json.dumps(build_agent_handoff_contract(), ensure_ascii=False, indent=2))
+        return 0
+    if args.command == "real-device-contract":
+        print(json.dumps(build_real_device_contract(), ensure_ascii=False, indent=2))
         return 0
     if args.command == "advance":
         print(

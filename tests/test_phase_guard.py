@@ -28,6 +28,8 @@ class PhaseGuardTests(unittest.TestCase):
         self.assertIn("ui_tree", contract["context_slices"]["pytest_ran"])
         self.assertIn("hypium_draft", contract["auto_safe_phases"])
         self.assertIn("first_plan_confirmation", contract["resume_policy"]["never_auto_cross"])
+        self.assertEqual(contract["real_device_gates"]["approval"]["user_loop"]["position"], "approve_real_device")
+        self.assertEqual(contract["real_device_gates"]["preflight"]["decision_contract"]["agent_owner"], "leaf-test-author")
 
     def test_cli_phase_guard_and_agent_handoff_contract_output_json(self):
         from tools.leaf_author.__main__ import main
@@ -40,10 +42,16 @@ class PhaseGuardTests(unittest.TestCase):
         with redirect_stdout(handoff_output):
             handoff_exit = main(["agent-handoff-contract"])
 
+        real_device_output = StringIO()
+        with redirect_stdout(real_device_output):
+            real_device_exit = main(["real-device-contract"])
+
         self.assertEqual(guard_exit, 0)
         self.assertEqual(json.loads(guard_output.getvalue())["status"], "stable")
         self.assertEqual(handoff_exit, 0)
         self.assertEqual(json.loads(handoff_output.getvalue())["manifest_kind"], "leaf_agent_handoff_contract")
+        self.assertEqual(real_device_exit, 0)
+        self.assertEqual(json.loads(real_device_output.getvalue())["manifest_kind"], "leaf_real_device_gate_contract")
 
 
 if __name__ == "__main__":

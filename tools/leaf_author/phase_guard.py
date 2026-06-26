@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 
 from tools.leaf_author.phase_contract import load_phase_contract
+from tools.leaf_author.real_device_contract import build_real_device_contract
 
 
 REQUIRED_PHASE_FIELDS = {
@@ -107,6 +108,7 @@ def build_agent_handoff_contract(contract: dict[str, object] | None = None) -> d
         "context_slices": context_slices,
         "user_checkpoints": {checkpoint: phases for checkpoint, phases in sorted(checkpoint_phases.items())},
         "auto_safe_phases": auto_safe_phases,
+        "real_device_gates": build_real_device_contract()["gates"],
     }
 
 
