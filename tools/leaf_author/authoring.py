@@ -99,6 +99,14 @@ def resume_run(root: Path, run_id: str, auto_safe: bool = False) -> dict[str, ob
         if not auto_safe:
             return payload
         return {**payload, "auto_advanced": False, "status": "waiting_for_confirmation"}
+    input_blocker = _load_real_device_input_blocker(root, workflow)
+    if input_blocker:
+        decision = _input_blocker_decision(workflow, input_blocker)
+        context_manifest = write_context_manifest(root, run_id, decision=decision)
+        payload = _resume_payload(root, run_id, decision, context_manifest)
+        if not auto_safe:
+            return payload
+        return {**payload, "auto_advanced": False, "status": "waiting_for_confirmation"}
     decision = decide_next_step(workflow)
     context_manifest = write_context_manifest(root, run_id, decision=decision)
     payload = _resume_payload(root, run_id, decision, context_manifest)
@@ -183,6 +191,7 @@ def advance_run(
             workflow = load_workflow(root, run_id)
         serial_decision = _real_device_serial_decision(serial)
         if not serial_decision["ready"]:
+            input_artifact = _write_real_device_input_artifact(root, run_id, workflow, selected_runtime_mode, serial_decision)
             return {
                 "run_id": run_id,
                 "status": "blocked",
@@ -190,6 +199,7 @@ def advance_run(
                 "current_phase": workflow.get("current_phase"),
                 "stages": stages,
                 "next_action": "provide_real_device_serial",
+                "real_device_input_path": input_artifact["path"],
                 "resume_summary": {
                     "requires_user_confirmation": True,
                     "safe_to_auto_continue": False,
@@ -205,6 +215,9 @@ def advance_run(
                     },
                 },
             }
+        if _has_artifact(workflow, "real_device_input"):
+            _write_real_device_input_artifact(root, run_id, workflow, selected_runtime_mode, serial_decision)
+            workflow = load_workflow(root, run_id)
     current_phase = str(workflow.get("current_phase", ""))
     if current_phase == "hypium_ran" and run_real:
         current_phase = "pytest_ran"
@@ -405,6 +418,30 @@ def _load_real_device_approval_blocker(root: Path, workflow: dict[str, object]) 
     return payload if payload.get("status") == "blocked" else None
 
 
+def _has_artifact(workflow: dict[str, object], artifact_key: str) -> bool:
+    artifacts = workflow.get("artifacts", {})
+    return isinstance(artifacts, dict) and isinstance(artifacts.get(artifact_key), str)
+
+
+def _load_real_device_input_blocker(root: Path, workflow: dict[str, object]) -> dict[str, object] | None:
+    if workflow.get("current_phase") == "complete":
+        return None
+    artifacts = workflow.get("artifacts", {})
+    if not isinstance(artifacts, dict):
+        return None
+    value = artifacts.get("real_device_input")
+    if not isinstance(value, str) or not value:
+        return None
+    path = root / value
+    if not path.is_file():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    return payload if payload.get("status") == "blocked" else None
+
+
 def _approval_blocker_decision(workflow: dict[str, object], blocker: dict[str, object]) -> dict[str, object]:
     required_token = blocker.get("required_approval_token")
     operator_message = blocker.get("operator_message")
@@ -424,6 +461,29 @@ def _approval_blocker_decision(workflow: dict[str, object], blocker: dict[str, o
         "user_loop": {
             "position": "approve_real_device",
             "required_input": str(required_token) if isinstance(required_token, str) else "",
+        },
+    }
+
+
+def _input_blocker_decision(workflow: dict[str, object], blocker: dict[str, object]) -> dict[str, object]:
+    required_input = blocker.get("required_input")
+    operator_message = blocker.get("operator_message")
+    return {
+        "current_phase": workflow.get("current_phase"),
+        "confirmed_plan": bool(workflow.get("confirmed_plan", False)),
+        "next_action": "provide_real_device_serial",
+        "user_checkpoint": "manual_operator_decision",
+        "requires_user_confirmation": True,
+        "safe_to_auto_continue": False,
+        "operator_message": str(operator_message or "Real-device runtime requires an explicit --serial value."),
+        "agent_owner": "leaf-test-author",
+        "context_slice": ["workflow", "real_device_input"],
+        "trigger_source": "workflow.json",
+        "allowed_artifacts": ["workflow", "real_device_input"],
+        "batch_focus_priority": 75,
+        "user_loop": {
+            "position": "provide_target_inputs",
+            "required_input": str(required_input) if isinstance(required_input, str) else "--serial <serial>",
         },
     }
 
@@ -458,6 +518,37 @@ def _write_real_device_approval_artifact(
     workflow_payload = dict(workflow)
     artifacts = dict(workflow_payload.get("artifacts", {}))
     artifacts["real_device_approval"] = str(path.relative_to(root))
+    workflow_payload["artifacts"] = artifacts
+    save_workflow(root, workflow_payload)
+    return {"path": str(path), "payload": payload}
+
+
+def _write_real_device_input_artifact(
+    root: Path,
+    run_id: str,
+    workflow: dict[str, object],
+    runtime_mode: str,
+    serial_decision: dict[str, object],
+) -> dict[str, object]:
+    path = root / ".leaf" / "runs" / run_id / "real_device_input.json"
+    payload = {
+        "schema_version": "1.0",
+        "artifact_kind": "real_device_input_decision",
+        "run_id": run_id,
+        "domain": workflow.get("domain"),
+        "runtime_mode": runtime_mode,
+        "status": "ready" if serial_decision.get("ready") else "blocked",
+        "missing": [] if serial_decision.get("ready") else ["serial"],
+        "required_input": "--serial <serial>",
+        "operator_message": "Real-device runtime requires an explicit --serial value before local or device stages run.",
+        "user_checkpoint": "manual_operator_decision",
+        "next_action": "provide_real_device_serial" if not serial_decision.get("ready") else "run_real_device_runtime",
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    workflow_payload = dict(workflow)
+    artifacts = dict(workflow_payload.get("artifacts", {}))
+    artifacts["real_device_input"] = str(path.relative_to(root))
     workflow_payload["artifacts"] = artifacts
     save_workflow(root, workflow_payload)
     return {"path": str(path), "payload": payload}

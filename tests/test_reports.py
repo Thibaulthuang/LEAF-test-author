@@ -135,6 +135,23 @@ class ReportTests(unittest.TestCase):
             self.assertIsNone(result["approval_required"])
             self.assertEqual(result["next_command"], "")
 
+    def test_report_run_surfaces_real_device_input_blocker(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "打开相机；点击拍照", run_id="report-input")
+            confirm_plan(root, "report-input")
+            blocked = advance_run(root, "report-input", run_real=True, runtime_mode="direct_smoke")
+
+            result = report_run(root, "report-input")
+
+            self.assertEqual(blocked["status"], "blocked")
+            self.assertEqual(result["user_action_required"], True)
+            self.assertEqual(result["user_loop"]["position"], "provide_target_inputs")
+            self.assertEqual(result["input_required"]["missing"], ["serial"])
+            self.assertIn("real_device_input", result["evidence"])
+            self.assertIn("--serial <serial>", result["next_command"])
+            self.assertNotIn("--approval-token", result["next_command"])
+
     def test_report_batch_summarizes_runs_and_next_focus(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

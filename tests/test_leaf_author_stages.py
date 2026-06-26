@@ -279,8 +279,53 @@ class LeafAuthorStageTests(unittest.TestCase):
             self.assertEqual(result["resume_summary"]["user_loop"]["position"], "provide_target_inputs")
             runtime.assert_not_called()
             run_dir = root / ".leaf" / "runs" / "stage-runtime-missing-serial"
+            input_path = run_dir / "real_device_input.json"
+            self.assertTrue(input_path.exists())
+            input_payload = json.loads(input_path.read_text(encoding="utf-8"))
+            self.assertEqual(input_payload["status"], "blocked")
+            self.assertEqual(input_payload["missing"], ["serial"])
+            self.assertEqual(input_payload["runtime_mode"], "direct_smoke")
             self.assertFalse((run_dir / "validation.json").exists())
-            self.assertEqual(load_workflow(root, "stage-runtime-missing-serial")["current_phase"], "hypium_draft")
+            workflow = load_workflow(root, "stage-runtime-missing-serial")
+            self.assertEqual(workflow["current_phase"], "hypium_draft")
+            self.assertEqual(workflow["artifacts"]["real_device_input"], ".leaf/runs/stage-runtime-missing-serial/real_device_input.json")
+
+    def test_advance_real_runtime_updates_existing_input_artifact_after_serial(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._confirmed_case(root, run_id="stage-runtime-serial-ready")
+
+            from tools.leaf_author.authoring import advance_run
+
+            blocked = advance_run(root, "stage-runtime-serial-ready", run_real=True, runtime_mode="direct_smoke")
+            self.assertEqual(blocked["status"], "blocked")
+
+            def fake_runtime(root_arg, run_id_arg, domain_arg, runtime_mode_arg, **kwargs):
+                from tools.leaf_author.workflow import load_workflow, save_workflow
+
+                smoke_path = root_arg / ".leaf" / "runs" / run_id_arg / "camera_direct_smoke.json"
+                smoke_path.write_text(json.dumps({"status": "complete", "quality_gate": "CAMERA_DIRECT_SMOKE_PASS"}) + "\n", encoding="utf-8")
+                workflow = load_workflow(root_arg, run_id_arg)
+                artifacts = dict(workflow.get("artifacts", {}))
+                artifacts["camera_direct_smoke"] = str(smoke_path.relative_to(root_arg))
+                workflow["artifacts"] = artifacts
+                workflow["current_phase"] = "camera_direct_smoke_complete"
+                save_workflow(root_arg, workflow)
+                return {
+                    "stage": "camera_direct_smoke",
+                    "pass_quality_gate": "CAMERA_DIRECT_SMOKE_PASS",
+                    "inspect_action": "inspect_camera_direct_smoke",
+                    "result": {"status": "complete", "quality_gate": "CAMERA_DIRECT_SMOKE_PASS"},
+                }
+
+            with patch("tools.leaf_author.authoring.run_domain_runtime", side_effect=fake_runtime):
+                result = advance_run(root, "stage-runtime-serial-ready", run_real=True, runtime_mode="direct_smoke", serial="SERIAL123")
+
+            self.assertEqual(result["status"], "complete")
+            input_payload = json.loads((root / ".leaf" / "runs" / "stage-runtime-serial-ready" / "real_device_input.json").read_text(encoding="utf-8"))
+            self.assertEqual(input_payload["status"], "ready")
+            self.assertEqual(input_payload["missing"], [])
+            self.assertEqual(input_payload["next_action"], "run_real_device_runtime")
 
     def test_advance_camera_capture_real_e2e_records_capture_gate_after_approval(self):
         with tempfile.TemporaryDirectory() as tmp:

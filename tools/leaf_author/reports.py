@@ -15,13 +15,14 @@ def report_run(root: Path, run_id: str) -> dict[str, object]:
     artifacts = run.get("artifacts", {})
     evidence = _existing_artifacts(root, artifacts if isinstance(artifacts, dict) else {})
     approval_required = None if run.get("current_phase") == "complete" else _real_device_approval(root, artifacts if isinstance(artifacts, dict) else {})
+    input_required = None if run.get("current_phase") == "complete" else _real_device_input(root, artifacts if isinstance(artifacts, dict) else {})
     latest_quality_gate = _latest_quality_gate(root, str(run.get("domain", "")), artifacts if isinstance(artifacts, dict) else {})
-    safe_to_auto_continue = bool(isinstance(resume_summary, dict) and resume_summary.get("safe_to_auto_continue")) and not approval_required
-    user_action_required = bool(isinstance(resume_summary, dict) and resume_summary.get("requires_user_confirmation")) or bool(approval_required)
+    safe_to_auto_continue = bool(isinstance(resume_summary, dict) and resume_summary.get("safe_to_auto_continue")) and not approval_required and not input_required
+    user_action_required = bool(isinstance(resume_summary, dict) and resume_summary.get("requires_user_confirmation")) or bool(approval_required) or bool(input_required)
     user_checkpoint = "real_device_confirmation" if approval_required else _user_checkpoint(run, user_action_required)
-    user_loop = _report_user_loop(resume_summary, approval_required)
-    decision_contract = _report_decision_contract(resume_summary, approval_required)
-    operator_message = _report_operator_message(resume_summary, approval_required)
+    user_loop = _report_user_loop(resume_summary, approval_required, input_required)
+    decision_contract = _report_decision_contract(resume_summary, approval_required, input_required)
+    operator_message = _report_operator_message(resume_summary, approval_required, input_required)
     return {
         "schema_version": "1.0",
         "run_id": run_id,
@@ -37,8 +38,9 @@ def report_run(root: Path, run_id: str) -> dict[str, object]:
         "user_loop": user_loop,
         "decision_contract": decision_contract,
         "operator_message": operator_message,
-        "next_command": _next_command(run_id, run, safe_to_auto_continue, user_checkpoint, approval_required),
+        "next_command": _next_command(run_id, run, safe_to_auto_continue, user_checkpoint, approval_required, input_required),
         "approval_required": approval_required,
+        "input_required": input_required,
         "evidence": evidence,
         "context_policy": {
             "scope": "run_report",
@@ -125,6 +127,29 @@ def _real_device_approval(root: Path, artifacts: dict[str, object]) -> dict[str,
     }
 
 
+def _real_device_input(root: Path, artifacts: dict[str, object]) -> dict[str, object] | None:
+    value = artifacts.get("real_device_input")
+    if not isinstance(value, str) or not value:
+        return None
+    path = root / value
+    if not path.is_file():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    if payload.get("status") != "blocked":
+        return None
+    missing = payload.get("missing", [])
+    return {
+        "artifact": value,
+        "runtime_mode": payload.get("runtime_mode"),
+        "missing": missing if isinstance(missing, list) else [],
+        "required_input": payload.get("required_input"),
+        "operator_message": payload.get("operator_message"),
+    }
+
+
 def _approval_user_loop(approval_required: dict[str, object]) -> dict[str, str]:
     required_input = approval_required.get("required_approval_token")
     return {
@@ -142,18 +167,47 @@ def _approval_decision_contract() -> dict[str, object]:
     }
 
 
-def _report_user_loop(resume_summary: object, approval_required: dict[str, object] | None) -> dict[str, object]:
+def _input_user_loop(input_required: dict[str, object]) -> dict[str, str]:
+    required_input = input_required.get("required_input")
+    return {
+        "position": "provide_target_inputs",
+        "required_input": str(required_input) if isinstance(required_input, str) else "--serial <serial>",
+    }
+
+
+def _input_decision_contract() -> dict[str, object]:
+    return {
+        "trigger_source": "workflow.json",
+        "agent_owner": "leaf-test-author",
+        "context_slice": ["workflow", "real_device_input"],
+        "allowed_artifacts": ["workflow", "real_device_input"],
+    }
+
+
+def _report_user_loop(
+    resume_summary: object,
+    approval_required: dict[str, object] | None,
+    input_required: dict[str, object] | None,
+) -> dict[str, object]:
     if approval_required:
         return _approval_user_loop(approval_required)
+    if input_required:
+        return _input_user_loop(input_required)
     if isinstance(resume_summary, dict):
         user_loop = resume_summary.get("user_loop", {})
         return user_loop if isinstance(user_loop, dict) else {}
     return {}
 
 
-def _report_decision_contract(resume_summary: object, approval_required: dict[str, object] | None) -> dict[str, object]:
+def _report_decision_contract(
+    resume_summary: object,
+    approval_required: dict[str, object] | None,
+    input_required: dict[str, object] | None,
+) -> dict[str, object]:
     if approval_required:
         return _approval_decision_contract()
+    if input_required:
+        return _input_decision_contract()
     return {
         "trigger_source": resume_summary.get("trigger_source", "") if isinstance(resume_summary, dict) else "",
         "agent_owner": resume_summary.get("agent_owner", "") if isinstance(resume_summary, dict) else "",
@@ -162,9 +216,15 @@ def _report_decision_contract(resume_summary: object, approval_required: dict[st
     }
 
 
-def _report_operator_message(resume_summary: object, approval_required: dict[str, object] | None) -> str:
+def _report_operator_message(
+    resume_summary: object,
+    approval_required: dict[str, object] | None,
+    input_required: dict[str, object] | None,
+) -> str:
     if approval_required:
         return str(approval_required.get("operator_message", ""))
+    if input_required:
+        return str(input_required.get("operator_message", ""))
     if isinstance(resume_summary, dict):
         return str(resume_summary.get("operator_message", ""))
     return ""
@@ -191,6 +251,7 @@ def _next_command(
     safe_to_auto_continue: bool,
     user_checkpoint: str | None,
     approval_required: dict[str, object] | None = None,
+    input_required: dict[str, object] | None = None,
 ) -> str:
     if safe_to_auto_continue:
         return f"python3 -m tools.leaf_author resume {run_id} --auto-safe"
@@ -199,6 +260,10 @@ def _next_command(
         approval_token = approval_required.get("required_approval_token")
         if isinstance(runtime_mode, str) and runtime_mode and isinstance(approval_token, str) and approval_token:
             return approved_real_device_next_command(run_id, runtime_mode, approval_token)
+    if input_required:
+        runtime_mode = input_required.get("runtime_mode")
+        if isinstance(runtime_mode, str) and runtime_mode:
+            return approved_real_device_next_command(run_id, runtime_mode)
     if user_checkpoint == "first_plan_confirmation":
         return f"python3 -m tools.leaf_author confirm-plan {run_id}"
     if user_checkpoint == "real_device_confirmation":

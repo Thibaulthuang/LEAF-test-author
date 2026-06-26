@@ -486,6 +486,28 @@ class LeafAuthorWorkflowTests(unittest.TestCase):
             self.assertEqual(result["status"], "in_progress")
             self.assertNotEqual(result["resume_summary"]["user_checkpoint"], "real_device_confirmation")
 
+    def test_resume_run_auto_safe_stops_at_real_device_input_blocker(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            from tools.leaf_author.authoring import advance_run, confirm_plan, resume_run, start_new_case
+
+            start_new_case(root, "camera", "打开相机；点击拍照", run_id="run-input-waits")
+            confirm_plan(root, "run-input-waits")
+            blocked = advance_run(root, "run-input-waits", run_real=True, runtime_mode="direct_smoke")
+
+            result = resume_run(root, "run-input-waits", auto_safe=True)
+
+            self.assertEqual(blocked["status"], "blocked")
+            self.assertEqual(result["auto_advanced"], False)
+            self.assertEqual(result["next_action"], "provide_real_device_serial")
+            self.assertEqual(result["resume_summary"]["user_loop"]["position"], "provide_target_inputs")
+            self.assertEqual(result["resume_summary"]["user_loop"]["required_input"], "--serial <serial>")
+            self.assertEqual(result["resume_summary"]["context_slice"], ["workflow", "real_device_input"])
+            manifest = json.loads((root / result["context_manifest"]["context_manifest_path"]).read_text(encoding="utf-8"))
+            self.assertIn("real_device_input", manifest["referenced_artifacts"])
+            self.assertNotIn("pytest", manifest["referenced_artifacts"])
+
     def test_resume_run_blocks_when_phase_guard_is_unstable(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
