@@ -11,7 +11,7 @@ from tools.leaf_author.experience import export_team_knowledge, record_experienc
 from tools.leaf_author.gui_context import collect_gui_context
 from tools.leaf_author.runner import run_pytest_draft
 from tools.leaf_author.validator import validate_pytest_draft
-from tools.leaf_author.workflow import load_workflow
+from tools.leaf_author.workflow import load_workflow, save_workflow
 
 
 class LeafAuthorStageTests(unittest.TestCase):
@@ -299,6 +299,65 @@ class LeafAuthorStageTests(unittest.TestCase):
             workflow = load_workflow(root, "stage-runtime-missing-serial")
             self.assertEqual(workflow["current_phase"], "hypium_draft")
             self.assertEqual(workflow["artifacts"]["real_device_input"], ".leaf/runs/stage-runtime-missing-serial/real_device_input.json")
+
+    def test_advance_real_runtime_uses_selected_device_serial_when_serial_is_omitted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._confirmed_case(root, run_id="stage-runtime-selected-device")
+            run_dir = root / ".leaf" / "runs" / "stage-runtime-selected-device"
+            selection_path = run_dir / "device_selection.json"
+            selection_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "1.0",
+                        "artifact_kind": "real_device_selection",
+                        "run_id": "stage-runtime-selected-device",
+                        "status": "selected",
+                        "serial": "SERIAL123",
+                        "targets": ["SERIAL123"],
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            workflow = load_workflow(root, "stage-runtime-selected-device")
+            workflow["artifacts"]["device_selection"] = ".leaf/runs/stage-runtime-selected-device/device_selection.json"
+            save_workflow(root, workflow)
+
+            from tools.leaf_author.authoring import advance_run
+
+            def fake_runtime(root_arg, run_id_arg, domain_arg, runtime_mode_arg, **kwargs):
+                self.assertEqual(kwargs["serial"], "SERIAL123")
+                from tools.leaf_author.workflow import load_workflow, save_workflow
+
+                smoke_path = root_arg / ".leaf" / "runs" / run_id_arg / "camera_direct_smoke.json"
+                smoke_path.write_text(json.dumps({"status": "complete", "quality_gate": "CAMERA_DIRECT_SMOKE_PASS"}) + "\n", encoding="utf-8")
+                workflow = load_workflow(root_arg, run_id_arg)
+                artifacts = dict(workflow.get("artifacts", {}))
+                artifacts["camera_direct_smoke"] = str(smoke_path.relative_to(root_arg))
+                workflow["artifacts"] = artifacts
+                workflow["current_phase"] = "camera_direct_smoke_complete"
+                save_workflow(root_arg, workflow)
+                return {
+                    "stage": "camera_direct_smoke",
+                    "pass_quality_gate": "CAMERA_DIRECT_SMOKE_PASS",
+                    "inspect_action": "inspect_camera_direct_smoke",
+                    "result": {"status": "complete", "quality_gate": "CAMERA_DIRECT_SMOKE_PASS"},
+                }
+
+            with patch("tools.leaf_author.authoring.run_domain_runtime", side_effect=fake_runtime):
+                result = advance_run(root, "stage-runtime-selected-device", run_real=True, runtime_mode="direct_smoke")
+
+            self.assertEqual(result["status"], "complete")
+            input_payload = json.loads((run_dir / "real_device_input.json").read_text(encoding="utf-8"))
+            self.assertEqual(input_payload["status"], "ready")
+            self.assertEqual(input_payload["serial"], "SERIAL123")
+            self.assertEqual(input_payload["serial_source"], "device_selection")
+            preflight_payload = json.loads((run_dir / "real_device_preflight.json").read_text(encoding="utf-8"))
+            self.assertEqual(preflight_payload["serial"], "SERIAL123")
+            self.assertEqual(preflight_payload["serial_source"], "device_selection")
 
     def test_advance_real_runtime_updates_existing_input_artifact_after_serial(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -158,6 +158,7 @@ def advance_run(
     workflow = load_workflow(root, run_id)
     selected_runtime_mode = resolve_runtime_mode(runtime_mode, camera_direct=camera_direct, camera_capture=camera_capture)
     domain = str(workflow.get("domain", ""))
+    effective_serial = serial or ""
     if run_real and selected_runtime_mode:
         approval = _real_device_approval_decision(domain, selected_runtime_mode, approval_token)
         if not approval["approved"]:
@@ -188,7 +189,7 @@ def advance_run(
         if approval["required_approval_token"]:
             _write_real_device_approval_artifact(root, run_id, workflow, selected_runtime_mode, approval, approval_token=approval_token)
             workflow = load_workflow(root, run_id)
-        serial_decision = _real_device_serial_decision(serial)
+        serial_decision = _real_device_serial_decision(root, workflow, serial)
         if not serial_decision["ready"]:
             input_artifact = _write_real_device_input_artifact(root, run_id, workflow, selected_runtime_mode, serial_decision)
             input_contract = real_device_decision_contract("input")
@@ -212,15 +213,15 @@ def advance_run(
                     "user_loop": real_device_user_loop("input"),
                 },
             }
-        if _has_artifact(workflow, "real_device_input"):
-            _write_real_device_input_artifact(root, run_id, workflow, selected_runtime_mode, serial_decision)
-            workflow = load_workflow(root, run_id)
+        effective_serial = str(serial_decision["serial"]).strip()
+        _write_real_device_input_artifact(root, run_id, workflow, selected_runtime_mode, serial_decision)
+        workflow = load_workflow(root, run_id)
         _write_real_device_preflight_artifact(
             root,
             run_id,
             workflow,
             selected_runtime_mode,
-            serial=str(serial).strip(),
+            serial=effective_serial,
             approval=approval,
             approval_token=approval_token,
             serial_decision=serial_decision,
@@ -246,7 +247,7 @@ def advance_run(
                 run_id,
                 domain,
                 selected_runtime_mode,
-                serial=serial or "",
+                serial=effective_serial,
                 hdc_path=hdc_path,
                 hdc_runner=hdc_runner,
             )
@@ -400,10 +401,26 @@ def _real_device_approval_decision(domain: str, runtime_mode: str, approval_toke
     }
 
 
-def _real_device_serial_decision(serial: str | None) -> dict[str, object]:
+def _real_device_serial_decision(root: Path, workflow: dict[str, object], serial: str | None) -> dict[str, object]:
+    if serial and serial.strip():
+        return {
+            "ready": True,
+            "serial": serial.strip(),
+            "source": "explicit_arg",
+        }
+    selection = _load_selected_device_artifact(root, workflow)
+    selected_serial = selection.get("serial") if isinstance(selection, dict) else None
+    if isinstance(selected_serial, str) and selected_serial.strip():
+        return {
+            "ready": True,
+            "serial": selected_serial.strip(),
+            "source": "device_selection",
+            "device_selection_artifact": selection.get("artifact"),
+        }
     return {
-        "ready": bool(serial and serial.strip()),
-        "serial": serial,
+        "ready": False,
+        "serial": None,
+        "source": "missing",
     }
 
 
@@ -448,6 +465,26 @@ def _load_real_device_input_blocker(root: Path, workflow: dict[str, object]) -> 
     except json.JSONDecodeError:
         return None
     return payload if payload.get("status") == "blocked" else None
+
+
+def _load_selected_device_artifact(root: Path, workflow: dict[str, object]) -> dict[str, object] | None:
+    artifacts = workflow.get("artifacts", {})
+    if not isinstance(artifacts, dict):
+        return None
+    value = artifacts.get("device_selection")
+    if not isinstance(value, str) or not value:
+        return None
+    path = root / value
+    if not path.is_file():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    if payload.get("status") != "selected":
+        return None
+    payload["artifact"] = value
+    return payload
 
 
 def _approval_blocker_decision(workflow: dict[str, object], blocker: dict[str, object]) -> dict[str, object]:
@@ -536,6 +573,9 @@ def _write_real_device_input_artifact(
         "domain": workflow.get("domain"),
         "runtime_mode": runtime_mode,
         "status": "ready" if serial_decision.get("ready") else "blocked",
+        "serial": serial_decision.get("serial"),
+        "serial_source": serial_decision.get("source"),
+        "device_selection_artifact": serial_decision.get("device_selection_artifact"),
         "missing": [] if serial_decision.get("ready") else ["serial"],
         "required_input": "--serial <serial>",
         "operator_message": "Real-device runtime requires an explicit --serial value before local or device stages run.",
@@ -573,6 +613,8 @@ def _write_real_device_preflight_artifact(
         "runtime_mode": runtime_mode,
         "status": "ready",
         "serial": serial,
+        "serial_source": serial_decision.get("source"),
+        "device_selection_artifact": serial_decision.get("device_selection_artifact"),
         "risk_level": safety.get("risk_level"),
         "mutates_device_state": bool(safety.get("mutates_device_state", True)),
         "approval_status": "approved" if required_approval else "not_required",
