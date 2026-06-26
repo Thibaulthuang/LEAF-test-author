@@ -178,6 +178,9 @@ def advance_run(
                     },
                 },
             }
+        if approval["required_approval_token"]:
+            _write_real_device_approval_artifact(root, run_id, workflow, selected_runtime_mode, approval, approval_token=approval_token)
+            workflow = load_workflow(root, run_id)
     current_phase = str(workflow.get("current_phase", ""))
     if current_phase == "hypium_ran" and run_real:
         current_phase = "pytest_ran"
@@ -398,6 +401,7 @@ def _write_real_device_approval_artifact(
     workflow: dict[str, object],
     runtime_mode: str,
     approval: dict[str, object],
+    approval_token: str | None = None,
 ) -> dict[str, object]:
     path = root / ".leaf" / "runs" / run_id / "real_device_approval.json"
     safety = approval["runtime_safety"] if isinstance(approval.get("runtime_safety"), dict) else {}
@@ -409,6 +413,7 @@ def _write_real_device_approval_artifact(
         "runtime_mode": runtime_mode,
         "status": "approved" if approval.get("approved") else "blocked",
         "required_approval_token": approval.get("required_approval_token"),
+        "approval_token": approval_token if approval.get("approved") else None,
         "risk_level": safety.get("risk_level"),
         "mutates_device_state": bool(safety.get("mutates_device_state", True)),
         "operator_message": safety.get("operator_message", "Explicit real-device approval is required."),

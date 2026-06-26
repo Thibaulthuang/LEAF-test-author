@@ -97,6 +97,23 @@ class ReportTests(unittest.TestCase):
             self.assertEqual(result["approval_required"]["required_approval_token"], "approve_camera_capture_e2e")
             self.assertIn("--approval-token approve_camera_capture_e2e", result["next_command"])
 
+    def test_report_run_clears_real_device_approval_after_approval(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "打开相机；点击拍照", run_id="report-approved")
+            confirm_plan(root, "report-approved")
+            advance_run(root, "report-approved", run_real=True, runtime_mode="capture_e2e", serial="SERIAL123")
+            approval_path = root / ".leaf" / "runs" / "report-approved" / "real_device_approval.json"
+            approval = json.loads(approval_path.read_text(encoding="utf-8"))
+            approval["status"] = "approved"
+            approval["next_action"] = "run_real_device_runtime"
+            approval_path.write_text(json.dumps(approval, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            result = report_run(root, "report-approved")
+
+            self.assertIsNone(result["approval_required"])
+            self.assertNotIn("--approval-token", result["next_command"])
+
     def test_report_batch_summarizes_runs_and_next_focus(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

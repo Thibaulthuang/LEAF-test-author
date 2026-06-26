@@ -318,6 +318,47 @@ class LeafAuthorStageTests(unittest.TestCase):
             manifest = json.loads((root / ".leaf" / "runs" / "stage-camera-capture" / "team_export_manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(manifest["artifacts"]["camera_capture_e2e"], ".leaf/runs/stage-camera-capture/camera_capture_e2e.json")
 
+    def test_advance_camera_capture_updates_existing_approval_artifact_after_approval(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._confirmed_case(root, run_id="stage-camera-capture-approved")
+
+            from tools.leaf_author.authoring import advance_run
+
+            blocked = advance_run(root, "stage-camera-capture-approved", serial="SERIAL123", run_real=True, camera_capture=True, hdc_path="/sdk/hdc")
+            self.assertEqual(blocked["status"], "blocked")
+
+            def fake_capture(root_arg, run_id_arg, **kwargs):
+                run_dir = root_arg / ".leaf" / "runs" / run_id_arg
+                capture_path = run_dir / "camera_capture_e2e.json"
+                capture_path.write_text(json.dumps({"status": "complete", "quality_gate": "CAMERA_CAPTURE_E2E_PASS"}) + "\n", encoding="utf-8")
+                from tools.leaf_author.workflow import load_workflow, save_workflow
+
+                workflow = load_workflow(root_arg, run_id_arg)
+                artifacts = dict(workflow.get("artifacts", {}))
+                artifacts["camera_capture_e2e"] = str(capture_path.relative_to(root_arg))
+                workflow["artifacts"] = artifacts
+                workflow["current_phase"] = "camera_capture_e2e_complete"
+                save_workflow(root_arg, workflow)
+                return {"status": "complete", "quality_gate": "CAMERA_CAPTURE_E2E_PASS"}
+
+            with patch("tools.leaf_author.camera_smoke.run_camera_capture_e2e", side_effect=fake_capture):
+                result = advance_run(
+                    root,
+                    "stage-camera-capture-approved",
+                    serial="SERIAL123",
+                    run_real=True,
+                    camera_capture=True,
+                    hdc_path="/sdk/hdc",
+                    approval_token="approve_camera_capture_e2e",
+                )
+
+            self.assertEqual(result["status"], "complete")
+            approval = json.loads((root / ".leaf" / "runs" / "stage-camera-capture-approved" / "real_device_approval.json").read_text(encoding="utf-8"))
+            self.assertEqual(approval["status"], "approved")
+            self.assertEqual(approval["next_action"], "run_real_device_runtime")
+            self.assertEqual(approval["approval_token"], "approve_camera_capture_e2e")
+
     def test_cli_advance_accepts_camera_direct_real_options(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
