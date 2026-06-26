@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -25,8 +27,7 @@ def create_workflow(root: Path, domain: str, teststep: str, run_id: str) -> dict
         },
     }
     workflow_path = root / run_dir / "workflow.json"
-    workflow_path.parent.mkdir(parents=True, exist_ok=True)
-    workflow_path.write_text(json.dumps(workflow, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    _write_json_atomic(workflow_path, workflow)
     return workflow
 
 
@@ -38,5 +39,22 @@ def load_workflow(root: Path, run_id: str) -> dict[str, object]:
 def save_workflow(root: Path, workflow: dict[str, object]) -> None:
     run_id = str(workflow["run_id"])
     workflow_path = root / ".leaf" / "runs" / run_id / "workflow.json"
-    workflow_path.parent.mkdir(parents=True, exist_ok=True)
-    workflow_path.write_text(json.dumps(workflow, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    _write_json_atomic(workflow_path, workflow)
+
+
+def _write_json_atomic(path: Path, payload: dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    content = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+    with tempfile.NamedTemporaryFile(
+        "w",
+        encoding="utf-8",
+        dir=path.parent,
+        prefix=f"{path.name}.",
+        suffix=".tmp",
+        delete=False,
+    ) as tmp:
+        tmp_path = Path(tmp.name)
+        tmp.write(content)
+        tmp.flush()
+        os.fsync(tmp.fileno())
+    tmp_path.replace(path)

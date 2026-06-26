@@ -6,7 +6,7 @@ from pathlib import Path
 from tools.leaf_author.device_probe import HdcProbe, ProbeCommandResult
 from tools.leaf_author.generator import generate_pytest_case
 from tools.leaf_author.planner import build_plan
-from tools.leaf_author.workflow import create_workflow, load_workflow
+from tools.leaf_author.workflow import create_workflow, load_workflow, save_workflow
 
 
 class LeafAuthorWorkflowTests(unittest.TestCase):
@@ -28,6 +28,19 @@ class LeafAuthorWorkflowTests(unittest.TestCase):
 
             loaded = load_workflow(root, "run-001")
             self.assertEqual(loaded, workflow)
+
+    def test_save_workflow_uses_complete_json_without_temp_artifacts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            workflow = create_workflow(root, "camera", "打开相机", run_id="run-atomic")
+            workflow["current_phase"] = "complete"
+            workflow["confirmed_plan"] = True
+
+            save_workflow(root, workflow)
+
+            workflow_path = root / ".leaf" / "runs" / "run-atomic" / "workflow.json"
+            self.assertEqual(json.loads(workflow_path.read_text(encoding="utf-8"))["current_phase"], "complete")
+            self.assertEqual(list(workflow_path.parent.glob("workflow.json.*.tmp")), [])
 
     def test_build_plan_splits_steps_and_points_to_generated_pytest(self):
         workflow = {

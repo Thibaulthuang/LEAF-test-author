@@ -30,6 +30,9 @@ def audit_run(root: Path, run_id: str) -> dict[str, object]:
 
     preflight = report.get("real_device_preflight")
     checks.extend(_real_device_preflight_checks(preflight if isinstance(preflight, dict) else None))
+    evidence = report.get("evidence", {})
+    context_manifest = _load_context_manifest(root, evidence if isinstance(evidence, dict) else {})
+    checks.extend(_context_manifest_checks(context_manifest, report))
 
     passed = all(bool(check["passed"]) for check in checks)
     payload = {
@@ -44,6 +47,7 @@ def audit_run(root: Path, run_id: str) -> dict[str, object]:
         "evidence": {
             "report": "report-run",
             "real_device_preflight": preflight.get("artifact") if isinstance(preflight, dict) else None,
+            "context_manifest": context_manifest.get("artifact") if isinstance(context_manifest, dict) else None,
         },
     }
     return _write_run_audit(root, run_id, payload)
@@ -91,6 +95,54 @@ def _real_device_preflight_checks(preflight: dict[str, object] | None) -> list[d
         _check("real_device_preflight_ready", preflight.get("status") == "ready", "Real-device preflight status is ready."),
         _check("real_device_input_ready", preflight.get("input_status") == "ready", "Real-device serial/input gate is ready."),
         _check("real_device_approval_ready", preflight.get("approval_status") in {"approved", "not_required"}, "Real-device approval gate is approved or not required."),
+    ]
+
+
+def _load_context_manifest(root: Path, evidence: dict[str, object]) -> dict[str, object] | None:
+    value = evidence.get("context_manifest")
+    if not isinstance(value, str) or not value:
+        return None
+    path = root / value
+    if not path.is_file():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    payload["artifact"] = value
+    return payload
+
+
+def _context_manifest_checks(context_manifest: dict[str, object] | None, report: dict[str, object]) -> list[dict[str, object]]:
+    if not context_manifest:
+        return [
+            _check("context_manifest_ready", False, "Context manifest artifact is missing or unreadable."),
+            _check("handoff_ready", False, "Context manifest handoff snapshot is missing."),
+            _check("user_loop_ready", False, "Context manifest user_loop snapshot is missing."),
+        ]
+    handoff = context_manifest.get("handoff")
+    user_loop = context_manifest.get("user_loop")
+    handoff_ready = (
+        isinstance(handoff, dict)
+        and handoff.get("to_agent") == report.get("decision_contract", {}).get("agent_owner")
+        and handoff.get("current_phase") == report.get("current_phase")
+        and handoff.get("next_action") == report.get("next_action")
+        and handoff.get("attention_boundary") == "one_active_run"
+        and handoff.get("artifact_loading") == "on_demand"
+    )
+    user_loop_ready = (
+        isinstance(user_loop, dict)
+        and "requires_user_confirmation" in user_loop
+        and "safe_to_auto_continue" in user_loop
+        and user_loop.get("requires_user_confirmation") == report.get("user_action_required")
+        and user_loop.get("safe_to_auto_continue") == report.get("safe_to_auto_continue")
+    )
+    return [
+        _check("context_manifest_ready", context_manifest.get("manifest_kind") == "run_context_manifest", "Context manifest artifact is present and typed."),
+        _check("handoff_ready", handoff_ready, "Context manifest handoff matches the report decision contract."),
+        _check("user_loop_ready", user_loop_ready, "Context manifest user_loop matches report checkpoint and auto-continue state."),
     ]
 
 
