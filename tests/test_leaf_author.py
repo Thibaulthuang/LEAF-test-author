@@ -464,6 +464,28 @@ class LeafAuthorWorkflowTests(unittest.TestCase):
             self.assertNotIn("pytest", manifest["referenced_artifacts"])
             self.assertEqual(load_workflow(root, "run-approval-waits")["current_phase"], "hypium_draft")
 
+    def test_resume_run_ignores_stale_real_device_approval_after_complete(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            from tools.leaf_author.authoring import advance_run, confirm_plan, resume_run, start_new_case
+            from tools.leaf_author.workflow import save_workflow
+
+            start_new_case(root, "camera", "打开相机；点击拍照", run_id="run-stale-approval")
+            confirm_plan(root, "run-stale-approval")
+            advance_run(root, "run-stale-approval", run_real=True, runtime_mode="capture_e2e", serial="SERIAL123")
+            workflow = load_workflow(root, "run-stale-approval")
+            workflow["current_phase"] = "complete"
+            save_workflow(root, workflow)
+
+            result = resume_run(root, "run-stale-approval", auto_safe=True)
+
+            self.assertEqual(result["current_phase"], "complete")
+            self.assertEqual(result["next_action"], "complete")
+            self.assertEqual(result["auto_advanced"], False)
+            self.assertEqual(result["status"], "in_progress")
+            self.assertNotEqual(result["resume_summary"]["user_checkpoint"], "real_device_confirmation")
+
     def test_resume_run_blocks_when_phase_guard_is_unstable(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

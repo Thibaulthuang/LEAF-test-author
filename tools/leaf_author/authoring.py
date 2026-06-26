@@ -356,6 +356,8 @@ def _real_device_approval_decision(domain: str, runtime_mode: str, approval_toke
 
 
 def _load_real_device_approval_blocker(root: Path, workflow: dict[str, object]) -> dict[str, object] | None:
+    if workflow.get("current_phase") == "complete":
+        return None
     artifacts = workflow.get("artifacts", {})
     if not isinstance(artifacts, dict):
         return None
