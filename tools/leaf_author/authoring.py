@@ -117,6 +117,9 @@ def resume_run(root: Path, run_id: str, auto_safe: bool = False) -> dict[str, ob
     payload = _resume_payload(root, run_id, decision, context_manifest)
     if not auto_safe:
         return payload
+    audit_summary = _run_audit_summary(root, workflow)
+    if audit_summary and audit_summary.get("failed_checks"):
+        return _blocked_by_run_audit(root, run_id, payload, audit_summary)
     if not payload["resume_summary"]["safe_to_auto_continue"]:
         return {**payload, "auto_advanced": False, "status": "waiting_for_confirmation" if payload["resume_summary"]["requires_user_confirmation"] else "in_progress"}
     advance_result = advance_run(root, run_id)
@@ -415,6 +418,54 @@ def _resume_payload(root: Path, run_id: str, decision: dict[str, object], contex
         "next_action": str(decision.get("next_action", "inspect_workflow_state")),
         "resume_summary": _resume_summary(decision),
         "context_manifest": context_manifest,
+        "workflow_path": str(root / ".leaf" / "runs" / run_id / "workflow.json"),
+    }
+
+
+def _run_audit_summary(root: Path, workflow: dict[str, object]) -> dict[str, object] | None:
+    artifacts = workflow.get("artifacts")
+    if not isinstance(artifacts, dict):
+        return None
+    value = artifacts.get("run_audit")
+    if not isinstance(value, str) or not value:
+        return None
+    path = root / value
+    if not path.is_file():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    checks = payload.get("checks")
+    checks = checks if isinstance(checks, list) else []
+    normalized_checks = [check for check in checks if isinstance(check, dict)]
+    failed = [str(check.get("name")) for check in normalized_checks if check.get("name") and not check.get("passed")]
+    return {
+        "artifact": str(path.relative_to(root)),
+        "status": str(payload.get("status", "")),
+        "total_checks": len(normalized_checks),
+        "passed_checks": sum(1 for check in normalized_checks if check.get("passed") is True),
+        "failed_checks": failed,
+    }
+
+
+def _blocked_by_run_audit(root: Path, run_id: str, payload: dict[str, object], audit_summary: dict[str, object]) -> dict[str, object]:
+    return {
+        **payload,
+        "auto_advanced": False,
+        "status": "blocked",
+        "block_reason": "run_audit_failed",
+        "next_action": "inspect_run_audit",
+        "next_command": "python3 -m tools.leaf_author report-run <run_id>",
+        "operator_message": "run audit failed; inspect run_audit_summary.failed_checks before auto-resuming this run.",
+        "user_checkpoint": "manual_operator_decision",
+        "user_loop": {
+            "position": "audit_failure_triage",
+            "required_input": "inspect run_audit_summary.failed_checks",
+        },
+        "run_audit_summary": audit_summary,
         "workflow_path": str(root / ".leaf" / "runs" / run_id / "workflow.json"),
     }
 

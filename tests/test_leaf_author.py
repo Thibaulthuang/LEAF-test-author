@@ -595,6 +595,45 @@ class LeafAuthorWorkflowTests(unittest.TestCase):
             self.assertEqual(workflow["phase_state"]["next_action"], "complete")
             self.assertEqual(workflow["phase_state"]["safe_to_auto_continue"], False)
 
+    def test_resume_run_auto_safe_blocks_when_run_audit_failed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            from tools.leaf_author.authoring import confirm_plan, resume_run, start_new_case
+
+            start_new_case(root, "camera", "打开相机；点击拍照", run_id="run-audit-block")
+            confirm_plan(root, "run-audit-block")
+            audit_path = root / ".leaf" / "runs" / "run-audit-block" / "run_audit.json"
+            audit_path.write_text(
+                json.dumps(
+                    {
+                        "status": "failed",
+                        "checks": [
+                            {"name": "context_manifest_matches_phase_contract", "passed": False},
+                        ],
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            workflow = load_workflow(root, "run-audit-block")
+            workflow["artifacts"]["run_audit"] = ".leaf/runs/run-audit-block/run_audit.json"
+            save_workflow(root, workflow)
+
+            result = resume_run(root, "run-audit-block", auto_safe=True)
+
+            self.assertEqual(result["status"], "blocked")
+            self.assertEqual(result["block_reason"], "run_audit_failed")
+            self.assertEqual(result["auto_advanced"], False)
+            self.assertEqual(result["next_action"], "inspect_run_audit")
+            self.assertEqual(result["next_command"], "python3 -m tools.leaf_author report-run <run_id>")
+            self.assertEqual(result["user_checkpoint"], "manual_operator_decision")
+            self.assertEqual(result["user_loop"]["position"], "audit_failure_triage")
+            self.assertEqual(result["run_audit_summary"]["failed_checks"], ["context_manifest_matches_phase_contract"])
+            self.assertEqual(load_workflow(root, "run-audit-block")["current_phase"], "hypium_draft")
+
     def test_resume_run_auto_safe_does_not_cross_confirmation_boundary(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
