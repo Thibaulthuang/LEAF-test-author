@@ -53,6 +53,8 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
         self.assertIn("batch_audit_summary", command)
         self.assertIn("failed_checks", command)
         self.assertIn("must not dispatch", command)
+        self.assertIn("inspect_batch_audit", command)
+        self.assertIn("next_command", command)
         self.assertIn("focus_plan.action_route", command)
         self.assertIn("action_route.command", command)
         self.assertIn("agent_mode", command)

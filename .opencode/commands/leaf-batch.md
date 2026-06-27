@@ -27,15 +27,20 @@ Examples:
    is non-empty, present the failed checks and `batch_audit_summary.focus_plan`
    to the user; OpenCode must not dispatch `resume-batch` or a selected run
    until the route/audit drift is resolved.
-5. If the report shows safe local work and `batch_audit_summary.failed_checks`
+5. If `resume-batch --auto-safe` returns `block_reason=batch_audit_failed`,
+   treat `next_action=inspect_batch_audit` and `next_command` as the stable
+   route. Present `operator_message`, `user_checkpoint`, `user_loop`,
+   `batch_audit_summary.failed_checks`, and `next_command` to the user before
+   any retry.
+6. If the report shows safe local work and `batch_audit_summary.failed_checks`
    is empty, call
    `python3 -m tools.leaf_author resume-batch <batch_id> --auto-safe`.
-6. It must still stop at user checkpoints, including first plan confirmation
+7. It must still stop at user checkpoints, including first plan confirmation
    and real-device confirmation.
-7. Keep attention scoped to one run at a time. Use the batch report to pick a
+8. Keep attention scoped to one run at a time. Use the batch report to pick a
    `next_run_focus`, then use `/leaf-report <run_id>` or `inspect-run <run_id>`
    before opening run artifacts.
-8. When `resume-batch` returns a `focus_plan`, read
+9. When `resume-batch` returns a `focus_plan`, read
    `focus_plan.action_route` before dispatching the selected run. The route is
    derived from that run's persisted phase, not from the batch conversation.
 
