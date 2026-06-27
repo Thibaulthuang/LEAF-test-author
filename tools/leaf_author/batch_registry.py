@@ -97,6 +97,7 @@ def resume_batch(root: Path, batch_id: str, auto_safe: bool = False) -> dict[str
             "block_reason": "batch_audit_failed",
             "next_action": "inspect_batch_audit",
             "next_command": "python3 -m tools.leaf_author report-batch <batch_id>",
+            "action_route": _batch_audit_failure_action_route(),
             "operator_message": "batch audit failed; inspect batch_audit_summary.failed_checks before resuming this batch.",
             "user_checkpoint": "manual_operator_decision",
             "user_loop": {
@@ -147,6 +148,27 @@ def resume_batch(root: Path, batch_id: str, auto_safe: bool = False) -> dict[str
     if audit_summary:
         payload["batch_audit_summary"] = audit_summary
     return payload
+
+
+def _batch_audit_failure_action_route() -> dict[str, object]:
+    return {
+        "phase": "batch_audit_failed",
+        "next_action": "inspect_batch_audit",
+        "trigger_source": "batch_audit.json",
+        "agent_owner": "leaf-test-author",
+        "agent_mode": AGENT_MODES["leaf-test-author"],
+        "handoff_required": False,
+        "subagent_boundary": "batch_audit_triage",
+        "context_slice": ["batch_audit_summary", "focus_plan"],
+        "allowed_artifacts": ["batch_audit"],
+        "user_checkpoint": "manual_operator_decision",
+        "auto_safe": False,
+        "user_loop": {
+            "position": "audit_failure_triage",
+            "required_input": "inspect batch_audit_summary.failed_checks",
+        },
+        "command": "python3 -m tools.leaf_author report-batch <batch_id>",
+    }
 
 
 def _load_batch(root: Path, batch_id: str) -> dict[str, object]:
