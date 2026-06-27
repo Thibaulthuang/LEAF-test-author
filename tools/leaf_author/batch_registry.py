@@ -300,6 +300,7 @@ def _batch_resume_focus_plan(runs: list[dict[str, object]]) -> dict[str, object]
         "context_slice": summary.get("context_slice", []),
         "allowed_artifacts": summary.get("allowed_artifacts", []),
         "target_policy": normalize_target_policy(summary.get("target_policy")),
+        "specific_question": str(summary.get("specific_question", "")),
         "user_checkpoint": summary.get("user_checkpoint"),
         "user_loop": {
             "position": str(user_loop.get("position", "")),

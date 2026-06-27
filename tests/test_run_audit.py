@@ -833,6 +833,19 @@ class RunAuditTests(unittest.TestCase):
             failed_checks = [check["name"] for check in result["batch_checks"] if not check["passed"]]
             self.assertIn("batch_resume_focus_gui_context", failed_checks)
 
+    def test_audit_batch_fails_when_gui_focus_plan_omits_specific_question(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "打开相机；点击拍照", run_id="audit-focus-gui-question")
+            create_batch(root, "audit-focus-gui-question-batch", ["audit-focus-gui-question"])
+
+            with patch("tools.leaf_author.run_audit.resume_batch", return_value=_batch_resume_view_with_gui_question_drift()):
+                result = audit_batch(root, "audit-focus-gui-question-batch")
+
+            self.assertEqual(result["status"], "failed")
+            failed_checks = [check["name"] for check in result["batch_checks"] if not check["passed"]]
+            self.assertIn("batch_resume_focus_gui_context", failed_checks)
+
     def test_audit_batch_fails_when_focus_plan_agent_handoff_rule_drifts(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -1185,6 +1198,26 @@ def _batch_resume_view_with_gui_context_drift() -> dict[str, object]:
     view["runs"][0]["resume_summary"]["agent_owner"] = "leaf-gui-agent"
     view["runs"][0]["resume_summary"]["agent_mode"] = "focused_subagent"
     view["runs"][0]["resume_summary"]["context_slice"] = ["workflow", "pytest_result"]
+    return view
+
+
+def _batch_resume_view_with_gui_question_drift() -> dict[str, object]:
+    view = _batch_resume_view_for_focus("audit-focus-gui-question")
+    view["focus_plan"]["agent_owner"] = "leaf-gui-agent"
+    view["focus_plan"]["agent_mode"] = "focused_subagent"
+    view["focus_plan"]["handoff_required"] = True
+    view["focus_plan"]["required_inputs"] = ["run_id", "context_manifest", "referenced_artifacts", "specific_question"]
+    view["focus_plan"]["subagent_boundary"] = "read_only_gui_context"
+    view["focus_plan"]["current_phase"] = "pytest_ran"
+    view["focus_plan"]["next_action"] = "collect_gui_context"
+    view["focus_plan"]["context_slice"] = ["workflow", "pytest_result", "ui_tree"]
+    view["focus_plan"]["specific_question"] = ""
+    view["runs"][0]["current_phase"] = "pytest_ran"
+    view["runs"][0]["next_action"] = "collect_gui_context"
+    view["runs"][0]["resume_summary"]["agent_owner"] = "leaf-gui-agent"
+    view["runs"][0]["resume_summary"]["agent_mode"] = "focused_subagent"
+    view["runs"][0]["resume_summary"]["context_slice"] = ["workflow", "pytest_result", "ui_tree"]
+    view["runs"][0]["resume_summary"]["specific_question"] = "Inspect the current UI tree for actionable locator candidates before recording experience."
     return view
 
 

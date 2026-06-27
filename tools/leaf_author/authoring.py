@@ -9,7 +9,7 @@ from tools.leaf_author.experience import export_team_knowledge, record_experienc
 from tools.leaf_author.generator import generate_pytest_case
 from tools.leaf_author.gui_context import collect_gui_context
 from tools.leaf_author.hypium import export_openharmony_test_project, generate_hypium_case, run_hypium_case
-from tools.leaf_author.phase_contract import decide_next_step, write_context_manifest
+from tools.leaf_author.phase_contract import decide_next_step, specific_question_for_decision, write_context_manifest
 from tools.leaf_author.phase_guard import build_agent_handoff_contract, validate_phase_contract
 from tools.leaf_author.planner import build_plan
 from tools.leaf_author.real_device_contract import real_device_decision_contract, real_device_user_loop
@@ -377,6 +377,7 @@ def _resume_summary(decision: dict[str, object]) -> dict[str, object]:
         "trigger_source": decision.get("trigger_source", "workflow.json"),
         "allowed_artifacts": decision.get("allowed_artifacts", []),
         "target_policy": decision.get("target_policy", {}),
+        "specific_question": specific_question_for_decision(decision),
         "user_loop": decision.get("user_loop", {}),
         "action_route": _action_route_for_decision(decision),
     }

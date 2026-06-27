@@ -1095,7 +1095,8 @@ def _batch_resume_checks(resume_view: dict[str, object]) -> list[dict[str, objec
     focus_matches_run = focus_present and _batch_focus_matches_selected_run(focus_plan, resume_view)
     focus_user_boundary = focus_present and _batch_focus_respects_user_boundary(focus_plan)
     focus_gui_context = focus_present and (
-        focus_plan.get("agent_owner") != "leaf-gui-agent" or "ui_tree" in _string_list(focus_plan.get("context_slice"))
+        focus_plan.get("agent_owner") != "leaf-gui-agent"
+        or ("ui_tree" in _string_list(focus_plan.get("context_slice")) and bool(str(focus_plan.get("specific_question", ""))))
     )
     focus_target_policy = focus_present and _target_policy_handoff_ready(focus_plan.get("target_policy"), focus_plan.get("target_policy"))
     focus_agent_handoff_rule = focus_present and _batch_focus_agent_handoff_rule_ready(focus_plan)
@@ -1157,6 +1158,7 @@ def _batch_focus_matches_selected_run(focus_plan: object, resume_view: dict[str,
         and _string_list(focus_plan.get("context_slice")) == _string_list(summary.get("context_slice"))
         and _string_list(focus_plan.get("allowed_artifacts")) == _string_list(summary.get("allowed_artifacts"))
         and focus_plan.get("target_policy") == summary.get("target_policy")
+        and str(focus_plan.get("specific_question", "")) == str(summary.get("specific_question", ""))
         and focus_plan.get("user_checkpoint") == summary.get("user_checkpoint")
         and bool(focus_plan.get("requires_user_confirmation")) == bool(summary.get("requires_user_confirmation"))
         and bool(focus_plan.get("safe_to_auto_continue")) == bool(summary.get("safe_to_auto_continue"))

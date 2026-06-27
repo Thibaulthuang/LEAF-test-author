@@ -7,6 +7,7 @@ from pathlib import Path
 
 from tools.leaf_author.authoring import confirm_plan, start_new_case
 from tools.leaf_author.batch_registry import create_batch, inspect_batch, list_batches, resume_batch
+from tools.leaf_author.workflow import load_workflow, save_workflow
 
 
 class BatchRegistryTests(unittest.TestCase):
@@ -267,6 +268,25 @@ class BatchRegistryTests(unittest.TestCase):
             self.assertEqual(result["focus_plan"]["action_route"]["agent_owner"], "leaf-test-author")
             self.assertEqual(result["focus_plan"]["action_route"]["user_checkpoint"], "first_plan_confirmation")
             self.assertEqual(result["focus_plan"]["action_route"]["command"], "python3 -m tools.leaf_author report-run <run_id>")
+
+    def test_resume_batch_focus_plan_carries_gui_specific_question(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "打开相机；点击拍照", run_id="batch-gui-focus")
+            confirm_plan(root, "batch-gui-focus")
+            workflow = load_workflow(root, "batch-gui-focus")
+            workflow["current_phase"] = "pytest_ran"
+            workflow["artifacts"]["pytest_result"] = ".leaf/runs/batch-gui-focus/pytest_result.json"
+            result_path = root / ".leaf" / "runs" / "batch-gui-focus" / "pytest_result.json"
+            result_path.write_text('{"quality_gate": "DRAFT_STATIC_PASS"}\n', encoding="utf-8")
+            save_workflow(root, workflow)
+            create_batch(root, "camera-batch", ["batch-gui-focus"])
+
+            result = resume_batch(root, "camera-batch")
+
+            self.assertEqual(result["runs"][0]["resume_summary"]["specific_question"], "Inspect the current UI tree for actionable locator candidates before recording experience.")
+            self.assertEqual(result["focus_plan"]["agent_owner"], "leaf-gui-agent")
+            self.assertEqual(result["focus_plan"]["specific_question"], "Inspect the current UI tree for actionable locator candidates before recording experience.")
 
     def test_resume_batch_isolates_unreadable_run_and_continues_safe_runs(self):
         with tempfile.TemporaryDirectory() as tmp:

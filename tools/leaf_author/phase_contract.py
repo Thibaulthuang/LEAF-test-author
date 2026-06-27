@@ -173,11 +173,14 @@ def _effective_user_checkpoint(current_phase: str, confirmed: bool, phase: dict[
     return None
 
 
-def _specific_question_for_decision(decision: dict[str, object]) -> str:
+def specific_question_for_decision(decision: dict[str, object]) -> str:
     value = decision.get("specific_question")
     if isinstance(value, str) and value:
         return value
     return _DEFAULT_SPECIFIC_QUESTIONS.get(str(decision.get("next_action", "")), "")
+
+
+_specific_question_for_decision = specific_question_for_decision
 
 
 def _previous_agent_for_phase(current_phase: str, contract: dict[str, object] | None = None) -> str:
