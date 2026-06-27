@@ -86,6 +86,7 @@ def report_batch(root: Path, batch_id: str) -> dict[str, object]:
         "safe_to_auto_continue": status_counts.get("safe_to_auto_continue", 0),
         "complete": status_counts.get("complete", 0),
         "blocked_or_inspect": status_counts.get("blocked_or_inspect", 0) + (1 if audit_focus else 0),
+        "audit_failed": 1 if audit_focus else 0,
     }
     return {
         "schema_version": "1.0",

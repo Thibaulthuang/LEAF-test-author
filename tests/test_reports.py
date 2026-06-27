@@ -461,6 +461,7 @@ class ReportTests(unittest.TestCase):
             self.assertEqual(result["total_runs"], 2)
             self.assertEqual(result["summary"]["waiting_for_user"], 1)
             self.assertEqual(result["summary"]["safe_to_auto_continue"], 1)
+            self.assertEqual(result["summary"]["audit_failed"], 0)
             self.assertEqual(result["next_run_focus"]["run_id"], "report-safe")
             self.assertEqual(result["runs"][0]["run_id"], "report-wait")
             self.assertEqual(result["runs"][0]["decision_contract"]["target_policy"]["scope"], "system_app_only")
@@ -629,6 +630,7 @@ class ReportTests(unittest.TestCase):
             result = report_batch(root, "report-batch-route")
 
             self.assertEqual(result["summary"]["blocked_or_inspect"], 1)
+            self.assertEqual(result["summary"]["audit_failed"], 1)
             self.assertEqual(result["batch_audit_summary"]["total_checks"], 2)
             self.assertEqual(result["batch_audit_summary"]["passed_checks"], 1)
             self.assertEqual(result["batch_audit_summary"]["failed_checks"], ["batch_resume_focus_action_route"])
