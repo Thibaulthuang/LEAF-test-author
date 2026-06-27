@@ -29,9 +29,11 @@ Report the current LEAF workflow decision state for one run or one batch.
    next step.
 6. For batch reports, also present `batch_audit_summary.total_checks`,
    `batch_audit_summary.passed_checks`, `batch_audit_summary.failed_checks`,
-   and `batch_audit_summary.focus_plan`. If `failed_checks` is non-empty, stop
-   before any resume or subagent dispatch and ask the user to handle the audit
-   failure.
+   `batch_audit_summary.focus_plan`, and `batch_live_device_summary`. Use
+   `batch_live_device_summary` to show whether live-device audit traces were
+   collected, which serials were seen, and which runtime modes were covered. If
+   `failed_checks` is non-empty, stop before any resume or subagent dispatch and
+   ask the user to handle the audit failure.
 7. For batch reports, present each selected run's `run_audit.failed_checks`.
    If `next_run_focus.next_action=inspect_run_audit`, stop before any resume or
    subagent dispatch and ask the user to inspect those failed checks.

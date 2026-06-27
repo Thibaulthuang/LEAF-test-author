@@ -100,6 +100,7 @@ def report_batch(root: Path, batch_id: str) -> dict[str, object]:
         "runtime_evidence_summary": _batch_runtime_evidence_summary(runs),
         "gui_handoff_summary": batch_audit["gui_handoff_summary"],
         "batch_audit_summary": batch_audit["batch_audit_summary"],
+        "batch_live_device_summary": batch_audit["batch_live_device_summary"],
         "ui_tree_summary": _batch_ui_tree_summary(runs),
         "next_run_focus": audit_focus or _next_report_focus(runs),
         "runs": [_batch_report_summary(run) for run in runs],
@@ -128,6 +129,7 @@ def _batch_audit_summary(root: Path, batch_id: str) -> dict[str, object]:
     default = {
         "gui_handoff_summary": _empty_gui_handoff_summary(),
         "batch_audit_summary": _empty_batch_audit_summary(),
+        "batch_live_device_summary": _empty_batch_live_device_summary(),
         "evidence": {},
     }
     if not audit_path.is_file():
@@ -139,11 +141,13 @@ def _batch_audit_summary(root: Path, batch_id: str) -> dict[str, object]:
     if not isinstance(payload, dict):
         return default
     summary = payload.get("gui_handoff_summary")
+    live_device_summary = payload.get("real_device_summary")
     batch_checks = payload.get("batch_checks")
     evidence = {"batch_audit": str(audit_path.relative_to(root))}
     return {
         "gui_handoff_summary": summary if isinstance(summary, dict) else _empty_gui_handoff_summary(),
         "batch_audit_summary": _batch_audit_check_summary(batch_checks, payload.get("focus_plan")),
+        "batch_live_device_summary": live_device_summary if isinstance(live_device_summary, dict) else _empty_batch_live_device_summary(),
         "evidence": evidence,
     }
 
@@ -166,6 +170,16 @@ def _empty_batch_audit_summary() -> dict[str, object]:
         "passed_checks": 0,
         "failed_checks": [],
         "focus_plan": None,
+    }
+
+
+def _empty_batch_live_device_summary() -> dict[str, object]:
+    return {
+        "total_traces": 0,
+        "serials": [],
+        "runtime_modes": [],
+        "live_connected": 0,
+        "live_unavailable": 0,
     }
 
 

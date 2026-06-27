@@ -83,6 +83,7 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
         self.assertIn("repair_workflow", command)
         self.assertIn("failed checks", command)
         self.assertIn("batch_audit_summary", command)
+        self.assertIn("batch_live_device_summary", command)
         self.assertIn("run_audit_summary", command)
         self.assertIn("run_audit.failed_checks", command)
         self.assertIn("inspect_run_audit", command)

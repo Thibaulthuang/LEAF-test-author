@@ -703,6 +703,42 @@ class ReportTests(unittest.TestCase):
             self.assertEqual(result["next_run_focus"]["run_id"], "report-batch-route")
             self.assertEqual(result["next_run_focus"]["failed_checks"], ["batch_resume_focus_action_route"])
 
+    def test_report_batch_includes_live_device_summary_from_batch_audit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "打开相机；点击拍照", run_id="report-batch-live")
+            create_batch(root, "report-batch-live", ["report-batch-live"])
+            audit_dir = root / ".leaf" / "batches" / "report-batch-live"
+            audit_dir.mkdir(parents=True, exist_ok=True)
+            (audit_dir / "batch_audit.json").write_text(
+                json.dumps(
+                    {
+                        "real_device_summary": {
+                            "total_traces": 1,
+                            "serials": ["SERIAL123"],
+                            "runtime_modes": ["direct_smoke"],
+                            "live_connected": 1,
+                            "live_unavailable": 0,
+                        },
+                        "batch_checks": [
+                            {"name": "batch_resume_attention_boundary", "passed": True},
+                        ],
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = report_batch(root, "report-batch-live")
+
+            self.assertEqual(result["batch_live_device_summary"]["total_traces"], 1)
+            self.assertEqual(result["batch_live_device_summary"]["serials"], ["SERIAL123"])
+            self.assertEqual(result["batch_live_device_summary"]["runtime_modes"], ["direct_smoke"])
+            self.assertEqual(result["batch_live_device_summary"]["live_connected"], 1)
+            self.assertEqual(result["batch_live_device_summary"]["live_unavailable"], 0)
+
     def test_cli_report_commands_output_json(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
