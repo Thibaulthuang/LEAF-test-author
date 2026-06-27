@@ -95,6 +95,12 @@ def resume_batch(root: Path, batch_id: str, auto_safe: bool = False) -> dict[str
             "auto_safe": auto_safe,
             "status": "blocked",
             "block_reason": "batch_audit_failed",
+            "operator_message": "batch audit failed; inspect batch_audit_summary.failed_checks before resuming this batch.",
+            "user_checkpoint": "manual_operator_decision",
+            "user_loop": {
+                "position": "audit_failure_triage",
+                "required_input": "inspect batch_audit_summary.failed_checks",
+            },
             "batch_audit_summary": audit_summary,
             "summary": {
                 "advanced": 0,

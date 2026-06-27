@@ -195,6 +195,10 @@ class BatchRegistryTests(unittest.TestCase):
 
             self.assertEqual(result["status"], "blocked")
             self.assertEqual(result["block_reason"], "batch_audit_failed")
+            self.assertIn("batch audit failed", result["operator_message"])
+            self.assertEqual(result["user_checkpoint"], "manual_operator_decision")
+            self.assertEqual(result["user_loop"]["position"], "audit_failure_triage")
+            self.assertEqual(result["user_loop"]["required_input"], "inspect batch_audit_summary.failed_checks")
             self.assertEqual(result["batch_audit_summary"]["failed_checks"], ["batch_resume_focus_action_route"])
             self.assertEqual(result["focus_plan"]["selected_run_id"], "batch-audit-safe")
             self.assertEqual(result["summary"]["advanced"], 0)
