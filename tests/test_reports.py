@@ -517,6 +517,37 @@ class ReportTests(unittest.TestCase):
             self.assertIn("error", bad)
             self.assertEqual(result["next_run_focus"]["run_id"], "report-bad")
 
+    def test_report_batch_surfaces_run_audit_failures_as_inspection_focus(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "打开相机", run_id="report-audit-focus")
+            create_batch(root, "report-batch-audit-focus", ["report-audit-focus"])
+            audit_path = root / ".leaf" / "runs" / "report-audit-focus" / "run_audit.json"
+            audit_path.write_text(
+                json.dumps(
+                    {
+                        "status": "failed",
+                        "checks": [
+                            {"name": "context_manifest_matches_phase_contract", "passed": False},
+                        ],
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = report_batch(root, "report-batch-audit-focus")
+
+            self.assertEqual(result["summary"]["blocked_or_inspect"], 1)
+            self.assertEqual(result["next_run_focus"]["run_id"], "report-audit-focus")
+            self.assertEqual(result["next_run_focus"]["focus_source"], "run-audit")
+            self.assertEqual(result["next_run_focus"]["next_action"], "inspect_run_audit")
+            self.assertEqual(result["next_run_focus"]["failed_checks"], ["context_manifest_matches_phase_contract"])
+            self.assertEqual(result["runs"][0]["run_audit"]["status"], "failed")
+            self.assertEqual(result["runs"][0]["run_audit"]["failed_checks"], ["context_manifest_matches_phase_contract"])
+
     def test_report_batch_includes_lightweight_real_device_preflight_summary(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

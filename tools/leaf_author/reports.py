@@ -718,6 +718,8 @@ def _next_command(
 def _report_status(run: dict[str, object]) -> str:
     if run.get("current_phase") == "complete":
         return "complete"
+    if _run_audit_failed(run):
+        return "blocked_or_inspect"
     if run.get("current_phase") == "unreadable" or run.get("next_action") == "repair_workflow":
         return "blocked_or_inspect"
     if run.get("safe_to_auto_continue"):
@@ -731,6 +733,14 @@ def _report_batch_run(root: Path, run_summary: dict[str, object]) -> dict[str, o
     if run_summary.get("current_phase") == "unreadable" or isinstance(run_summary.get("error"), dict):
         return _unreadable_run_report(root, run_summary)
     return report_run(root, str(run_summary["run_id"]))
+
+
+def _run_audit_failed(run: dict[str, object]) -> bool:
+    run_audit = run.get("run_audit_summary")
+    if not isinstance(run_audit, dict):
+        return False
+    failed_checks = run_audit.get("failed_checks")
+    return isinstance(failed_checks, list) and bool(failed_checks)
 
 
 def _unreadable_run_report(root: Path, run_summary: dict[str, object]) -> dict[str, object]:
@@ -780,6 +790,15 @@ def _unreadable_run_report(root: Path, run_summary: dict[str, object]) -> dict[s
 
 def _next_report_focus(runs: list[dict[str, object]]) -> dict[str, object] | None:
     for run in runs:
+        if _run_audit_failed(run):
+            focus = _batch_report_summary(run)
+            run_audit = run.get("run_audit_summary")
+            run_audit = run_audit if isinstance(run_audit, dict) else {}
+            focus["focus_source"] = "run-audit"
+            focus["next_action"] = "inspect_run_audit"
+            focus["failed_checks"] = _string_list(run_audit.get("failed_checks"))
+            return focus
+    for run in runs:
         if run.get("current_phase") == "unreadable" or run.get("next_action") == "repair_workflow":
             return _batch_report_summary(run)
     for status in ("safe_to_auto_continue", "waiting_for_user", "blocked_or_inspect"):
@@ -812,6 +831,7 @@ def _batch_report_summary(run: dict[str, object]) -> dict[str, object]:
     real_device_preflight = run.get("real_device_preflight")
     runtime_evidence = run.get("runtime_evidence_summary")
     gui_handoff = run.get("gui_handoff")
+    run_audit = run.get("run_audit_summary")
     summary = {
         "run_id": run.get("run_id"),
         "domain": run.get("domain"),
@@ -828,6 +848,7 @@ def _batch_report_summary(run: dict[str, object]) -> dict[str, object]:
         "real_device_preflight": _batch_preflight_summary(real_device_preflight if isinstance(real_device_preflight, dict) else None),
         "runtime_evidence": _batch_runtime_evidence_detail(runtime_evidence if isinstance(runtime_evidence, dict) else None),
         "gui_handoff": _batch_gui_handoff_detail(gui_handoff if isinstance(gui_handoff, dict) else None),
+        "run_audit": _batch_run_audit_detail(run_audit if isinstance(run_audit, dict) else None),
     }
     if isinstance(run.get("error"), dict):
         summary["error"] = run["error"]
@@ -846,6 +867,18 @@ def _batch_preflight_summary(preflight: dict[str, object] | None) -> dict[str, o
         "approval_status": preflight.get("approval_status"),
         "required_approval_token": preflight.get("required_approval_token"),
         "input_status": preflight.get("input_status"),
+    }
+
+
+def _batch_run_audit_detail(run_audit: dict[str, object] | None) -> dict[str, object] | None:
+    if not run_audit:
+        return None
+    return {
+        "artifact": run_audit.get("artifact"),
+        "status": run_audit.get("status"),
+        "total_checks": run_audit.get("total_checks"),
+        "passed_checks": run_audit.get("passed_checks"),
+        "failed_checks": _string_list(run_audit.get("failed_checks")),
     }
 
 
