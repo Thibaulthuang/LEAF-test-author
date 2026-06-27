@@ -17,6 +17,11 @@ Resume an interrupted LEAF authoring run.
 5. It must still stop at user checkpoints, including the first plan confirmation and any real-device confirmation.
 6. Do not repeat high-risk actions unless the workflow state and user approval allow them.
 7. Read `resume_summary.action_route` before deciding the next dispatch. The route is derived from the persisted `workflow.json` phase and the shared handoff contract; do not dispatch from memory or from the chat transcript alone.
+8. If the result returns `block_reason=run_audit_failed`, treat
+   `next_action=inspect_run_audit` and `next_command` as the stable route.
+   Present `operator_message`, `user_checkpoint`, `user_loop`,
+   `run_audit_summary.failed_checks`, and `next_command` to the user before
+   any retry.
 
 The expected deterministic call is:
 

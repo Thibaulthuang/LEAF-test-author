@@ -41,6 +41,9 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
         self.assertIn("subagent_boundary", command)
         self.assertIn("user_checkpoint", command)
         self.assertIn("must still stop", command)
+        self.assertIn("run_audit_failed", command)
+        self.assertIn("inspect_run_audit", command)
+        self.assertIn("run_audit_summary.failed_checks", command)
 
     def test_leaf_batch_documents_multi_case_entrypoint(self):
         root = Path(__file__).resolve().parents[1]
@@ -52,6 +55,8 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
         self.assertIn("report-batch", command)
         self.assertIn("batch_audit_summary", command)
         self.assertIn("failed_checks", command)
+        self.assertIn("run_audit.failed_checks", command)
+        self.assertIn("inspect_run_audit", command)
         self.assertIn("must not dispatch", command)
         self.assertIn("inspect_batch_audit", command)
         self.assertIn("next_command", command)
@@ -78,6 +83,9 @@ class OpenCodeWorkflowDocsTests(unittest.TestCase):
         self.assertIn("repair_workflow", command)
         self.assertIn("failed checks", command)
         self.assertIn("batch_audit_summary", command)
+        self.assertIn("run_audit_summary", command)
+        self.assertIn("run_audit.failed_checks", command)
+        self.assertIn("inspect_run_audit", command)
         self.assertIn("failed_checks", command)
         self.assertIn("user_checkpoint", command)
         self.assertIn("user_loop", command)
