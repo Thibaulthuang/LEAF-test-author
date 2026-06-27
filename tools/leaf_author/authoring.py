@@ -494,6 +494,7 @@ def _run_audit_failure_action_route() -> dict[str, object]:
 
 def _blocked_by_phase_guard(root: Path, run_id: str, guard: dict[str, object]) -> dict[str, object]:
     workflow = load_workflow(root, run_id)
+    action_route = _phase_guard_failure_action_route()
     return {
         "run_id": run_id,
         "status": "blocked",
@@ -501,6 +502,7 @@ def _blocked_by_phase_guard(root: Path, run_id: str, guard: dict[str, object]) -
         "current_phase": workflow.get("current_phase"),
         "confirmed_plan": bool(workflow.get("confirmed_plan", False)),
         "next_action": "fix_phase_contract",
+        "action_route": action_route,
         "phase_guard": guard,
         "resume_summary": {
             "requires_user_confirmation": True,
@@ -516,8 +518,30 @@ def _blocked_by_phase_guard(root: Path, run_id: str, guard: dict[str, object]) -
                 "position": "manual_triage",
                 "required_input": "fix phase contract",
             },
+            "action_route": action_route,
         },
         "workflow_path": str(root / ".leaf" / "runs" / run_id / "workflow.json"),
+    }
+
+
+def _phase_guard_failure_action_route() -> dict[str, object]:
+    return {
+        "phase": "phase_contract_unstable",
+        "next_action": "fix_phase_contract",
+        "trigger_source": "phase_guard",
+        "agent_owner": "leaf-test-author",
+        "agent_mode": "orchestrator",
+        "handoff_required": False,
+        "subagent_boundary": "phase_contract_triage",
+        "context_slice": ["workflow", "phase_guard"],
+        "allowed_artifacts": ["workflow"],
+        "user_checkpoint": "manual_operator_decision",
+        "auto_safe": False,
+        "user_loop": {
+            "position": "manual_triage",
+            "required_input": "fix phase contract",
+        },
+        "command": "python3 -m tools.leaf_author phase-guard",
     }
 
 

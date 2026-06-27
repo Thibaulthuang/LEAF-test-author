@@ -747,6 +747,14 @@ class LeafAuthorWorkflowTests(unittest.TestCase):
 
             self.assertEqual(result["status"], "blocked")
             self.assertEqual(result["block_reason"], "phase_contract_unstable")
+            self.assertEqual(result["action_route"]["next_action"], "fix_phase_contract")
+            self.assertEqual(result["action_route"]["command"], "python3 -m tools.leaf_author phase-guard")
+            self.assertEqual(result["action_route"]["agent_owner"], "leaf-test-author")
+            self.assertEqual(result["action_route"]["agent_mode"], "orchestrator")
+            self.assertEqual(result["action_route"]["handoff_required"], False)
+            self.assertEqual(result["action_route"]["subagent_boundary"], "phase_contract_triage")
+            self.assertEqual(result["action_route"]["context_slice"], ["workflow", "phase_guard"])
+            self.assertEqual(result["action_route"]["user_checkpoint"], "manual_operator_decision")
             self.assertEqual(result["phase_guard"]["issues"], ["hypium_draft: missing trigger_source"])
             self.assertEqual(load_workflow(root, "run-guard-block")["current_phase"], "hypium_draft")
 
@@ -769,6 +777,9 @@ class LeafAuthorWorkflowTests(unittest.TestCase):
 
             self.assertEqual(result["status"], "blocked")
             self.assertEqual(result["block_reason"], "phase_contract_unstable")
+            self.assertEqual(result["action_route"]["next_action"], "fix_phase_contract")
+            self.assertEqual(result["action_route"]["command"], "python3 -m tools.leaf_author phase-guard")
+            self.assertEqual(result["action_route"]["subagent_boundary"], "phase_contract_triage")
             self.assertEqual(result["stages"], [])
             self.assertEqual(load_workflow(root, "run-advance-guard-block")["current_phase"], "hypium_draft")
 
