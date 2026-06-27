@@ -563,6 +563,7 @@ def _context_manifest_summary(root: Path, evidence: dict[str, str]) -> dict[str,
         "handoff_required": handoff.get("handoff_required"),
         "subagent_boundary": handoff.get("subagent_boundary"),
         "required_inputs": handoff.get("required_inputs") if isinstance(handoff.get("required_inputs"), list) else [],
+        "specific_question": handoff.get("specific_question"),
     }
 
 

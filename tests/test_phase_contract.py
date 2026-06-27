@@ -80,6 +80,10 @@ class PhaseContractTests(unittest.TestCase):
             self.assertEqual(report["decision_contract"]["agent_owner"], "leaf-gui-agent")
             self.assertEqual(report["user_loop"]["position"], "observe_safe_local_progress")
             self.assertEqual(report["evidence"]["context_manifest"], ".leaf/runs/contract-run/context_manifest.json")
+            self.assertEqual(
+                report["context_manifest"]["specific_question"],
+                "Inspect the current UI tree for actionable locator candidates before recording experience.",
+            )
 
     def test_context_manifest_records_attention_boundary_and_artifact_refs(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -127,6 +131,7 @@ class PhaseContractTests(unittest.TestCase):
                 ["run_id", "context_manifest", "referenced_artifacts", "specific_question"],
             )
             self.assertEqual(payload["handoff"]["next_action"], "collect_gui_context")
+            self.assertEqual(payload["handoff"]["specific_question"], "Inspect the current UI tree for actionable locator candidates before recording experience.")
             self.assertEqual(payload["handoff"]["attention_boundary"], "one_active_run")
             self.assertEqual(payload["handoff"]["artifact_loading"], "on_demand")
             self.assertEqual(payload["handoff"]["context_slice"], ["workflow", "pytest_result", "ui_tree"])

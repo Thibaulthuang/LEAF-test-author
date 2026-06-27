@@ -22,6 +22,10 @@ _DEFAULT_MESSAGES = {
     "complete": "Workflow is complete.",
 }
 
+_DEFAULT_SPECIFIC_QUESTIONS = {
+    "collect_gui_context": "Inspect the current UI tree for actionable locator candidates before recording experience.",
+}
+
 
 def load_phase_contract(root: Path | None = None) -> dict[str, object]:
     repo_root = root or Path(__file__).resolve().parents[2]
@@ -119,6 +123,7 @@ def write_context_manifest(root: Path, run_id: str, decision: dict[str, object] 
         "trigger_source": decision.get("trigger_source"),
         "current_phase": decision.get("current_phase"),
         "next_action": decision.get("next_action"),
+        "specific_question": _specific_question_for_decision(decision),
         "attention_boundary": "one_active_run",
         "artifact_loading": "on_demand",
         "context_slice": decision.get("context_slice", []),
@@ -166,6 +171,13 @@ def _effective_user_checkpoint(current_phase: str, confirmed: bool, phase: dict[
     if isinstance(checkpoint, str) and checkpoint:
         return checkpoint
     return None
+
+
+def _specific_question_for_decision(decision: dict[str, object]) -> str:
+    value = decision.get("specific_question")
+    if isinstance(value, str) and value:
+        return value
+    return _DEFAULT_SPECIFIC_QUESTIONS.get(str(decision.get("next_action", "")), "")
 
 
 def _previous_agent_for_phase(current_phase: str, contract: dict[str, object] | None = None) -> str:
