@@ -633,6 +633,10 @@ class ReportTests(unittest.TestCase):
             self.assertEqual(result["batch_audit_summary"]["failed_checks"], ["batch_resume_focus_action_route"])
             self.assertEqual(result["batch_audit_summary"]["focus_plan"]["selected_run_id"], "report-batch-route")
             self.assertEqual(result["batch_audit_summary"]["focus_plan"]["action_route"]["command"], "bad-command")
+            self.assertEqual(result["next_run_focus"]["focus_source"], "batch-audit")
+            self.assertEqual(result["next_run_focus"]["next_action"], "inspect_batch_audit")
+            self.assertEqual(result["next_run_focus"]["run_id"], "report-batch-route")
+            self.assertEqual(result["next_run_focus"]["failed_checks"], ["batch_resume_focus_action_route"])
 
     def test_cli_report_commands_output_json(self):
         with tempfile.TemporaryDirectory() as tmp:

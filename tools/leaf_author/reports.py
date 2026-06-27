@@ -80,6 +80,7 @@ def report_batch(root: Path, batch_id: str) -> dict[str, object]:
     runs = [_report_batch_run(root, run) for run in batch["runs"]]
     status_counts = Counter(_report_status(run) for run in runs)
     batch_audit = _batch_audit_summary(root, batch_id)
+    audit_focus = _batch_audit_focus(batch_audit["batch_audit_summary"])
     return {
         "schema_version": "1.0",
         "batch_id": batch_id,
@@ -96,7 +97,7 @@ def report_batch(root: Path, batch_id: str) -> dict[str, object]:
         "gui_handoff_summary": batch_audit["gui_handoff_summary"],
         "batch_audit_summary": batch_audit["batch_audit_summary"],
         "ui_tree_summary": _batch_ui_tree_summary(runs),
-        "next_run_focus": _next_report_focus(runs),
+        "next_run_focus": audit_focus or _next_report_focus(runs),
         "runs": [_batch_report_summary(run) for run in runs],
         "evidence": batch_audit["evidence"],
         "context_policy": {
@@ -752,6 +753,25 @@ def _next_report_focus(runs: list[dict[str, object]]) -> dict[str, object] | Non
             if _report_status(run) == status:
                 return _batch_report_summary(run)
     return None
+
+
+def _batch_audit_focus(batch_audit_summary: object) -> dict[str, object] | None:
+    if not isinstance(batch_audit_summary, dict):
+        return None
+    failed_checks = batch_audit_summary.get("failed_checks")
+    if not isinstance(failed_checks, list) or not failed_checks:
+        return None
+    focus_plan = batch_audit_summary.get("focus_plan")
+    focus_plan = focus_plan if isinstance(focus_plan, dict) else {}
+    selected_run_id = focus_plan.get("selected_run_id")
+    return {
+        "run_id": selected_run_id,
+        "focus_source": "batch-audit",
+        "next_action": "inspect_batch_audit",
+        "next_command": "python3 -m tools.leaf_author report-batch <batch_id>",
+        "failed_checks": [str(check) for check in failed_checks],
+        "focus_plan": focus_plan,
+    }
 
 
 def _batch_report_summary(run: dict[str, object]) -> dict[str, object]:
