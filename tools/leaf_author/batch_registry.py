@@ -95,6 +95,8 @@ def resume_batch(root: Path, batch_id: str, auto_safe: bool = False) -> dict[str
             "auto_safe": auto_safe,
             "status": "blocked",
             "block_reason": "batch_audit_failed",
+            "next_action": "inspect_batch_audit",
+            "next_command": "python3 -m tools.leaf_author report-batch <batch_id>",
             "operator_message": "batch audit failed; inspect batch_audit_summary.failed_checks before resuming this batch.",
             "user_checkpoint": "manual_operator_decision",
             "user_loop": {
