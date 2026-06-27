@@ -81,17 +81,18 @@ def report_batch(root: Path, batch_id: str) -> dict[str, object]:
     status_counts = Counter(_report_status(run) for run in runs)
     batch_audit = _batch_audit_summary(root, batch_id)
     audit_focus = _batch_audit_focus(batch_audit["batch_audit_summary"])
+    summary = {
+        "waiting_for_user": status_counts.get("waiting_for_user", 0),
+        "safe_to_auto_continue": status_counts.get("safe_to_auto_continue", 0),
+        "complete": status_counts.get("complete", 0),
+        "blocked_or_inspect": status_counts.get("blocked_or_inspect", 0) + (1 if audit_focus else 0),
+    }
     return {
         "schema_version": "1.0",
         "batch_id": batch_id,
         "title": batch.get("title", batch_id),
         "total_runs": len(runs),
-        "summary": {
-            "waiting_for_user": status_counts.get("waiting_for_user", 0),
-            "safe_to_auto_continue": status_counts.get("safe_to_auto_continue", 0),
-            "complete": status_counts.get("complete", 0),
-            "blocked_or_inspect": status_counts.get("blocked_or_inspect", 0),
-        },
+        "summary": summary,
         "real_device_summary": _batch_real_device_summary(runs),
         "runtime_evidence_summary": _batch_runtime_evidence_summary(runs),
         "gui_handoff_summary": batch_audit["gui_handoff_summary"],

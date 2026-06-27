@@ -628,6 +628,7 @@ class ReportTests(unittest.TestCase):
 
             result = report_batch(root, "report-batch-route")
 
+            self.assertEqual(result["summary"]["blocked_or_inspect"], 1)
             self.assertEqual(result["batch_audit_summary"]["total_checks"], 2)
             self.assertEqual(result["batch_audit_summary"]["passed_checks"], 1)
             self.assertEqual(result["batch_audit_summary"]["failed_checks"], ["batch_resume_focus_action_route"])
