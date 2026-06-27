@@ -66,6 +66,37 @@ class ReportTests(unittest.TestCase):
 
             self.assertEqual(result["evidence"]["workflow_diagnostics"], ".leaf/runs/report-diag/workflow_diagnostics.json")
 
+    def test_report_run_summarizes_run_audit_failures_when_present(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            start_new_case(root, "camera", "打开相机", run_id="report-audit")
+            run_dir = root / ".leaf" / "runs" / "report-audit"
+            audit_path = run_dir / "run_audit.json"
+            audit_path.write_text(
+                json.dumps(
+                    {
+                        "status": "failed",
+                        "checks": [
+                            {"name": "phase_guard", "passed": True},
+                            {"name": "context_manifest_matches_phase_contract", "passed": False},
+                        ],
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = report_run(root, "report-audit")
+
+            self.assertEqual(result["evidence"]["run_audit"], ".leaf/runs/report-audit/run_audit.json")
+            self.assertEqual(result["run_audit_summary"]["artifact"], ".leaf/runs/report-audit/run_audit.json")
+            self.assertEqual(result["run_audit_summary"]["status"], "failed")
+            self.assertEqual(result["run_audit_summary"]["total_checks"], 2)
+            self.assertEqual(result["run_audit_summary"]["passed_checks"], 1)
+            self.assertEqual(result["run_audit_summary"]["failed_checks"], ["context_manifest_matches_phase_contract"])
+
     def test_report_run_returns_repair_prompt_for_unreadable_workflow(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

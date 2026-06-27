@@ -34,6 +34,7 @@ def report_run(root: Path, run_id: str) -> dict[str, object]:
         real_device_preflight,
         latest_quality_gate,
     )
+    run_audit_summary = _run_audit_summary(root, evidence)
     gui_handoff = _gui_handoff_summary(root, evidence)
     safe_to_auto_continue = bool(isinstance(resume_summary, dict) and resume_summary.get("safe_to_auto_continue")) and not approval_required and not input_required
     user_action_required = bool(isinstance(resume_summary, dict) and resume_summary.get("requires_user_confirmation")) or bool(approval_required) or bool(input_required)
@@ -65,6 +66,7 @@ def report_run(root: Path, run_id: str) -> dict[str, object]:
         "device_selection": device_selection,
         "real_device_preflight": real_device_preflight,
         "runtime_evidence_summary": runtime_evidence_summary,
+        "run_audit_summary": run_audit_summary,
         "gui_handoff": gui_handoff,
         "evidence": evidence,
         "context_policy": {
@@ -187,6 +189,35 @@ def _add_conventional_evidence(root: Path, run_id: str, evidence: dict[str, str]
     ui_tree_diagnostics = root / ".leaf" / "runs" / run_id / "ui_tree_diagnostics.json"
     if ui_tree_diagnostics.is_file():
         evidence["ui_tree_diagnostics"] = str(ui_tree_diagnostics.relative_to(root))
+    run_audit = root / ".leaf" / "runs" / run_id / "run_audit.json"
+    if run_audit.is_file():
+        evidence["run_audit"] = str(run_audit.relative_to(root))
+
+
+def _run_audit_summary(root: Path, evidence: dict[str, str]) -> dict[str, object] | None:
+    value = evidence.get("run_audit")
+    if not isinstance(value, str) or not value:
+        return None
+    path = root / value
+    if not path.is_file():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    checks = payload.get("checks")
+    checks = checks if isinstance(checks, list) else []
+    normalized_checks = [check for check in checks if isinstance(check, dict)]
+    failed = [str(check.get("name")) for check in normalized_checks if check.get("name") and not check.get("passed")]
+    return {
+        "artifact": value,
+        "status": str(payload.get("status", "")),
+        "total_checks": len(normalized_checks),
+        "passed_checks": sum(1 for check in normalized_checks if check.get("passed") is True),
+        "failed_checks": failed,
+    }
 
 
 def _latest_quality_gate(root: Path, domain: str, artifacts: dict[str, object]) -> str:
