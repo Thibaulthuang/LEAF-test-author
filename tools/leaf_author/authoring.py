@@ -459,6 +459,7 @@ def _blocked_by_run_audit(root: Path, run_id: str, payload: dict[str, object], a
         "block_reason": "run_audit_failed",
         "next_action": "inspect_run_audit",
         "next_command": "python3 -m tools.leaf_author report-run <run_id>",
+        "action_route": _run_audit_failure_action_route(),
         "operator_message": "run audit failed; inspect run_audit_summary.failed_checks before auto-resuming this run.",
         "user_checkpoint": "manual_operator_decision",
         "user_loop": {
@@ -467,6 +468,27 @@ def _blocked_by_run_audit(root: Path, run_id: str, payload: dict[str, object], a
         },
         "run_audit_summary": audit_summary,
         "workflow_path": str(root / ".leaf" / "runs" / run_id / "workflow.json"),
+    }
+
+
+def _run_audit_failure_action_route() -> dict[str, object]:
+    return {
+        "phase": "run_audit_failed",
+        "next_action": "inspect_run_audit",
+        "trigger_source": "run_audit.json",
+        "agent_owner": "leaf-test-author",
+        "agent_mode": "orchestrator",
+        "handoff_required": False,
+        "subagent_boundary": "run_audit_triage",
+        "context_slice": ["run_audit_summary", "workflow"],
+        "allowed_artifacts": ["run_audit", "workflow"],
+        "user_checkpoint": "manual_operator_decision",
+        "auto_safe": False,
+        "user_loop": {
+            "position": "audit_failure_triage",
+            "required_input": "inspect run_audit_summary.failed_checks",
+        },
+        "command": "python3 -m tools.leaf_author report-run <run_id>",
     }
 
 
